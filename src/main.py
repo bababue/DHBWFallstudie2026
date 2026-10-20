@@ -16,7 +16,7 @@ INTERVAL = 3
 
 # Texte, die nacheinander angezeigt werden
 SEITEN = [
-    ["Hallo!", "Raspberry Pi 5"],
+    ["Hallo!", "Rezwan ist ein kleiner gooner!"],
     ["OLED Display", "0.96 Zoll", "128 x 64 Pixel"],
     ["Mein Projekt", "Python + I2C"],
     ["GitHub Deployment", "Laeuft!"]
