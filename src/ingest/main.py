@@ -1,51 +1,54 @@
 
-"""Zeigt Shrek auf dem OLED des Raspberry Pi."""
+"""Zeigt den gemessenen Abstand auf dem OLED des Raspberry Pi."""
 
 import time
-from pathlib import Path
 
+from gpiozero import DistanceSensor
+from gpiozero.pins.lgpio import LGPIOFactory
 from luma.core.interface.serial import i2c
+from luma.core.render import canvas
 from luma.oled.device import ssd1306
-from PIL import Image, ImageOps
+from PIL import ImageFont
 
 
 OLED_ADDRESS = 0x3C
 OLED_WIDTH = 128
 OLED_HEIGHT = 64
-BILD_PFAD = Path(__file__).with_name("shrek.png")
+TRIGGER_GPIO = 5
+ECHO_GPIO = 6
 
 
-def lade_bild():
-    """Bereitet das lokale Shrek-Bild fuer das OLED auf."""
-    with Image.open(BILD_PFAD) as quelle:
-        hintergrund = Image.new("RGBA", quelle.size, "white")
-        hintergrund.alpha_composite(quelle.convert("RGBA"))
-        ausschnitt = ImageOps.fit(
-            hintergrund.convert("L"),
-            (OLED_WIDTH, OLED_HEIGHT),
-            method=Image.LANCZOS,
-            centering=(0.5, 0.12),
-        )
-        return ImageOps.autocontrast(ausschnitt).convert("1")
+def lade_schriftgroesse(groesse):
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", groesse)
+    except OSError:
+        return ImageFont.load_default()
 
 
 def main():
     serial = i2c(port=1, address=OLED_ADDRESS)
     display = ssd1306(serial, width=OLED_WIDTH, height=OLED_HEIGHT)
-    bild = lade_bild()
-    display.clear()
-    print("Shrek wird alle 10 Sekunden kurz angezeigt")
+    sensor = DistanceSensor(
+        echo=ECHO_GPIO,
+        trigger=TRIGGER_GPIO,
+        max_distance=4,
+        queue_len=5,
+        pin_factory=LGPIOFactory(),
+    )
+    wert_schrift = lade_schriftgroesse(23)
+    print("Abstandssensor gestartet")
 
     try:
         while True:
-            time.sleep(10)
-            display.display(bild)
+            abstand_cm = sensor.distance * 100
+            with canvas(display) as draw:
+                draw.text((4, 19), f"{abstand_cm:.1f} cm", font=wert_schrift, fill="white")
             time.sleep(1)
-            display.clear()
     except KeyboardInterrupt:
         print("Programm beendet")
     finally:
         display.clear()
+        sensor.close()
 
 
 if __name__ == "__main__":
