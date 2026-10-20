@@ -3,3 +3,4 @@ Pillow
 gpiozero>=2.0.1.post3
 adafruit-lgpio==0.2.2.0
 adafruit-circuitpython-scd4x
+adafruit-extended-bus

@@ -4,7 +4,7 @@
 import time
 
 import adafruit_scd4x
-import board
+from adafruit_extended_bus import ExtendedI2C
 from gpiozero import DistanceSensor
 from gpiozero.pins.lgpio import LGPIOFactory
 from luma.core.interface.serial import i2c
@@ -43,7 +43,7 @@ def main():
     co2_sensor = None
 
     try:
-        co2_sensor = adafruit_scd4x.SCD4X(board.I2C())
+        co2_sensor = adafruit_scd4x.SCD4X(ExtendedI2C(1))
         co2_sensor.start_periodic_measurement()
         print("Abstands- und CO2-Sensor gestartet")
 

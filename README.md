@@ -22,7 +22,7 @@ cp src/visualisation/.env .env
 
 Falls es keine bisherige `.env` gibt, `cp .env.example .env` ausführen und in `.env` `INFLUXDB_PASSWORD`, `INFLUXDB_ADMIN_TOKEN` sowie `GRAFANA_ADMIN_PASSWORD` setzen. Die `.env` wird nicht in Git eingecheckt. Bei abweichender Benutzer-ID für Grafana `GRAFANA_UID` und `GRAFANA_GID` anpassen.
 
-Für OLED und SCD41 muss I²C auf dem Pi aktiviert sein. Beide nutzen denselben I²C-Bus; der SCD41 hat standardmäßig Adresse `0x62`, das OLED hier `0x3C`. Der Container erhält `/dev/i2c-1` sowie den GPIO-Chip. Für einen aktuellen Pi 5 ist `/dev/gpiochip0` voreingestellt; falls der zuständige Chip auf diesem Pi `/dev/gpiochip4` heißt, `GPIOCHIP_DEVICE=/dev/gpiochip4` in `.env` setzen. Die Echo-Leitung des Abstandssensors darf am GPIO nur 3,3 V liefern. Der erste CO₂-Wert erscheint nach etwa fünf Sekunden.
+Für OLED und SCD41 muss I²C auf dem Pi aktiviert sein. Beide nutzen denselben I²C-Bus; der SCD41 hat standardmäßig Adresse `0x62`, das OLED hier `0x3C`. Das Python-Skript öffnet für den SCD41 direkt `/dev/i2c-1`, damit im Container keine Board-Erkennung nötig ist. Der Container erhält diesen Bus sowie den GPIO-Chip. Für einen aktuellen Pi 5 ist `/dev/gpiochip0` voreingestellt; falls der zuständige Chip auf diesem Pi `/dev/gpiochip4` heißt, `GPIOCHIP_DEVICE=/dev/gpiochip4` in `.env` setzen. Die Echo-Leitung des Abstandssensors darf am GPIO nur 3,3 V liefern. Der erste CO₂-Wert erscheint nach etwa fünf Sekunden.
 
 Dann die Container starten:
 
