@@ -33,15 +33,15 @@ def main():
     serial = i2c(port=1, address=OLED_ADDRESS)
     display = ssd1306(serial, width=OLED_WIDTH, height=OLED_HEIGHT)
     bild = lade_bild()
-    display.display(bild)
-    print("Shrek wird auf dem OLED angezeigt")
+    display.clear()
+    print("Shrek wird alle 10 Sekunden kurz angezeigt")
 
     try:
         while True:
-            time.sleep(9)
-            display.clear()
-            time.sleep(1)
+            time.sleep(10)
             display.display(bild)
+            time.sleep(1)
+            display.clear()
     except KeyboardInterrupt:
         print("Programm beendet")
     finally:
