@@ -18,7 +18,7 @@ INTERVAL = 3
 SEITEN = [
     ["Hallo!", "Rezwan ist ein kleiner gooner!"],
     ["OLED Display", "0.96 Zoll", "128 x 64 Pixel"],
-    ["Mein Projekt", "Python + I2C"],
+    ["Mein Projekt", "Rezwan abfucken"],
     ["GitHub Deployment", "Laeuft!"]
 ]
 
