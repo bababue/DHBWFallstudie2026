@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="/home/moos/sensor-app"
-BRANCH="main"
+REPO="/home/moos/DHBWFallstudie2026"
+BRANCH="master"
 
 echo "Checking github for updates"
 
