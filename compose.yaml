@@ -1,4 +1,13 @@
 services:
+  ingest:
+    build: ./src/ingest
+    restart: unless-stopped
+    devices:
+      - /dev/i2c-1:/dev/i2c-1
+      - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
+    volumes:
+      - /proc/device-tree:/proc/device-tree:ro
+
   influxdb:
     image: influxdb:2.7.11
     restart: unless-stopped
@@ -12,8 +21,8 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:?Set INFLUXDB_BUCKET in .env}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?Set INFLUXDB_ADMIN_TOKEN in .env}
     volumes:
-      - ./influxdb/data:/var/lib/influxdb2
-      - ./influxdb/config:/etc/influxdb2
+      - ./src/visualisation/influxdb/data:/var/lib/influxdb2
+      - ./src/visualisation/influxdb/config:/etc/influxdb2
 
   grafana:
     image: grafana/grafana:13.2.2
@@ -25,7 +34,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
     volumes:
-      - ./grafana/data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./src/visualisation/grafana/data:/var/lib/grafana
+      - ./src/visualisation/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - influxdb
