@@ -1,12 +1,9 @@
 
-"""Zeigt den neuesten XKCD-Comic auf dem OLED des Raspberry Pi."""
+"""Zeigt Shrek auf dem OLED des Raspberry Pi."""
 
-from io import BytesIO
 import time
+from pathlib import Path
 
-import requests
-from gpiozero import PWMOutputDevice
-from gpiozero.pins.lgpio import LGPIOFactory
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 from PIL import Image, ImageOps
@@ -15,63 +12,32 @@ from PIL import Image, ImageOps
 OLED_ADDRESS = 0x3C
 OLED_WIDTH = 128
 OLED_HEIGHT = 64
-XKCD_API = "https://xkcd.com/info.0.json"
-UPDATE_INTERVAL = 30 * 60
-RETRY_INTERVAL = 5 * 60
-LAUTSPRECHER_GPIO = 18  # Physischer Pin 12
+BILD_PFAD = Path(__file__).with_name("shrek.png")
 
 
-def lade_aktuellen_comic(session):
-    """Laedt den aktuellen Comic und passt ihn an das monochrome OLED an."""
-    antwort = session.get(XKCD_API, timeout=15)
-    antwort.raise_for_status()
-    comic = antwort.json()
-
-    bild_antwort = session.get(comic["img"], timeout=30)
-    bild_antwort.raise_for_status()
-    with Image.open(BytesIO(bild_antwort.content)) as quelle:
+def lade_bild():
+    """Bereitet das lokale Shrek-Bild fuer das OLED auf."""
+    with Image.open(BILD_PFAD) as quelle:
         hintergrund = Image.new("RGBA", quelle.size, "white")
         hintergrund.alpha_composite(quelle.convert("RGBA"))
-        skaliert = ImageOps.contain(
-            hintergrund.convert("L"), (OLED_WIDTH, OLED_HEIGHT), method=Image.LANCZOS
+        ausschnitt = ImageOps.fit(
+            hintergrund.convert("L"),
+            (OLED_WIDTH, OLED_HEIGHT),
+            method=Image.LANCZOS,
+            centering=(0.5, 0.12),
         )
-
-    flaeche = Image.new("L", (OLED_WIDTH, OLED_HEIGHT), "white")
-    flaeche.paste(
-        skaliert,
-        ((OLED_WIDTH - skaliert.width) // 2, (OLED_HEIGHT - skaliert.height) // 2),
-    )
-    return comic["num"], ImageOps.invert(flaeche).convert("1")
+        return ImageOps.autocontrast(ausschnitt).convert("1")
 
 
 def main():
-    lautsprecher = PWMOutputDevice(
-        LAUTSPRECHER_GPIO, frequency=440, pin_factory=LGPIOFactory()
-    )
-    try:
-        lautsprecher.value = 0.5
-        time.sleep(1)
-    finally:
-        lautsprecher.off()
-        lautsprecher.close()
-
     serial = i2c(port=1, address=OLED_ADDRESS)
     display = ssd1306(serial, width=OLED_WIDTH, height=OLED_HEIGHT)
-    letzter_comic = None
+    display.display(lade_bild())
+    print("Shrek wird auf dem OLED angezeigt")
 
     try:
-        with requests.Session() as session:
-            while True:
-                try:
-                    nummer, bild = lade_aktuellen_comic(session)
-                    if nummer != letzter_comic:
-                        display.display(bild)
-                        letzter_comic = nummer
-                        print(f"XKCD-Comic {nummer} wird angezeigt")
-                    time.sleep(UPDATE_INTERVAL)
-                except (requests.RequestException, OSError, ValueError, KeyError) as fehler:
-                    print(f"XKCD konnte nicht geladen werden: {fehler}")
-                    time.sleep(RETRY_INTERVAL)
+        while True:
+            time.sleep(60)
     except KeyboardInterrupt:
         print("Programm beendet")
     finally:
