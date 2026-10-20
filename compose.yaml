@@ -2,11 +2,18 @@ services:
   ingest:
     build: ./src/ingest
     restart: unless-stopped
+    environment:
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_ORG: ${INFLUXDB_ORG:?Set INFLUXDB_ORG in .env}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:?Set INFLUXDB_BUCKET in .env}
+      INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?Set INFLUXDB_ADMIN_TOKEN in .env}
     devices:
       - /dev/i2c-1:/dev/i2c-1
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
     volumes:
       - /proc/device-tree:/proc/device-tree:ro
+    depends_on:
+      - influxdb
 
   influxdb:
     image: influxdb:2.7.11
