@@ -32,12 +32,16 @@ def lade_bild():
 def main():
     serial = i2c(port=1, address=OLED_ADDRESS)
     display = ssd1306(serial, width=OLED_WIDTH, height=OLED_HEIGHT)
-    display.display(lade_bild())
+    bild = lade_bild()
+    display.display(bild)
     print("Shrek wird auf dem OLED angezeigt")
 
     try:
         while True:
-            time.sleep(60)
+            time.sleep(9)
+            display.clear()
+            time.sleep(1)
+            display.display(bild)
     except KeyboardInterrupt:
         print("Programm beendet")
     finally:
