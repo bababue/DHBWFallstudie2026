@@ -23,7 +23,7 @@ NEW_COMMIT=$(git_moos rev-parse HEAD)
 
 if [ "$OLD_COMMIT" != "$NEW_COMMIT" ]; then
     echo "Updating Python packages in .venv"
-    "$PYTHON" -m pip install -r "$REPO/src/requirements.txt"
+    "$PYTHON" -m pip install -r "$REPO/src/ingest/requirements.txt"
     systemctl daemon-reload
     echo "Restarting systemd service"
     systemctl restart moos.service

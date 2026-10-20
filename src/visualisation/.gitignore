@@ -1,0 +1,7 @@
+.env
+/grafana/data/*
+!/grafana/data/.gitkeep
+/influxdb/data/*
+!/influxdb/data/.gitkeep
+/influxdb/config/*
+!/influxdb/config/.gitkeep

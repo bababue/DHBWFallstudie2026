@@ -6,8 +6,8 @@ After=network-online.target
 [Service]
 Type=simple
 User=moos
-WorkingDirectory=/home/moos/DHBWFallstudie2026
-ExecStart=/home/moos/DHBWFallstudie2026/.venv/bin/python -u /home/moos/DHBWFallstudie2026/src/main.py
+WorkingDirectory=/home/moos/DHBWFallstudie2026/src/ingest
+ExecStart=/home/moos/DHBWFallstudie2026/.venv/bin/python -u /home/moos/DHBWFallstudie2026/src/ingest/main.py
 Restart=on-failure
 RestartSec=5
 
