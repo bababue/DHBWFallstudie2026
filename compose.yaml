@@ -1,5 +1,6 @@
 services:
   ingest:
+    container_name: ingest
     build: ./src/ingest
     restart: unless-stopped
     environment:
@@ -16,6 +17,7 @@ services:
       - influxdb
 
   influxdb:
+    container_name: influxdb
     image: influxdb:2.7.11
     restart: unless-stopped
     ports:
@@ -32,6 +34,7 @@ services:
       - ./src/visualisation/influxdb/config:/etc/influxdb2
 
   grafana:
+    container_name: grafana
     image: grafana/grafana:13.2.2
     restart: unless-stopped
     user: ${GRAFANA_UID:-1000}:${GRAFANA_GID:-1000}
