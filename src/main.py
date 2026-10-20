@@ -1,92 +1,45 @@
 
+"""Zeigt Shrek auf dem 128 x 64 Pixel grossen OLED des Raspberry Pi."""
+
 import time
+from pathlib import Path
 
 from luma.core.interface.serial import i2c
-from luma.core.render import canvas
 from luma.oled.device import ssd1306
-from PIL import ImageFont
+from PIL import Image, ImageOps
 
-# OLED-Konfiguration
+
 OLED_ADDRESS = 0x3C
 OLED_WIDTH = 128
 OLED_HEIGHT = 64
-
-# Sekunden pro Bildschirm
-INTERVAL = 3
-
-# Texte, die nacheinander angezeigt werden
-SEITEN = [
-    ["Hey team!", "Rezwan ist ein kleiner gooner!"],
-    ["OLED Display", "0.96 Zoll", "128 x 64 Pixel"],
-    ["Mein Projekt", "Rezwan abfucken"],
-    ["GitHub Deployment", "Laeuft!"]
-]
-
-# I2C initialisieren
-serial = i2c(port=1, address=OLED_ADDRESS)
-
-# Display initialisieren
-display = ssd1306(
-    serial,
-    width=OLED_WIDTH,
-    height=OLED_HEIGHT
-)
-
-font = ImageFont.load_default()
+BILD_PFAD = Path(__file__).with_name("shrek.png")
 
 
-def zeige_seite(zeilen, nummer):
-    """Zeichnet eine Seite auf das OLED."""
-
-    with canvas(display) as draw:
-
-        # Kopfzeile
-        draw.text(
-            (2, 0),
-            "RASPBERRY PI 5",
-            font=font,
-            fill="white"
+def lade_oled_bild():
+    """Schneidet Shreks Kopf und Oberkoerper aus und wandelt sie in 1 Bit um."""
+    with Image.open(BILD_PFAD) as quelle:
+        hintergrund = Image.new("RGBA", quelle.size, "white")
+        hintergrund.alpha_composite(quelle.convert("RGBA"))
+        ausschnitt = ImageOps.fit(
+            hintergrund.convert("L"),
+            (OLED_WIDTH, OLED_HEIGHT),
+            method=Image.LANCZOS,
+            centering=(0.5, 0.12),
         )
-
-        # Trennlinie
-        draw.line(
-            (0, 14, 127, 14),
-            fill="white"
-        )
-
-        # Textzeilen
-        for index, text in enumerate(zeilen):
-            y = 20 + index * 13
-
-            draw.text(
-                (4, y),
-                text,
-                font=font,
-                fill="white"
-            )
-
-        # Seitenanzeige
-        draw.text(
-            (105, 55),
-            str(nummer),
-            font=font,
-            fill="white"
-        )
+        return ImageOps.autocontrast(ausschnitt).convert("1")
 
 
 def main():
-    print("OLED gestartet")
+    serial = i2c(port=1, address=OLED_ADDRESS)
+    display = ssd1306(serial, width=OLED_WIDTH, height=OLED_HEIGHT)
+    display.display(lade_oled_bild())
+    print("Shrek wird auf dem OLED angezeigt")
 
     try:
         while True:
-            for index, seite in enumerate(SEITEN, start=1):
-                print(f"Seite {index}: {seite}")
-                zeige_seite(seite, index)
-                time.sleep(INTERVAL)
-
+            time.sleep(60)
     except KeyboardInterrupt:
         print("Programm beendet")
-
     finally:
         display.clear()
 
