@@ -1,8 +1,8 @@
 
-"""Zeigt Abstand und CO2-Konzentration auf dem OLED des Raspberry Pi."""
+"""Zeigt Abstand, CO2, Temperatur und Luftfeuchtigkeit auf dem OLED."""
 
-import time
 import os
+import time
 
 import adafruit_scd4x
 from adafruit_extended_bus import ExtendedI2C
@@ -48,9 +48,10 @@ def main():
         queue_len=5,
         pin_factory=LGPIOFactory(chip=0),
     )
-    beschriftung = lade_schriftgroesse(11)
-    wert_schrift = lade_schriftgroesse(19)
+    schrift = lade_schriftgroesse(12)
     co2_ppm = None
+    temperatur_c = None
+    luftfeuchtigkeit_prozent = None
     co2_sensor = None
     influx_fehler = False
 
@@ -64,19 +65,31 @@ def main():
             neuer_co2_wert = False
             if co2_sensor.data_ready:
                 co2_ppm = co2_sensor.CO2
+                temperatur_c = co2_sensor.temperature
+                luftfeuchtigkeit_prozent = co2_sensor.relative_humidity
                 neuer_co2_wert = True
 
             co2_text = f"{co2_ppm} ppm" if co2_ppm is not None else "warte..."
-            print(f"Abstand: {abstand_cm:.1f} cm | CO2: {co2_text}")
+            temperatur_text = f"{temperatur_c:.1f} C" if temperatur_c is not None else "warte..."
+            feuchte_text = (
+                f"{luftfeuchtigkeit_prozent:.1f} %"
+                if luftfeuchtigkeit_prozent is not None else "warte..."
+            )
+            print(
+                f"Abstand: {abstand_cm:.1f} cm | CO2: {co2_text} | "
+                f"Temperatur: {temperatur_text} | Luftfeuchtigkeit: {feuchte_text}"
+            )
             with canvas(display) as draw:
-                draw.text((2, 0), "Abstand", font=beschriftung, fill="white")
-                draw.text((2, 11), f"{abstand_cm:.1f} cm", font=wert_schrift, fill="white")
-                draw.text((2, 32), "CO2", font=beschriftung, fill="white")
-                draw.text((2, 43), co2_text, font=wert_schrift, fill="white")
+                draw.text((2, 0), f"Abst: {abstand_cm:.1f} cm", font=schrift, fill="white")
+                draw.text((2, 16), f"CO2: {co2_text}", font=schrift, fill="white")
+                draw.text((2, 32), f"Temp: {temperatur_text}", font=schrift, fill="white")
+                draw.text((2, 48), f"Feucht: {feuchte_text}", font=schrift, fill="white")
 
             punkt = Point("sensorwerte").field("abstand_cm", abstand_cm)
             if neuer_co2_wert:
                 punkt.field("co2_ppm", co2_ppm)
+                punkt.field("temperatur_c", temperatur_c)
+                punkt.field("luftfeuchtigkeit_prozent", luftfeuchtigkeit_prozent)
             try:
                 write_api.write(bucket=influx_bucket, record=punkt)
                 if influx_fehler:

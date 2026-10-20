@@ -1,6 +1,6 @@
 # Moos Fallstudie auf dem Raspberry Pi
 
-Das Projekt läuft mit Docker Compose: `ingest` liest den Abstandssensor (Trigger GPIO 5, Echo GPIO 6) und den SCD41-CO₂-Sensor über I²C. Beide Werte erscheinen auf dem OLED und in den Container-Logs. Zusätzlich schreibt `ingest` sie in den Bucket von InfluxDB; Grafana läuft im selben Compose-Projekt. Die Visualisierungsdaten liegen unter `src/visualisation/`.
+Das Projekt läuft mit Docker Compose: `ingest` liest den Abstandssensor (Trigger GPIO 5, Echo GPIO 6) und CO₂, Temperatur sowie relative Luftfeuchtigkeit vom SCD41 über I²C. Alle vier Werte erscheinen auf dem OLED und in den Container-Logs. Zusätzlich schreibt `ingest` sie in den Bucket von InfluxDB; Grafana läuft im selben Compose-Projekt. Die Visualisierungsdaten liegen unter `src/visualisation/`.
 
 ## Einmalige Umstellung auf dem Pi
 
@@ -42,4 +42,4 @@ sudo docker compose logs -f grafana influxdb
 
 Grafana: `http://<pi-ip>:3000` · InfluxDB: `http://<pi-ip>:8086`.
 
-In InfluxDB heißt die Messreihe `sensorwerte`. Sie enthält das Feld `abstand_cm` (jede Sekunde) und das Feld `co2_ppm` (bei jedem neuen SCD41-Wert, etwa alle fünf Sekunden). In Grafana die InfluxDB-Datenquelle mit Flux und dem Bucket aus `INFLUXDB_BUCKET` verwenden. Falls InfluxDB kurzzeitig nicht erreichbar ist, läuft die Anzeige weiter; fehlgeschlagene Schreibvorgänge erscheinen in den `ingest`-Logs.
+In InfluxDB heißt die Messreihe `sensorwerte`. Sie enthält das Feld `abstand_cm` (jede Sekunde) sowie `co2_ppm`, `temperatur_c` und `luftfeuchtigkeit_prozent` (bei jedem neuen SCD41-Wert, etwa alle fünf Sekunden). In Grafana die InfluxDB-Datenquelle mit Flux und dem Bucket aus `INFLUXDB_BUCKET` verwenden. Falls InfluxDB kurzzeitig nicht erreichbar ist, läuft die Anzeige weiter; fehlgeschlagene Schreibvorgänge erscheinen in den `ingest`-Logs.
