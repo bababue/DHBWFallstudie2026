@@ -1,2 +1,4 @@
 luma.oled
 Pillow
+requests
+gpiozero>=2.0.1.post3

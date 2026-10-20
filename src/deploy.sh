@@ -22,6 +22,12 @@ NEW_COMMIT=$(git_moos rev-parse HEAD)
 
 if [ "$OLD_COMMIT" != "$NEW_COMMIT" ]; then
     echo "New version found: $NEW_COMMIT"
+
+    if ! git_moos diff --quiet "$OLD_COMMIT" "$NEW_COMMIT" -- src/requirements.txt; then
+        echo "Requirements changed; updating Python packages"
+        python3 -m pip install -r "$REPO/src/requirements.txt"
+    fi
+
     echo "Restarting systemd service"
     systemctl restart moos.service
 else
