@@ -2,3 +2,4 @@ luma.oled
 Pillow
 requests
 gpiozero>=2.0.1.post3
+adafruit-lgpio==0.2.2.0; sys_platform == "linux" and python_version == "3.13" and platform_machine == "aarch64"

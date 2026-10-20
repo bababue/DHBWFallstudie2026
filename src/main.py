@@ -6,6 +6,7 @@ import time
 
 import requests
 from gpiozero import PWMOutputDevice
+from gpiozero.pins.lgpio import LGPIOFactory
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 from PIL import Image, ImageOps
@@ -44,7 +45,9 @@ def lade_aktuellen_comic(session):
 
 
 def main():
-    lautsprecher = PWMOutputDevice(LAUTSPRECHER_GPIO, frequency=440)
+    lautsprecher = PWMOutputDevice(
+        LAUTSPRECHER_GPIO, frequency=440, pin_factory=LGPIOFactory()
+    )
     try:
         lautsprecher.value = 0.5
         time.sleep(1)
