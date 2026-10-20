@@ -1,0 +1,11 @@
+[Unit]
+Description=GitHub Updates alle 5s abrufen
+
+[Timer]
+OnBootSec=10s
+OnUnitInactiveSec=5s
+AccuracySec=10s
+Unit=moos-deploy.service
+
+[Install]
+WantedBy=timers.target

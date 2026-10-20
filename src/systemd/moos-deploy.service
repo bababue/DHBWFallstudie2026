@@ -1,0 +1,8 @@
+[Unit]
+Description=Sensor App GitHub Deployment
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/moos/DHBWFallstudie2026/src/deploy.sh
