@@ -16,7 +16,7 @@ INTERVAL = 3
 
 # Texte, die nacheinander angezeigt werden
 SEITEN = [
-    ["Hey zsm!", "Rezwan ist ein kleiner gooner!"],
+    ["Hey team!", "Rezwan ist ein kleiner gooner!"],
     ["OLED Display", "0.96 Zoll", "128 x 64 Pixel"],
     ["Mein Projekt", "Rezwan abfucken"],
     ["GitHub Deployment", "Laeuft!"]
