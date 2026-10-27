@@ -7,7 +7,9 @@ Der Stripe muss über eine passende Treiberstufe angeschlossen sein; der GPIO st
 Auf dem Raspberry Pi starten:
 
 ```bash
-sudo docker compose up -d --build --remove-orphans
+sudo ./start.sh
 ```
+
+Das Startskript zieht zuerst den aktuellen Stand von `origin master` als Benutzer `moos` und startet danach den Container `ingest`.
 
 Der Container benötigt den GPIO-Chip. Standardmäßig wird `/dev/gpiochip0` verwendet. Falls der zuständige Chip auf dem Pi anders heißt, `GPIOCHIP_DEVICE` in `.env` entsprechend setzen (Vorlage: `.env.example`).

@@ -1,7 +1,7 @@
 services:
   ingest:
     build: ./src/ingest
-    container-name: ingest
+    container_name: ingest
     restart: unless-stopped
     devices:
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
