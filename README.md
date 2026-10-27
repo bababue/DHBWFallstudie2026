@@ -1,6 +1,6 @@
 # LED-Stripe an GPIO12
 
-Das Python-Skript hält den LED-Stripe an GPIO12 dauerhaft auf 0,5 (50 % PWM-Tastgrad). GPIO12 ist der PWM0-fähige Pin.
+Das Python-Skript blendet den LED-Stripe an GPIO12 dauerhaft auf und ab. GPIO12 ist der PWM0-fähige Pin. Ein vollständiger Zyklus dauert ungefähr vier Sekunden.
 
 Der Stripe muss über eine passende Treiberstufe angeschlossen sein; der GPIO steuert nur deren Eingang.
 
