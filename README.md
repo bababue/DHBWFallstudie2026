@@ -13,8 +13,8 @@ Zugangsdaten stehen in `.env`. Die Vorlage ist `.env.example`.
 cp .env.example .env
 ```
 
-Vor dem Start die drei Passwörter/Token in `.env` durch eigene lange Werte
-ersetzen. Die Datei ist von Git ausgeschlossen. Bei einem bereits eingerichteten
+Vor dem Start die Platzhalter für Passwörter und Token in `.env` durch eigene
+lange Werte ersetzen. Die Datei ist von Git ausgeschlossen. Bei einem bereits eingerichteten
 InfluxDB-Datenverzeichnis ändern neue Initialisierungswerte den bestehenden
 Benutzer oder Token nicht.
 
@@ -41,13 +41,40 @@ docker compose up -d --build
 docker compose logs -f ingest
 ```
 
-Die Container heißen `sensor-ingest`, `influxdb`, `grafana` und `dashboard`.
+Die Container heißen `sensor-ingest`, `influxdb`, `grafana`, `dashboard` und
+`camera`. Sensoren, Steuerung und Kamera laufen vollständig in Docker Compose.
 
 Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es zeigt
-für jede Messgröße den Sensornamen und den letzten Wert ohne CSS. Die Seite
-aktualisiert sich alle 30 Sekunden. Messwerte, die älter als 180 Sekunden sind,
-erscheinen als „kein aktueller Wert“. Beide Zeiten lassen sich in `.env` über
-`DASHBOARD_REFRESH_SECONDS` und `DASHBOARD_MAX_AGE_SECONDS` ändern.
+für jede Messgröße den Sensornamen und den letzten Wert ohne CSS. Der Browser
+lädt die Seite einmal und erhält neue Werte über eine WebSocket-Verbindung.
+Der Server prüft InfluxDB alle 2 Sekunden und sendet Änderungen sofort an alle
+verbundenen Browser. Messwerte, die älter als 180 Sekunden sind, erscheinen als
+„kein aktueller Wert“. Die Zeiten lassen sich in `.env` über
+`DASHBOARD_POLL_SECONDS` und `DASHBOARD_MAX_AGE_SECONDS` ändern. Bei einer
+unterbrochenen Verbindung verbindet sich der Browser automatisch neu.
+
+Auf derselben Seite erscheint der MJPEG-Livestream der Pi-Kamera. Der
+`camera`-Container startet `rpicam-vid` erst, wenn ein Browser den Stream
+öffnet, und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream
+ist auch unter `http://moos.local:8000/stream.mjpg` erreichbar. `CAMERA_PORT`
+in `.env` kann den Port ändern. Für den Kamerazugriff erhält der Container
+Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 20 und 21.
+
+Die Regler für Licht und Lüfter senden ihre Werte über dieselbe
+WebSocket-Verbindung wie die Sensoranzeige. Die Steuerung ist zunächst mit
+`ACTUATORS_ENABLED=false` abgeschaltet. Vor dem Einschalten die Freilaufdiode
+am Lüfter und die Verdrahtung prüfen. Dann `ACTUATORS_ENABLED=true` und ein
+langes `CONTROL_PASSWORD` in `.env` setzen und `docker compose up -d --build`
+ausführen. Das Passwort wird beim Verstellen im Dashboard eingegeben. LED und
+Lüfter beginnen bei jedem Start mit 0 %. Die LED nutzt GPIO 20 mit 200 Hz,
+der Lüfter GPIO 21 mit 5 Hz. Die Lüfterskala und der einsekündige Anlaufstoß
+folgen der Übergabe; alle Pins und Frequenzen stehen in `.env`. Ein harter
+Prozessabbruch kann den letzten GPIO-Pegel bis zum Neustart stehen lassen.
+Die Steuerung ist für ein vertrauenswürdiges lokales Netzwerk gedacht, da die
+Webseite derzeit HTTP verwendet.
+
+Vor dem Start dürfen keine früheren Dienste die Kamera, Port 8000 oder die
+GPIO-Pins 20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
 
 InfluxDB: `http://moos.local:8086`; Grafana: `http://moos.local:3000`.
 Grafana-Nutzer ist `admin`, Passwort steht in `.env`. Die InfluxDB-Datenquelle
