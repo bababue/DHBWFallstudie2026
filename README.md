@@ -41,6 +41,14 @@ docker compose up -d --build
 docker compose logs -f ingest
 ```
 
+Die Container heißen `sensor-ingest`, `influxdb`, `grafana` und `dashboard`.
+
+Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es zeigt
+für jede Messgröße den Sensornamen und den letzten Wert ohne CSS. Die Seite
+aktualisiert sich alle 30 Sekunden. Messwerte, die älter als 180 Sekunden sind,
+erscheinen als „kein aktueller Wert“. Beide Zeiten lassen sich in `.env` über
+`DASHBOARD_REFRESH_SECONDS` und `DASHBOARD_MAX_AGE_SECONDS` ändern.
+
 InfluxDB: `http://moos.local:8086`; Grafana: `http://moos.local:3000`.
 Grafana-Nutzer ist `admin`, Passwort steht in `.env`. Die InfluxDB-Datenquelle
 `Moos InfluxDB` und das Dashboard `Moos-Kasten Sensoren` mit zwölf Mess- und

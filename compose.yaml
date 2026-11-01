@@ -1,6 +1,7 @@
 services:
   influxdb:
     image: influxdb:2
+    container_name: influxdb
     restart: unless-stopped
     ports:
       - "8086:8086"
@@ -17,6 +18,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    container_name: grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -32,11 +34,21 @@ services:
 
   ingest:
     build: ./src/ingest
-    container_name: ingest
+    container_name: sensor-ingest
     restart: unless-stopped
     env_file: .env
     devices:
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
+    depends_on:
+      - influxdb
+
+  dashboard:
+    build: ./src/dashboard
+    container_name: dashboard
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
     depends_on:
       - influxdb
 
