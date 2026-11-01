@@ -1,2 +1,2 @@
-gpiozero>=2.0.1.post3
 adafruit-lgpio==0.2.2.0
+influxdb-client>=1.49,<2
