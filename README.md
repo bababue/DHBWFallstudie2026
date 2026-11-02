@@ -107,6 +107,17 @@ Port 8000 weiterhin belegt ist, zeigt `sudo ss -ltnp '( sport = :8000 )'`
 den Prozess. Die Abschaltung der alten Dienste ist nur einmalig nötig.
 `--remove-orphans` entfernt beim Umstieg frühere Container.
 
+Der systemd-Timer `moos-deploy.timer` prüft `origin/master` alle 10 Sekunden
+auf Änderungen. Nach einer Änderung an der Timer-Datei muss die installierte
+Version auf dem Pi einmal aktualisiert werden:
+
+```sh
+sudo install -m 644 deploy/moos-deploy.timer /etc/systemd/system/moos-deploy.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now moos-deploy.timer
+sudo systemctl restart moos-deploy.timer
+```
+
 Die Container heißen `sensors`, `influxdb`, `dashboard` und `camera`.
 Sensoren, OLED, Steuerung und Kamera laufen vollständig in Docker Compose.
 
