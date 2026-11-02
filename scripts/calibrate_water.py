@@ -18,7 +18,7 @@ def main():
     if args.water_height < 0:
         parser.error('Wassertiefe darf nicht negativ sein')
     if not args.inside:
-        root = Path(__file__).resolve().parent
+        root = Path(__file__).resolve().parents[1]
         command = ['docker', 'compose']
         running = subprocess.check_output(command + ['ps', '--status', 'running', '--services'], cwd=root, text=True).splitlines()
         resume = 'sensors' in running

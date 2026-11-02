@@ -67,8 +67,8 @@ im Schallweg kann auch einen Medianfilter täuschen.
 Kalibrierung im leeren Behälter, mit ruhiger Oberfläche und freiem Schallweg:
 
 ```sh
-python3 calibrate_water.py
-python3 calibrate_water.py --write
+python3 scripts/calibrate_water.py
+python3 scripts/calibrate_water.py --write
 ```
 
 Das Skript stoppt einen laufenden Sensorcontainer vorübergehend, misst 80 Echos

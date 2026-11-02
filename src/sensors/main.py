@@ -141,6 +141,12 @@ def display_readings(values, now, max_age=12):
 def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
+    # The shared volume survives restarts; do not show its previous mode.
+    try:
+        os.unlink('/run/moos/mode.json')
+    except FileNotFoundError:
+        pass
+
     config = Config.from_config()
     from configuration import revision
     loaded_revision = revision()
