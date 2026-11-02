@@ -6,15 +6,29 @@ ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
 
-Alle Pins (BCM-Nummern), I2C-Adressen, die Abtastintervalle und die InfluxDB-
-Zugangsdaten stehen in `.env`. Die Vorlage ist `.env.example`.
+Hardwareparameter und Messintervalle stehen in `config/config.json`. Die Datei
+wird versioniert. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
+prüft Struktur, Wertebereiche und doppelt vergebene GPIOs. Sensoränderungen
+starten den Sensorcontainer automatisch neu (der angezeigte Modus beginnt wieder
+in AUTO). `null` bei einem Moos-Bezugsabstand bedeutet „noch nicht kalibriert“.
+I²C-Adressen sind dezimale Zahlen: 68 = 0x44, 35 = 0x23, 98 = 0x62.
+
+`.env` enthält nur die InfluxDB-Verbindung, Zugangsdaten und das GPIO-Gerät für
+Compose. Beim Start über `start.sh` oder Auto-Deployment werden bisherige
+Hardwarewerte einmalig aus `.env` übernommen und nicht mehr verwendete Werte
+entfernt. `config/.env-migrated` kennzeichnet die abgeschlossene Migration.
+
+Änderungen im Web-Editor ändern die versionierte JSON-Datei auf dem Pi. Diese
+müssen vor weiteren Git-Updates übernommen und committed werden; das Deployment
+überschreibt keine lokalen Änderungen. Der Editor ist wie das Dashboard für das
+vertrauenswürdige lokale Netz vorgesehen.
 
 `sensors` liest SHT45, BH1750 und den Wasserstandsensor unabhängig voneinander
 etwa jede Sekunde. Beim SCD40 prüft es alle 0,5 Sekunden, ob ein neuer CO₂-Wert
 bereitliegt; der Sensor selbst erzeugt nur etwa alle 5 Sekunden einen neuen Wert.
 Zwischen diesen Messungen wird kein alter CO₂-Wert erneut gespeichert.
 Datenbank-Schreibvorgänge laufen getrennt von den GPIO-Abfragen. Das Dashboard
-fragt InfluxDB alle 0,5 Sekunden ab und zeigt Werte nach 12 Sekunden ohne neues
+fragt aktuelle Messwerte alle zwei Sekunden ab und zeigt Werte nach 12 Sekunden ohne neues
 Sample nicht mehr als aktuell an. Der Sensorprozess aktualisiert das OLED etwa
 einmal pro Sekunde direkt aus den letzten Messwerten.
 
@@ -27,7 +41,7 @@ einen Beispieltoken für eine **neue** InfluxDB-Installation. Die Datei `.env`
 ist von Git ausgeschlossen. Für einen bestehenden InfluxDB-Datenbestand muss
 `INFLUXDB_TOKEN` in `.env` mit einem dort bereits gültigen Token übereinstimmen:
 Neue Initialisierungswerte ändern bestehende Benutzer, Passwörter oder Tokens
-nicht. Die Vorlage aktiviert die Aktorsteuerung.
+nicht.
 
 | Seite | SDA | SCL | Sensoren |
 | --- | ---: | ---: | --- |
@@ -45,10 +59,10 @@ Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
 Zwei zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
-| Sensor | Trigger | Echo | Kalibrierwert in `.env` |
+| Sensor | Trigger | Echo | Kalibrierwert in `config/config.json` |
 | --- | ---: | ---: | --- |
-| Moos 1 | GPIO 9 | GPIO 11 | `MOSS_1_EMPTY_DISTANCE_CM` |
-| Moos 2 | GPIO 0 | GPIO 5 | `MOSS_2_EMPTY_DISTANCE_CM` |
+| Moos 1 | GPIO 9 | GPIO 11 | `moos_1.bezugsabstand_cm` |
+| Moos 2 | GPIO 0 | GPIO 5 | `moos_2.bezugsabstand_cm` |
 
 Jeder Kalibrierwert ist der Abstand vom Sensor zur moosfreien Bezugsfläche in cm.
 Ohne ihn wird nur der Rohabstand angezeigt. Mit ihm berechnet die Software die

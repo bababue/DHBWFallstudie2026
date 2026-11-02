@@ -2,9 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY sensors/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY *.py ./
+COPY configuration.py config_keys.json ./
+COPY sensors/*.py ./
 
 CMD ["python", "-u", "main.py"]

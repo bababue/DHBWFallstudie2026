@@ -1,0 +1,86 @@
+{
+  "LEFT_I2C_SDA_GPIO": [
+    "i2c",
+    "links_sda_gpio"
+  ],
+  "LEFT_I2C_SCL_GPIO": [
+    "i2c",
+    "links_scl_gpio"
+  ],
+  "RIGHT_I2C_SDA_GPIO": [
+    "i2c",
+    "rechts_sda_gpio"
+  ],
+  "RIGHT_I2C_SCL_GPIO": [
+    "i2c",
+    "rechts_scl_gpio"
+  ],
+  "I2C_DELAY_US": [
+    "i2c",
+    "taktpause_us"
+  ],
+  "SHT45_ADDRESS": [
+    "i2c",
+    "sht45_adresse"
+  ],
+  "BH1750_ADDRESS": [
+    "i2c",
+    "bh1750_adresse"
+  ],
+  "SCD40_ADDRESS": [
+    "i2c",
+    "scd40_adresse"
+  ],
+  "WATER_TRIGGER_GPIO": [
+    "wasserstand",
+    "trigger_gpio"
+  ],
+  "WATER_ECHO_GPIO": [
+    "wasserstand",
+    "echo_gpio"
+  ],
+  "WATER_FLOOR_DISTANCE_CM": [
+    "wasserstand",
+    "sensor_boden_abstand_cm"
+  ],
+  "MOSS_1_TRIGGER_GPIO": [
+    "moos_1",
+    "trigger_gpio"
+  ],
+  "MOSS_1_ECHO_GPIO": [
+    "moos_1",
+    "echo_gpio"
+  ],
+  "MOSS_1_EMPTY_DISTANCE_CM": [
+    "moos_1",
+    "bezugsabstand_cm"
+  ],
+  "MOSS_2_TRIGGER_GPIO": [
+    "moos_2",
+    "trigger_gpio"
+  ],
+  "MOSS_2_ECHO_GPIO": [
+    "moos_2",
+    "echo_gpio"
+  ],
+  "MOSS_2_EMPTY_DISTANCE_CM": [
+    "moos_2",
+    "bezugsabstand_cm"
+  ],
+  "BUTTON_GPIO": [
+    "taster",
+    "gpio"
+  ],
+  "FAST_SAMPLE_INTERVAL_SECONDS": [
+    "messintervalle",
+    "schnelle_sensoren_s"
+  ],
+  "MOSS_SAMPLE_INTERVAL_SECONDS": [
+    "messintervalle",
+    "moos_s"
+  ],
+  "CO2_READY_POLL_SECONDS": [
+    "messintervalle",
+    "co2_bereitschaft_s"
+  ]
+}

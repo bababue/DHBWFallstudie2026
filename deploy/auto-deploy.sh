@@ -26,5 +26,6 @@ if [[ "$(git rev-parse HEAD)" != "$target" ]]; then
     exit 1
 fi
 
+python3 "$repo_dir/deploy/migrate-config.py"
 docker compose up -d --build --remove-orphans
 printf '%s\n' "$target" > "$STATE_DIRECTORY/deployed-commit"

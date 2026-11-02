@@ -64,5 +64,31 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[1].args[0])
 
 
+class ConfigEditorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_save_validates_and_rejects_conflicting_edits(self):
+        original = main.configuration.load()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.json'
+            path.write_text(json.dumps(original))
+            with patch.object(main.configuration, 'PATH', path):
+                revision = main.configuration.revision()
+                original['wasserstand']['sensor_boden_abstand_cm'] = 8.5
+
+                class Request:
+                    headers = {'x-moosbox-config': '1'}
+
+                    async def body(self):
+                        return json.dumps({'config': original, 'revision': revision}).encode()
+
+                response = await main.save_config(Request())
+                self.assertIn('revision', response)
+                self.assertEqual(main.configuration.load()['wasserstand']['sensor_boden_abstand_cm'], 8.5)
+                response = await main.save_config(Request())
+                self.assertEqual(response.status_code, 409)
+                original['taster']['gpio'] = original['wasserstand']['echo_gpio']
+                response = await main.save_config(Request())
+                self.assertEqual(response.status_code, 400)
+
+
 if __name__ == '__main__':
     unittest.main()

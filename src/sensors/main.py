@@ -13,6 +13,7 @@ from threading import Event
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+from configuration import setting
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, start_button_reader
 from moss_height import MossAggregate, MossHeight
@@ -27,7 +28,7 @@ STOP = Event()
 
 
 def env_int(name: str, default: str) -> int:
-    return int(os.getenv(name, default), 0)
+    return int(setting(name, default), 0)
 
 
 @dataclass(frozen=True)
@@ -56,9 +57,9 @@ class Config:
     influx_token: str
 
     @classmethod
-    def from_env(cls):
+    def from_config(cls):
         config = cls(
-            chip=os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
+            chip=setting("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
             left_sda=env_int("LEFT_I2C_SDA_GPIO", "15"),
             left_scl=env_int("LEFT_I2C_SCL_GPIO", "14"),
             right_sda=env_int("RIGHT_I2C_SDA_GPIO", "23"),
@@ -66,25 +67,25 @@ class Config:
             water_trigger=env_int("WATER_TRIGGER_GPIO", "6"),
             water_echo=env_int("WATER_ECHO_GPIO", "13"),
             button_pin=env_int("BUTTON_GPIO", "26"),
-            water_floor_distance_cm=float(os.getenv("WATER_FLOOR_DISTANCE_CM", "8.62")),
+            water_floor_distance_cm=float(setting("WATER_FLOOR_DISTANCE_CM", "8.62")),
             moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
                              env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
                             for index, (trigger, echo) in enumerate(
                                 ((9, 11), (0, 5)), start=1)),
             moss_empty_distances_cm=tuple(
-                float(value) if (value := os.getenv(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
+                float(value) if (value := setting(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
                 for index in range(1, 3)),
-            moss_interval=float(os.getenv("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
+            moss_interval=float(setting("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
             delay_us=env_int("I2C_DELAY_US", "12"),
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
             bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
             scd40_address=env_int("SCD40_ADDRESS", "0x62"),
-            fast_interval=float(os.getenv("FAST_SAMPLE_INTERVAL_SECONDS", "1")),
-            co2_poll_interval=float(os.getenv("CO2_READY_POLL_SECONDS", "0.5")),
-            influx_url=os.getenv("INFLUXDB_URL", "http://influxdb:8086"),
-            influx_org=os.getenv("INFLUXDB_ORG", "moos"),
-            influx_bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
-            influx_token=os.getenv("INFLUXDB_TOKEN", ""),
+            fast_interval=float(setting("FAST_SAMPLE_INTERVAL_SECONDS", "1")),
+            co2_poll_interval=float(setting("CO2_READY_POLL_SECONDS", "0.5")),
+            influx_url=setting("INFLUXDB_URL", "http://influxdb:8086"),
+            influx_org=setting("INFLUXDB_ORG", "moos"),
+            influx_bucket=setting("INFLUXDB_BUCKET", "moos_sensors"),
+            influx_token=setting("INFLUXDB_TOKEN", ""),
         )
         pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl,
                 config.water_trigger, config.water_echo, config.button_pin,
@@ -140,7 +141,9 @@ def display_readings(values, now, max_age=12):
 def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
-    config = Config.from_env()
+    config = Config.from_config()
+    from configuration import revision
+    loaded_revision = revision()
     chip_number = int(config.chip.removeprefix("/dev/gpiochip"))
     handle = lgpio.gpiochip_open(chip_number)
     buses = []
@@ -220,6 +223,9 @@ def run():
                                             record=points), STOP)
             try:
                 while not STOP.is_set():
+                    if revision() != loaded_revision:
+                        LOG.info("Configuration changed; restarting sensor service")
+                        break
                     now = time.monotonic()
                     due = [task for task in tasks if task.ready(now)]
                     mode, show_info, version = modes.snapshot()
