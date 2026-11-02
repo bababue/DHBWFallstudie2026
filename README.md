@@ -135,8 +135,11 @@ und rechts. Fehlt ein SHT45, wird der SCD40 derselben Seite als gekennzeichnetes
 Backup verwendet; bei nur einer verfügbaren Seite wird diese gekennzeichnet.
 Die Kachel zeigt die Werte links und rechts sowie die Differenz rechts minus links;
 ein SCD40-Ersatz ist mit „(fallback)“ gekennzeichnet. Der aktuelle Wert wird
-alle zwei Sekunden aktualisiert. Der Verlauf bietet 1 Stunde, 24 Stunden, 7 Tage
-und 30 Tage; er wird alle 30 Sekunden aktualisiert. Für eine Stunde wird je
+alle zwei Sekunden aktualisiert. Luftfeuchtigkeit steht als gleichartige Kachel
+neben Temperatur und verwendet ebenfalls SHT45 mit SCD40 als Backup.
+Beide Verläufe bieten 10 Minuten, 1 Stunde, 24 Stunden, 7 Tage
+und 30 Tage; sie werden alle 30 Sekunden aktualisiert. Für 10 Minuten wird je
+2-Sekunden-Fenster der letzte Wert verwendet. Für eine Stunde wird je
 10-Sekunden-Fenster der letzte Wert verwendet, für längere Zeiträume jeweils
 das Mittel pro Sensor und Zeitfenster (1, 5 oder 30 Minuten). Fehlende Fenster
 erscheinen als Lücke. Die ursprünglichen Messwerte bleiben in InfluxDB erhalten.

@@ -4,6 +4,11 @@ from temperature import combine
 
 
 class TemperatureTests(unittest.TestCase):
+    def test_humidity_uses_percent_and_same_sensor_priority(self):
+        result = combine({('left', 'sht45'): 60, ('right', 'scd40'): 62}, '%')
+        self.assertEqual(result['value'], 61)
+        self.assertEqual(result['source'], 'L: 60,0%\nR: 62,0% (fallback)\n+2,0%')
+
     def test_prefers_sht45_and_averages_both_sides(self):
         result = combine({('left', 'sht45'): 20, ('right', 'sht45'): 22,
                           ('left', 'scd40'): 30})

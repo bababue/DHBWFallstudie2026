@@ -1,11 +1,11 @@
 """Combine temperature measurements from the two sides of the box."""
 from math import isfinite
 
-PERIODS = {'1h': ('1h', '10s', 'last'), '24h': ('24h', '1m', 'mean'),
+PERIODS = {'10m': ('10m', '2s', 'last'), '1h': ('1h', '10s', 'last'), '24h': ('24h', '1m', 'mean'),
            '7d': ('7d', '5m', 'mean'), '30d': ('30d', '30m', 'mean')}
 
 
-def combine(readings):
+def combine(readings, unit="°"):
     selected = []
     for side in ('left', 'right'):
         for sensor in ('sht45', 'scd40'):
@@ -22,10 +22,10 @@ def combine(readings):
         if side in by_side:
             sensor, reading = by_side[side]
             text = f'{reading:.1f}'.replace('.', ',')
-            lines.append(f"{label}: {text}°{' (fallback)' if sensor == 'scd40' else ''}")
+            lines.append(f"{label}: {text}{unit}{' (fallback)' if sensor == 'scd40' else ''}")
         else:
             lines.append(f'{label}: –')
     if len(selected) == 2:
         difference = by_side['right'][1] - by_side['left'][1]
-        lines.append(f'{difference:+.1f}°'.replace('.', ','))
+        lines.append(f'{difference:+.1f}{unit}'.replace('.', ','))
     return {'value': value, 'source': '\n'.join(lines)}
