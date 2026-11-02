@@ -31,8 +31,8 @@
     "gpio": 26
   },
   "messintervalle": {
-    "schnelle_sensoren_s": 1.0,
-    "moos_s": 4.0,
+    "schnelle_sensoren_s": 1,
+    "moos_s": 4,
     "co2_bereitschaft_s": 0.5
   },
   "moos_3": {

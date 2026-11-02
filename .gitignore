@@ -1,7 +1,3 @@
 /.env
 __pycache__/
 /sshUserPfad/
-
-/config/.env-migrated
-
-/config/config.json

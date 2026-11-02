@@ -2,6 +2,8 @@ import json
 import tempfile
 import time
 import unittest
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,6 +31,13 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn('led-slider', body)
         self.assertIn('id="debug-toggle"', body)
         self.assertIn('id="debug-panel" hidden', body)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js nicht installiert')
+    def test_rendered_javascript_has_valid_syntax(self):
+        body = main.index().body.decode()
+        script = body.split('<script>', 1)[1].split('</script>', 1)[0]
+        result = subprocess.run(['node', '--check'], input=script, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_debug_returns_individual_sensor_values_without_aggregation(self):
         record = SimpleNamespace(values={'side': 'left', 'sensor': 'scd40'},

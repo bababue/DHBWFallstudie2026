@@ -6,21 +6,20 @@ ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
 
-Hardwareparameter und Messintervalle stehen in `config/config.json`. Die lokale Datei ist von Git ausgeschlossen; `config/config.example.json`
-dient als versionierte Vorlage und wird beim ersten Start automatisch kopiert. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
+Hardwareparameter und Messintervalle stehen in der versionierten Datei
+`config/config.json`. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
 prüft Struktur, Wertebereiche und doppelt vergebene GPIOs. Sensoränderungen
 starten den Sensorcontainer automatisch neu (der angezeigte Modus beginnt wieder
 in AUTO). `null` bei einem Moos-Bezugsabstand bedeutet „noch nicht kalibriert“.
 I²C-Adressen sind dezimale Zahlen: 68 = 0x44, 35 = 0x23, 98 = 0x62.
 
-`.env` enthält nur die InfluxDB-Verbindung, Zugangsdaten und das GPIO-Gerät für
-Compose. Beim Start über `start.sh` oder Auto-Deployment werden bisherige
-Hardwarewerte einmalig aus `.env` übernommen und nicht mehr verwendete Werte
-entfernt. `config/.env-migrated` kennzeichnet die abgeschlossene Migration.
+`.env` enthält die InfluxDB-Verbindung, Zugangsdaten und das GPIO-Gerät für
+Compose. Die Hardwareparameter werden aus `config/config.json` gelesen.
 
-Änderungen im Web-Editor bleiben lokal auf dem Pi und werden von Git-Updates
-nicht überschrieben. Der Editor ist wie das Dashboard für das
-vertrauenswürdige lokale Netz vorgesehen.
+Änderungen im Web-Editor verändern die versionierte Datei auf dem Pi. Solche
+Änderungen müssen vor einem Git-Update übernommen oder gesichert werden; sie
+können sonst den automatischen Deploy verhindern. Der Editor ist wie das
+Dashboard für das vertrauenswürdige lokale Netz vorgesehen.
 
 `sensors` liest SHT45, BH1750 und den Wasserstandsensor unabhängig voneinander
 etwa jede Sekunde. Beim SCD40 prüft es alle 0,5 Sekunden, ob ein neuer CO₂-Wert
