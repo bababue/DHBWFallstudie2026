@@ -125,6 +125,10 @@ Das Dashboard ist unter `http://moos.local:8080` erreichbar. Es zeigt den
 aktuellen Modus des OLED-Tasters und den Kamerastream. Der Modus wird über ein
 gemeinsames Volume zwischen Sensorprozess und Dashboard ausgetauscht. Fällt der
 Sensorprozess aus, meldet das Dashboard den Modus als nicht verfügbar.
+Der Debug-Modus blendet eine Tabelle mit den letzten Temperatur- und
+Luftfeuchtigkeitswerten von SHT45 und SCD40 links und rechts ein. Die bereits
+in °C und Prozent gespeicherten Einzelwerte werden unverändert angezeigt;
+Messwerte, die älter als 12 Sekunden sind, erscheinen nicht mehr als aktuell.
 
 Der `camera`-Container startet `rpicam-vid`, wenn ein Browser den Stream öffnet,
 und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream ist auch
