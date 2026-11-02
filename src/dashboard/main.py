@@ -125,25 +125,40 @@ def make_payload(values: dict[tuple[str, str, str], float], error: bool = False,
 
 
 def render_page() -> str:
+    def pin(name, default):
+        return html.escape(os.getenv(name, str(default)))
+
+    i2c_pins = (
+        f'L: SDA {pin("LEFT_I2C_SDA_GPIO", 15)}/SCL {pin("LEFT_I2C_SCL_GPIO", 14)}; '
+        f'R: SDA {pin("RIGHT_I2C_SDA_GPIO", 23)}/SCL {pin("RIGHT_I2C_SCL_GPIO", 24)}'
+    )
+    moss_pins = tuple(
+        f'Trigger {pin(f"MOSS_{index}_TRIGGER_GPIO", trigger)}, '
+        f'Echo {pin(f"MOSS_{index}_ECHO_GPIO", echo)}'
+        for index, (trigger, echo) in enumerate(((0, 5), (9, 11), (22, 10), (17, 27)), 1)
+    )
     rows = "".join(
-        f'<tr><td>{html.escape(label)}</td><td>{sensor.upper()}</td>'
+        f'<tr><td>{html.escape(label)}</td><td>{sensor.upper()}</td><td>{i2c_pins}</td>'
         f'<td id="left-{sensor}-{field}">Verbinde…</td>'
         f'<td id="right-{sensor}-{field}">Verbinde…</td></tr>'
         for label, sensor, field, _, _ in DISPLAY_ROWS
     )
-    rows += ('<tr><td>Wasserstand</td><td>Ultraschall</td>'
+    water_pins = (f'Trigger {pin("WATER_TRIGGER_GPIO", 6)}, '
+                  f'Echo {pin("WATER_ECHO_GPIO", 13)}')
+    rows += (f'<tr><td>Wasserstand</td><td>Ultraschall</td><td>{water_pins}</td>'
              '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>'
-             '<tr><td>Wasserstand: Median (1 Minute)</td><td>Ultraschall</td>'
+             f'<tr><td>Wasserstand: Median (1 Minute)</td><td>Ultraschall</td><td>{water_pins}</td>'
              '<td id="tank-ultrasonic-water_level_median_1m_cm" colspan="2">Verbinde…</td></tr>'
-             '<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td>'
+             f'<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td><td>{water_pins}</td>'
              '<td id="tank-ultrasonic-distance_cm" colspan="2">Verbinde…</td></tr>')
     rows += "".join(
-        f'<tr><td>Moos {index}: {label}</td><td>Ultraschall</td>'
+        f'<tr><td>Moos {index}: {label}</td><td>Ultraschall</td><td>{moss_pins[index - 1]}</td>'
         f'<td id="moss{index}-ultrasonic-{field}" colspan="2">Verbinde…</td></tr>'
         for index in range(1, 5)
         for field, label in (("distance_cm", "Rohabstand"), ("height_cm", "Höhe"))
     )
     rows += ('<tr><td>Mooshöhe: gemeinsamer Median</td><td>4 Messstellen</td>'
+             '<td>Moos 1–4</td>'
              '<td id="moss-aggregate-height_median_cm" colspan="2">Verbinde…</td></tr>')
     script = """
 <script>
@@ -228,8 +243,13 @@ connectCamera();
     return (
         '<!doctype html><html lang="de"><head><meta charset="utf-8">'
         "<title>Sensorwerte</title></head><body><h1>Sensorwerte</h1>"
-        "<table><thead><tr><th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th></tr></thead>"
+        "<table><thead><tr><th>Messwert</th><th>Sensor</th><th>GPIO (BCM)</th>"
+        "<th>Links</th><th>Rechts</th></tr></thead>"
         f"<tbody>{rows}</tbody></table>"
+        '<p>Mooshöhen benötigen je Messstelle den Abstand vom Sensor zur moosfreien '
+        'Bezugsfläche als MOSS_1_EMPTY_DISTANCE_CM bis MOSS_4_EMPTY_DISTANCE_CM '
+        'in .env. Der gemeinsame Median '
+        'benötigt mindestens drei kalibrierte Messstellen.</p>'
         '<h2>Kamera</h2><img id="camera" alt="Live-Bild der Kamera" width="640" height="360">'
         '<p id="camera-status">Verbinde…</p>'
         '<h2>Steuerung</h2>'

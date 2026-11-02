@@ -16,9 +16,12 @@ class DashboardTests(unittest.TestCase):
     def test_plain_page_contains_every_sensor_value(self):
         page = render_page()
         self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 12)
-        self.assertIn("<th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th>", page)
-        self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td id="left-scd40-co2_ppm">', page)
-        self.assertIn('<tr><td>Wasserstand</td><td>Ultraschall</td><td id="tank-ultrasonic-water_level_cm"', page)
+        self.assertIn("<th>Messwert</th><th>Sensor</th><th>GPIO (BCM)</th><th>Links</th><th>Rechts</th>", page)
+        self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td>L: SDA 15/SCL 14; R: SDA 23/SCL 24</td><td id="left-scd40-co2_ppm">', page)
+        self.assertIn('<tr><td>Wasserstand</td><td>Ultraschall</td><td>Trigger 6, Echo 13</td><td id="tank-ultrasonic-water_level_cm"', page)
+        for index, trigger, echo in ((1, 0, 5), (2, 9, 11), (3, 22, 10), (4, 17, 27)):
+            self.assertIn(f'<tr><td>Moos {index}: Rohabstand</td><td>Ultraschall</td><td>Trigger {trigger}, Echo {echo}</td>', page)
+        self.assertIn('MOSS_1_EMPTY_DISTANCE_CM bis MOSS_4_EMPTY_DISTANCE_CM', page)
         self.assertIn('id="tank-ultrasonic-water_level_median_1m_cm"', page)
         self.assertIn('id="tank-ultrasonic-distance_cm"', page)
         self.assertIn('id="moss1-ultrasonic-distance_cm"', page)
