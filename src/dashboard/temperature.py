@@ -6,6 +6,10 @@ PERIODS = {'10m': ('10m', '2s', 'last'), '1h': ('1h', '10s', 'last'), '24h': ('2
 
 
 def combine(readings, unit="°"):
+    if unit == "cm":
+        value = readings.get(("tank", "ultrasonic"))
+        valid = isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
+        return {"value": value if valid else None, "source": "" if valid else "Keine aktuellen Messwerte"}
     selected = []
     for side in ('left', 'right'):
         for sensor in ({'ppm': ('scd40',), 'lx': ('bh1750',)}.get(unit, ('sht45', 'scd40'))):
