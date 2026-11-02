@@ -16,25 +16,9 @@ services:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
 
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    env_file: .env
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./src/grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      - influxdb
-
-  ingest:
-    build: ./src/ingest
-    container_name: sensor-ingest
+  sensors:
+    build: ./src/sensors
+    container_name: sensors
     restart: unless-stopped
     env_file: .env
     devices:
@@ -70,4 +54,3 @@ services:
 volumes:
   influxdb-data:
   influxdb-config:
-  grafana-data:

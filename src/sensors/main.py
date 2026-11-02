@@ -15,7 +15,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 
 
-LOG = logging.getLogger("moos.ingest")
+LOG = logging.getLogger("moos.sensors")
 STOP = Event()
 
 
@@ -43,7 +43,7 @@ class Config:
     @classmethod
     def from_env(cls):
         if os.getenv("B24_1_ENABLED", "false").lower() == "true":
-            raise ValueError("B24_1 ingestion is not implemented; leave B24_1_ENABLED=false")
+            raise ValueError("B24_1 reading is not implemented; leave B24_1_ENABLED=false")
         config = cls(
             chip=os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
             left_sda=env_int("LEFT_I2C_SDA_GPIO", "15"),
