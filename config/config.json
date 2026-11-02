@@ -31,14 +31,6 @@
     "demo": true,
     "demo_abstand_cm": 7.059
   },
-  "taster": {
-    "gpio": 26
-  },
-  "messintervalle": {
-    "schnelle_sensoren_s": 1,
-    "moos_s": 4,
-    "co2_bereitschaft_s": 0.5
-  },
   "moos_3": {
     "trigger_gpio": 22,
     "echo_gpio": 10,
@@ -52,6 +44,14 @@
     "bezugsabstand_cm": null,
     "demo": false,
     "demo_abstand_cm": null
+  },
+  "taster": {
+    "gpio": 26
+  },
+  "messintervalle": {
+    "schnelle_sensoren_s": 1,
+    "moos_s": 4,
+    "co2_bereitschaft_s": 0.5
   },
   "deckel": {
     "offen_abstand_cm": 12.0

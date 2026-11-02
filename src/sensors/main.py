@@ -207,20 +207,25 @@ def run():
         display_values = {}
         next_display = start_time
         displayed_version = None
+        published_mode = None
+        mode_since = time.time()
         maintenance_active = False
         next_stop_attempt = 0.0
         lid_next_due = {}
 
         def refresh_display():
-            nonlocal next_display, displayed_version
+            nonlocal next_display, displayed_version, published_mode, mode_since
             mode, show_info, version = modes.snapshot()
             now = time.monotonic()
             if version == displayed_version and now < next_display:
                 return
             next_display = now + 1
+            if mode != published_mode:
+                published_mode = mode
+                mode_since = time.time()
             try:
                 with open("/run/moos/mode.tmp", "w") as state:
-                    json.dump({"mode": mode, "updated": time.time()}, state)
+                    json.dump({"mode": mode, "updated": time.time(), "since": mode_since}, state)
                 os.replace("/run/moos/mode.tmp", "/run/moos/mode.json")
             except OSError as exc:
                 LOG.warning("Mode publication failed: %s", exc)

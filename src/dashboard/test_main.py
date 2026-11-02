@@ -53,6 +53,36 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('last()', query)
         self.assertNotIn('aggregateWindow', query)
 
+    def test_maintenance_hides_current_values_but_keeps_history(self):
+        record = SimpleNamespace(values={'side': 'left', 'sensor': 'sht45'},
+                                 get_value=lambda: 20,
+                                 get_time=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.query_api.return_value.query.return_value = [SimpleNamespace(records=[record])]
+        with patch.object(main, 'mode_state', return_value={'mode': 'MAINTENANCE'}), \
+                patch.object(main, 'InfluxDBClient', return_value=client):
+            self.assertEqual(main.debug_sensors(), {'readings': []})
+            result = main.temperature('24h')
+        self.assertIsNone(result['current']['value'])
+        self.assertEqual(result['points'][0]['value'], 20)
+        self.assertEqual(client.query_api.return_value.query.call_count, 1)
+
+    def test_current_queries_start_at_recent_mode_transition(self):
+        since = time.time() - 2
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.query_api.return_value.query.return_value = []
+        with patch.object(main, 'mode_state', return_value={'mode': 'AUTO', 'since': since}), \
+                patch.object(main, 'InfluxDBClient', return_value=client):
+            main.debug_sensors()
+            main.temperature('1h', current_only=True)
+            main.moss('1h', current_only=True)
+        for call in client.query_api.return_value.query.call_args_list:
+            self.assertIn('range(start: time(v:', call.args[0])
+        with patch.object(main, 'mode_state', return_value={'mode': 'AUTO', 'since': since - 20}):
+            self.assertEqual(main.current_range(), '-12s')
+
     def test_temperature_combines_current_and_history_by_window(self):
         def record(side, sensor, value):
             return SimpleNamespace(values={'side': side, 'sensor': sensor},

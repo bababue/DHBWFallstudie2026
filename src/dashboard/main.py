@@ -4,6 +4,7 @@ import html
 import logging
 import time
 from pathlib import Path
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import FastAPI
@@ -19,14 +20,36 @@ MODE_FILE = Path('/run/moos/mode.json')
 LOG = logging.getLogger('moos.dashboard')
 
 
+def mode_state():
+    try:
+        data = json.loads(MODE_FILE.read_text())
+        now = time.time()
+        if data['mode'] in ('AUTO', 'MAINTENANCE', 'MEASURING') and 0 <= now - data['updated'] < 5:
+            return data
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return {}
+
+
+def current_range():
+    """Ignore values from before the latest mode change, within the 12 s window."""
+    state = mode_state()
+    since = state.get('since')
+    if isinstance(since, (int, float)) and not isinstance(since, bool) and time.time() - 12 < since <= time.time():
+        return f'time(v: "{datetime.fromtimestamp(since, timezone.utc).isoformat()}")'
+    return '-12s'
+
+
 @app.get('/api/debug/sensors')
 def debug_sensors():
     """Return the latest stored sensor readings without aggregation."""
+    if mode_state().get('mode') == 'MAINTENANCE':
+        return {'readings': []}
     bucket = setting('INFLUXDB_BUCKET', 'moos_sensors')
     org = setting('INFLUXDB_ORG', 'moos')
     query = (
         f'from(bucket: {json.dumps(bucket)})\n'
-        '  |> range(start: -12s)\n'
+        f'  |> range(start: {current_range()})\n'
         '  |> filter(fn: (r) => r._measurement == "moos_sensor" and '
         '((r.sensor == "sht45" or r.sensor == "scd40" or r.sensor == "bh1750") and '
         '(r._field == "temperature_c" or r._field == "humidity_pct" or r._field == "co2_ppm" or r._field == "illuminance_lux") and '
@@ -43,7 +66,7 @@ def debug_sensors():
                 for table in client.query_api().query(query, org=org)
                 for record in table.records
             ]
-        return {'readings': readings}
+        return {'readings': [] if mode_state().get('mode') == 'MAINTENANCE' else readings}
     except Exception:
         LOG.exception('Could not read debug sensor values')
         return Response('Sensordaten nicht erreichbar', status_code=503)
@@ -91,7 +114,7 @@ def metric_data(field, unit, period, current_only):
             '  |> filter(fn: (r) => r._measurement == "moos_sensor" and '
             f'r._field == {json.dumps(field)} and ({sensor_filter}) '
             f'and ({side_filter}))\n')
-    current_query = base.replace('DURATION', '12s') + '  |> last()'
+    current_query = base.replace('-DURATION', current_range()) + '  |> last()'
     history_query = (base.replace('DURATION', duration) +
                      f'  |> aggregateWindow(every: {window}, fn: {function}, createEmpty: false, timeSrc: "_start")')
     try:
@@ -99,9 +122,12 @@ def metric_data(field, unit, period, current_only):
                             token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
             api = client.query_api()
             current = {}
-            for table in api.query(current_query, org=org):
-                for record in table.records:
-                    current[(record.values.get('side'), record.values.get('sensor'))] = record.get_value()
+            if mode_state().get('mode') != 'MAINTENANCE':
+                for table in api.query(current_query, org=org):
+                    for record in table.records:
+                        current[(record.values.get('side'), record.values.get('sensor'))] = record.get_value()
+            if mode_state().get('mode') == 'MAINTENANCE':
+                current = {}
             if current_only:
                 return {'current': combine(current, unit)}
             windows = {}
@@ -134,9 +160,12 @@ def moss(period: str = '1h', current_only: bool = False):
                             token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
             api = client.query_api()
             current = {}
-            for table in api.query(base.replace('DURATION', '12s') + '  |> last()', org=org):
-                for record in table.records:
-                    current[record.values.get('side')] = record.get_value()
+            if mode_state().get('mode') != 'MAINTENANCE':
+                for table in api.query(base.replace('-DURATION', current_range()) + '  |> last()', org=org):
+                    for record in table.records:
+                        current[record.values.get('side')] = record.get_value()
+            if mode_state().get('mode') == 'MAINTENANCE':
+                current = {}
             if current_only:
                 return {'current': current}
             series = {f'moss{index}': [] for index in range(1, 5)}
@@ -156,13 +185,7 @@ def moss(period: str = '1h', current_only: bool = False):
 
 @app.get('/api/mode')
 def mode():
-    try:
-        data = json.loads(MODE_FILE.read_text())
-        if data['mode'] in ('AUTO', 'MAINTENANCE', 'MEASURING') and 0 <= time.time() - data['updated'] < 5:
-            return {'mode': data['mode']}
-    except (OSError, ValueError, TypeError, KeyError):
-        pass
-    return {'mode': None}
+    return {'mode': mode_state().get('mode')}
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -176,7 +199,8 @@ def index():
     </style></head><body><main><header class="topbar"><div class="mode-block"><h1 id="mode">Verbinde …</h1><p class="status" id="mode-status"></p></div><div class="toolbar"><label class="debug-switch"><input type="checkbox" id="debug-toggle"> Debug-Modus</label><label><select id="global-period" aria-label="Zeitraum"><option value="10m">10 Minuten</option><option value="1h" selected>1 Stunde</option><option value="24h">24 Stunden</option><option value="7d">7 Tage</option><option value="30d">30 Tage</option></select></label></div></header><div class="grid"><section class="card" id="debug-panel" hidden><p class="label">Sensoren · Rohwerte</p><div class="table-wrap"><table><thead><tr><th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th></tr></thead><tbody><tr><td>Temperatur (°C)</td><td>SHT45</td><td id="left-sht45-temperature_c">–</td><td id="right-sht45-temperature_c">–</td></tr><tr><td>Temperatur (°C)</td><td>SCD40</td><td id="left-scd40-temperature_c">–</td><td id="right-scd40-temperature_c">–</td></tr><tr><td>Luftfeuchtigkeit (%)</td><td>SHT45</td><td id="left-sht45-humidity_pct">–</td><td id="right-sht45-humidity_pct">–</td></tr><tr><td>Luftfeuchtigkeit (%)</td><td>SCD40</td><td id="left-scd40-humidity_pct">–</td><td id="right-scd40-humidity_pct">–</td></tr><tr><td>CO₂ (ppm)</td><td>SCD40</td><td id="left-scd40-co2_ppm">–</td><td id="right-scd40-co2_ppm">–</td></tr><tr><td>Licht (lx)</td><td>BH1750</td><td id="left-bh1750-illuminance_lux">–</td><td id="right-bh1750-illuminance_lux">–</td></tr><tr><td>Wasser</td><td>Ultraschall</td><td><small>Wassersensor (cm)</small><br><span id="tank-ultrasonic-distance_cm">–</span></td><td><small>Wasserstand (max(0; __WATER_OFFSET__ − Rohabstand), cm)</small><br><span id="tank-ultrasonic-water_level_cm">–</span></td></tr><tr><td>Moos 1</td><td>Ultraschall</td><td><small>Abstand (cm)</small><br><span id="moss1-ultrasonic-distance_cm">–</span></td><td><small>Mooshöhe (cm)</small><br><span id="moss1-ultrasonic-height_cm">–</span></td></tr><tr><td>Moos 2</td><td>Ultraschall</td><td><small>Abstand (cm)</small><br><span id="moss2-ultrasonic-distance_cm">–</span></td><td><small>Mooshöhe (cm)</small><br><span id="moss2-ultrasonic-height_cm">–</span></td></tr><tr><td>Moos 3</td><td>Ultraschall</td><td><small>Abstand (cm)</small><br><span id="moss3-ultrasonic-distance_cm">–</span></td><td><small>Mooshöhe (cm)</small><br><span id="moss3-ultrasonic-height_cm">–</span></td></tr><tr><td>Moos 4</td><td>Ultraschall</td><td><small>Abstand (cm)</small><br><span id="moss4-ultrasonic-distance_cm">–</span></td><td><small>Mooshöhe (cm)</small><br><span id="moss4-ultrasonic-height_cm">–</span></td></tr><tr><td>Mooshöhe Ø</td><td>Ultraschall</td><td colspan="2" id="moss-average">–</td></tr></tbody></table></div><p class="status" id="debug-status">Verbinde …</p></section><section class="card"><div class="temperature-head"><div><p class="label">Temperatur</p><div class="metric-readout"><p class="temperature-value" id="temperature">–</p><p class="status" id="temperature-source">Lade Messwerte …</p></div></div></div><svg class="chart" id="temperature-chart" viewBox="0 0 800 230" role="img" aria-label="Temperaturverlauf"></svg><p class="status" id="temperature-chart-status">Lade Verlauf …</p></section><section class="card"><div class="humidity-head"><div><p class="label">Luftfeuchtigkeit</p><div class="metric-readout"><p class="humidity-value" id="humidity">–</p><p class="status" id="humidity-source">Lade Messwerte …</p></div></div></div><svg class="chart" id="humidity-chart" viewBox="0 0 800 230" role="img" aria-label="Luftfeuchtigkeitverlauf"></svg><p class="status" id="humidity-chart-status">Lade Verlauf …</p></section><section class="card"><div class="co2-head"><div><p class="label">CO₂</p><div class="metric-readout"><p class="co2-value" id="co2">–</p><p class="status" id="co2-source">Lade Messwerte …</p></div></div></div><svg class="chart" id="co2-chart" viewBox="0 0 800 230" role="img" aria-label="CO₂verlauf"></svg><p class="status" id="co2-chart-status">Lade Verlauf …</p></section><section class="card"><div class="light-head"><div><p class="label">Licht</p><div class="metric-readout"><p class="light-value" id="light">–</p><p class="status" id="light-source">Lade Messwerte …</p></div></div></div><svg class="chart" id="light-chart" viewBox="0 0 800 230" role="img" aria-label="Lichtverlauf"></svg><p class="status" id="light-chart-status">Lade Verlauf …</p></section><section class="card"><div class="water-head"><div><p class="label">Wasserstand &amp; Mooshöhe</p><div class="metric-readout"><p class="water-value" id="water">–</p><p class="status" id="water-source">Lade Messwerte …</p></div></div></div><div class="chart-legend"><span><i class="legend-water"></i>Wasserstand</span><span><i class="legend-moss"></i>Mooshöhe Ø</span></div><svg class="chart" id="water-chart" viewBox="0 0 800 230" role="img" aria-label="Verlauf von Wasserstand und Mooshöhe"></svg><p class="status" id="water-chart-status">Lade Verlauf …</p></section><section class="card camera"><p class="label" id="camera-status" aria-live="polite">Live Feed: Verbinde …</p><img id="camera" alt="Kamerafeed"></section></div></main><script>
     const topbar=document.querySelector('.topbar');
     new ResizeObserver(()=>document.documentElement.style.setProperty('--topbar-height',topbar.getBoundingClientRect().height+'px')).observe(topbar);
-    async function updateMode(){try{const response=await fetch('/api/mode',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(['AUTO','MAINTENANCE','MEASURING'].includes(data.mode))document.documentElement.dataset.mode=data.mode;document.getElementById('mode').textContent=data.mode||'Nicht verfügbar';document.getElementById('mode-status').textContent=data.mode?'':'Verbindung zum Sensorprozess fehlt';}catch(e){document.getElementById('mode').textContent='Nicht verfügbar';document.getElementById('mode-status').textContent='Verbindung zum Dashboard fehlt';}}updateMode();setInterval(updateMode,1000);
+    function clearCurrent(){for(const metric of ['temperature','humidity','co2','light','water']){document.getElementById(metric).textContent='–';document.getElementById(metric+'-source').textContent=''}document.querySelectorAll('#debug-panel tbody [id]').forEach(cell=>cell.textContent='–');document.getElementById('debug-status').textContent=''}
+    async function updateMode(){try{const response=await fetch('/api/mode',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(['AUTO','MAINTENANCE','MEASURING'].includes(data.mode))document.documentElement.dataset.mode=data.mode;if(data.mode==='MAINTENANCE')clearCurrent();document.getElementById('mode').textContent=data.mode||'Nicht verfügbar';document.getElementById('mode-status').textContent=data.mode?'':'Verbindung zum Sensorprozess fehlt';}catch(e){document.getElementById('mode').textContent='Nicht verfügbar';document.getElementById('mode-status').textContent='Verbindung zum Dashboard fehlt';}}updateMode();setInterval(updateMode,1000);
     const chartColors={temperature:'#d97706',humidity:'#0891b2',co2:'#7c3aed',light:'#ca8a04',water:'#2563eb',moss:'#16a34a'};
     function initMetric(metric, unit){
     const periodSelect=document.getElementById('global-period'), chart=document.getElementById(metric+'-chart');
@@ -204,12 +228,12 @@ def index():
       }
     }
     async function updateTemperature(){const request=++temperatureRequest;try{const response=await fetch('/api/'+metric+'?period='+periodSelect.value,{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(metric==='water'){try{const mossResponse=await fetch('/api/moss?period='+periodSelect.value,{cache:'no-store'});if(!mossResponse.ok)throw Error();const moss=await mossResponse.json(),windows=new Map();for(const series of Object.values(moss.series))for(const point of series){if(Number.isFinite(point.value)){const values=windows.get(point.time)||[];values.push(point.value);windows.set(point.time,values)}}data.moss_points=[...windows].sort((a,b)=>a[0]-b[0]).map(([time,values])=>({time,value:values.reduce((a,b)=>a+b,0)/values.length}));data.moss_window_seconds=moss.window_seconds}catch(e){data.moss_points=[]}}if(request!==temperatureRequest)return;drawTemperature(data)}catch(e){if(request!==temperatureRequest)return;chart.replaceChildren();document.getElementById(metric+'-chart-status').textContent='Verlauf nicht erreichbar'}}
-    async function updateCurrentTemperature(){try{const response=await fetch('/api/'+metric+'?current_only=true',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(metric==='moss'){const fmt=v=>v==null?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' cm';document.getElementById(metric).textContent='1: '+fmt(data.current.moss1);document.getElementById(metric+'-source').textContent=['2: '+fmt(data.current.moss2)+' ╌','3: '+fmt(data.current.moss3)+' ⋯','4: '+fmt(data.current.moss4)+' – ·'].join('\\n');return}document.getElementById(metric+'').textContent=data.current.value===null?'–':data.current.value.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' '+unit;document.getElementById(metric+'-source').textContent=data.current.source}catch(e){document.getElementById(metric+'').textContent='–';document.getElementById(metric+'-source').textContent='Daten nicht erreichbar'}}
+    async function updateCurrentTemperature(){try{const response=await fetch('/api/'+metric+'?current_only=true',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(document.documentElement.dataset.mode==='MAINTENANCE'){clearCurrent();return}if(metric==='moss'){const fmt=v=>v==null?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' cm';document.getElementById(metric).textContent='1: '+fmt(data.current.moss1);document.getElementById(metric+'-source').textContent=['2: '+fmt(data.current.moss2)+' ╌','3: '+fmt(data.current.moss3)+' ⋯','4: '+fmt(data.current.moss4)+' – ·'].join('\\n');return}document.getElementById(metric+'').textContent=data.current.value===null?'–':data.current.value.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' '+unit;document.getElementById(metric+'-source').textContent=data.current.source}catch(e){document.getElementById(metric+'').textContent='–';document.getElementById(metric+'-source').textContent='Daten nicht erreichbar'}}
     periodSelect.addEventListener('change',updateTemperature);updateTemperature();updateCurrentTemperature();setInterval(updateTemperature,30000);setInterval(updateCurrentTemperature,2000);
     }
     initMetric("temperature", "°C");initMetric("humidity", "%");initMetric("co2", "ppm");initMetric("light", "lx");initMetric("water", "cm");
     const debugToggle=document.getElementById('debug-toggle'), debugPanel=document.getElementById('debug-panel'), debugStatus=document.getElementById('debug-status');
-    async function updateDebug(){if(!debugToggle.checked)return;try{const response=await fetch('/api/debug/sensors',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(!debugToggle.checked)return;debugPanel.querySelectorAll('tbody [id]').forEach(cell=>cell.textContent='–');for(const reading of data.readings){const cell=document.getElementById(`${reading.side}-${reading.sensor}-${reading.field}`);if(cell)cell.textContent=String(reading.value)}const heights=data.readings.filter(r=>/^moss[1-4]$/.test(r.side)&&r.sensor==='ultrasonic'&&r.field==='height_cm'&&Number.isFinite(r.value)).map(r=>r.value);document.getElementById('moss-average').textContent=heights.length?(heights.reduce((a,b)=>a+b,0)/heights.length).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' cm ('+heights.length+'/4)':'–';debugStatus.textContent=data.readings.length?'':'Keine aktuellen Messwerte';}catch(e){if(debugToggle.checked){debugPanel.querySelectorAll('tbody [id]').forEach(cell=>cell.textContent='–');debugStatus.textContent='Sensordaten nicht erreichbar'}}}
+    async function updateDebug(){if(!debugToggle.checked)return;try{const response=await fetch('/api/debug/sensors',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(!debugToggle.checked)return;if(document.documentElement.dataset.mode==='MAINTENANCE'){clearCurrent();return}debugPanel.querySelectorAll('tbody [id]').forEach(cell=>cell.textContent='–');for(const reading of data.readings){const cell=document.getElementById(`${reading.side}-${reading.sensor}-${reading.field}`);if(cell)cell.textContent=String(reading.value)}const heights=data.readings.filter(r=>/^moss[1-4]$/.test(r.side)&&r.sensor==='ultrasonic'&&r.field==='height_cm'&&Number.isFinite(r.value)).map(r=>r.value);document.getElementById('moss-average').textContent=heights.length?(heights.reduce((a,b)=>a+b,0)/heights.length).toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' cm ('+heights.length+'/4)':'–';debugStatus.textContent=data.readings.length?'':'Keine aktuellen Messwerte';}catch(e){if(debugToggle.checked){debugPanel.querySelectorAll('tbody [id]').forEach(cell=>cell.textContent='–');debugStatus.textContent='Sensordaten nicht erreichbar'}}}
     debugToggle.addEventListener('change',()=>{debugPanel.hidden=!debugToggle.checked;if(debugToggle.checked)updateDebug()});setInterval(updateDebug,1000);
     const camera=document.getElementById('camera');function connectCamera(){camera.src='/camera/stream.mjpg?'+Date.now()}camera.onload=()=>document.getElementById('camera-status').textContent='Live Feed';camera.onerror=()=>{document.getElementById('camera-status').textContent='Live Feed: Nicht erreichbar';setTimeout(connectCamera,3000)};connectCamera();
     </script></body></html>'''.replace('__WATER_OFFSET__', html.escape(setting('WATER_FLOOR_DISTANCE_CM', '8.62').replace('.', ','))))
