@@ -65,12 +65,12 @@ Kalibrierung im leeren Behälter, mit ruhiger Oberfläche und freiem Schallweg:
 
 ```sh
 python3 scripts/calibrate_water.py
-python3 scripts/calibrate_water.py --write
 ```
 
-Das Skript stoppt einen laufenden Sensorcontainer vorübergehend, misst 80 Echos
-im Container und startet ihn danach wieder. Es speichert nur bei ausreichender
-Messqualität. Bei bekannter Wassertiefe kann `--water-height 1.5` angegeben werden.
+Das Skript stoppt einen laufenden Sensorcontainer vorübergehend, misst 200 Echos
+im Container und startet ihn danach wieder. Bei ausreichender Messqualität fragt
+es nach der Messung, ob das Ergebnis gespeichert werden soll. Bei bekannter
+Wassertiefe kann `--water-height 1.5` angegeben werden.
 Die Kalibrierung ersetzt nicht die Prüfung des Mindestabstands laut Sensordatenblatt.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
@@ -78,8 +78,8 @@ Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
 Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
 ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst
-das Skript jeden Sensor 200-mal mit 0,1 Sekunden Pause und speichert stabile Bezugsabstände automatisch in
-`config/config.json`. Nicht angeschlossene oder instabile Sensoren behalten ihren
+das Skript jeden Sensor 200-mal mit 0,1 Sekunden Pause und fragt, ob stabile
+Bezugsabstände in `config/config.json` gespeichert werden sollen. Nicht angeschlossene oder instabile Sensoren behalten ihren
 bisherigen Wert. Der Sensorcontainer wird währenddessen angehalten und danach
 wieder gestartet, falls er zuvor lief.
 

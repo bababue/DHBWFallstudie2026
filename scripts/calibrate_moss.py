@@ -16,15 +16,17 @@ SAMPLE_COUNT = 200
 SAMPLE_INTERVAL_SECONDS = 0.1
 RESULT_PREFIX = "MOOS_KALIBRIERUNG_JSON="
 MAX_DEVIATION_CM = 0.3
+MIN_VALID_FRACTION = 0.3
+MIN_STABLE_FRACTION = 0.8
 
 
 def reference(samples):
     valid = [value for value in samples if value is not None and math.isfinite(value) and 0 < value <= 400]
-    if len(valid) < SAMPLE_COUNT * 0.8:
+    if len(valid) < SAMPLE_COUNT * MIN_VALID_FRACTION:
         return None
     center = statistics.median(valid)
     accepted = [value for value in valid if abs(value - center) <= MAX_DEVIATION_CM]
-    if len(accepted) < len(valid) * 0.8:
+    if len(accepted) < len(valid) * MIN_STABLE_FRACTION:
         return None
     return round(statistics.median(accepted), 3)
 
@@ -63,6 +65,14 @@ def main():
                 code = process.wait()
             if code != 0 or not results:
                 return code or 1
+            try:
+                answer = input('Werte in config/config.json speichern? [j/N] ').strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print('\nNicht gespeichert.')
+                return 1
+            if answer not in ('j', 'ja', 'y', 'yes'):
+                print('Nicht gespeichert.')
+                return 0
             if hashlib.sha256(config_path.read_bytes()).digest() != revision:
                 print('Konfiguration wurde zwischenzeitlich geändert; keine Werte gespeichert.')
                 return 1
@@ -109,9 +119,14 @@ def main():
                 for _ in range(SAMPLE_COUNT):
                     samples.append(sensor._distance_cm())
                     time.sleep(SAMPLE_INTERVAL_SECONDS)
+                valid = [value for value in samples
+                         if value is not None and math.isfinite(value) and 0 < value <= 400]
+                print(f'Moos {index}: {len(valid)}/{SAMPLE_COUNT} gültige Echos', flush=True)
                 result = reference(samples)
                 if result is None:
-                    print(f'Moos {index}: keine ausreichend stabilen Messungen; bisheriger Wert bleibt erhalten.', flush=True)
+                    reason = ('zu wenige gültige Echos' if len(valid) < SAMPLE_COUNT * MIN_VALID_FRACTION
+                              else 'Messwerte streuen zu stark')
+                    print(f'Moos {index}: {reason}; bisheriger Wert bleibt erhalten.', flush=True)
                 else:
                     results[index] = result
                     print(f'Moos {index}: {result:.3f} cm', flush=True)
