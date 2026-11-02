@@ -119,28 +119,24 @@
     "moos_4",
     "bezugsabstand_cm"
   ],
-  "MOSS_DEMO_DATA": [
-    "moos_demo",
-    "demo_data"
-  ],
-  "MOSS_1_DEMO_DISTANCE_CM": [
-    "moos_demo",
-    "demo_distance_1_cm"
-  ],
-  "MOSS_2_DEMO_DISTANCE_CM": [
-    "moos_demo",
-    "demo_distance_2_cm"
-  ],
-  "MOSS_3_DEMO_DISTANCE_CM": [
-    "moos_demo",
-    "demo_distance_3_cm"
-  ],
-  "MOSS_4_DEMO_DISTANCE_CM": [
-    "moos_demo",
-    "demo_distance_4_cm"
-  ],
   "LID_OPEN_DISTANCE_CM": [
     "deckel",
     "offen_abstand_cm"
+  ],
+  "MOSS_1_DEMO": [
+    "moos_1",
+    "demo"
+  ],
+  "MOSS_2_DEMO": [
+    "moos_2",
+    "demo"
+  ],
+  "MOSS_3_DEMO": [
+    "moos_3",
+    "demo"
+  ],
+  "MOSS_4_DEMO": [
+    "moos_4",
+    "demo"
   ]
 }

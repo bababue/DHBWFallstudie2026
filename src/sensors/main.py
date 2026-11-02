@@ -175,15 +175,16 @@ def run():
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
                                   config.water_floor_distance_cm, options=load()["wasserstand"])
         sensors.append(("tank", water_sensor))
-        demo = load()["moos_demo"]
+        moss_config = load()
         water_noise = WaterNoise()
         for index, ((trigger, echo), empty_distance) in enumerate(
                 zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
-            demo_distance = demo[f"demo_distance_{index}_cm"]
-            if demo["demo_data"] and demo_distance is None:
+            demo = moss_config[f"moos_{index}"]["demo"]
+            if demo and empty_distance is None:
+                LOG.warning("Moos %s: Demo ohne Bezugsabstand deaktiviert", index)
                 continue
             sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance,
-                                demo_distance_cm=demo_distance if demo["demo_data"] else None)
+                                demo_distance_cm=empty_distance if demo else None)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])

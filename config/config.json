@@ -12,7 +12,7 @@
   "wasserstand": {
     "trigger_gpio": 6,
     "echo_gpio": 13,
-    "sensor_boden_abstand_cm": 8.262,
+    "sensor_boden_abstand_cm": 8.265,
     "filter_messungen": 5,
     "max_streuung_cm": 0.2,
     "max_fuellhoehe_cm": null
@@ -20,12 +20,14 @@
   "moos_1": {
     "trigger_gpio": 9,
     "echo_gpio": 11,
-    "bezugsabstand_cm": null
+    "bezugsabstand_cm": 6.94,
+    "demo": true
   },
   "moos_2": {
     "trigger_gpio": 0,
     "echo_gpio": 5,
-    "bezugsabstand_cm": null
+    "bezugsabstand_cm": 6.059,
+    "demo": true
   },
   "taster": {
     "gpio": 26
@@ -38,21 +40,16 @@
   "moos_3": {
     "trigger_gpio": 22,
     "echo_gpio": 10,
-    "bezugsabstand_cm": null
+    "bezugsabstand_cm": null,
+    "demo": false
   },
   "moos_4": {
     "trigger_gpio": 17,
     "echo_gpio": 27,
-    "bezugsabstand_cm": null
+    "bezugsabstand_cm": null,
+    "demo": false
   },
   "deckel": {
     "offen_abstand_cm": 12.0
-  },
-  "moos_demo": {
-    "demo_data": true,
-    "demo_distance_1_cm": 6.940,
-    "demo_distance_2_cm": 6.059,
-    "demo_distance_3_cm": null,
-    "demo_distance_4_cm": null
   }
 }

@@ -79,20 +79,17 @@ Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 Ihre Echozeiten werden wie beim Wassersensor über GPIO-Flanken mit Zeitstempeln
 erfasst. Das gilt auch für die Kalibrierung der Moossensoren.
 
-Für synthetische Moosdaten `moos_demo.demo_data` in `config/config.json` auf
-`true` setzen und `moos_demo.demo_distance_1_cm` bis `demo_distance_4_cm`
-auf die gewünschten Abstände der jeweiligen Sensoren in cm setzen. Alle vier
-Sensoren erzeugen dann unabhängig normalverteilte Abstände um ihren jeweiligen
-Wert. Steht ein Demoabstand auf `null`, ist dieser Sensor im Demomodus
-ausgeschaltet und liefert keine Messwerte; außerhalb des Demomodus wird der
-echte Sensor weiterhin verwendet. Die Standardabweichung wird laufend aus den gültigen Rohabständen des
+Für synthetische Moosdaten bei jedem gewünschten Sensor `moos_1.demo` bis
+`moos_4.demo` in `config/config.json` auf `true` setzen. Die Werte sind
+normalverteilt um den jeweiligen `bezugsabstand_cm`. Ist dieser `null`, liefert
+der Demo-Sensor keine Messwerte. Bei `demo: false` wird der echte Sensor genutzt.
+Die Standardabweichung wird laufend aus den gültigen Rohabständen des
 Wassersensors der letzten 60 Sekunden geschätzt. Mindestens fünf Messwerte sind
 nötig; ohne diese werden keine Demowerte erzeugt. Auch tatsächliche Änderungen
-des Wasserstands beeinflussen diese Schätzung. Ein vorhandener Moos-Kalibrierwert bleibt die Referenz; fehlt er,
-dient der Demoabstand als Referenz. Die Daten werden in InfluxDB gespeichert und
-tragen dort das Feld `demo_data=true`; echte Moosmessungen erhalten `false`.
-Zum Beenden `demo_data` wieder auf `false` setzen. Der Sensorcontainer übernimmt
-die Änderung durch Neustart.
+des Wasserstands beeinflussen diese Schätzung. Die Daten werden in InfluxDB
+gespeichert und tragen dort das Feld `demo_data=true`; echte Moosmessungen
+erhalten `false`. Der Sensorcontainer übernimmt Konfigurationsänderungen durch
+Neustart.
 
 Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
 ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst

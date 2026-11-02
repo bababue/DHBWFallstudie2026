@@ -20,34 +20,26 @@ class ConfigurationTests(unittest.TestCase):
         data['messintervalle']['schnelle_sensoren_s'] = 0
         with self.assertRaises(ValueError): validate(data)
 
-    def test_demo_configuration_requires_boolean_and_valid_distance(self):
-        data = copy.deepcopy(load())
-        data['moos_demo']['demo_data'] = 'false'
-        with self.assertRaises(ValueError): validate(data)
-        data['moos_demo']['demo_data'] = True
-        data['moos_demo']['demo_distance_2_cm'] = -1
-        with self.assertRaises(ValueError): validate(data)
-
-    def test_legacy_demo_distance_is_copied_to_each_sensor(self):
-        data = copy.deepcopy(load())
-        data['moos_demo'] = {'demo_data': True, 'demo_distance_cm': 7.2}
-        upgraded = validate(upgrade(data))
-        self.assertEqual([upgraded['moos_demo'][f'demo_distance_{i}_cm'] for i in range(1, 5)], [7.2] * 4)
-        self.assertIn('demo_distance_cm', data['moos_demo'])
-
-    def test_individual_demo_distances_are_preserved(self):
+    def test_demo_flags_must_be_boolean_and_allow_missing_reference(self):
         data = copy.deepcopy(load())
         for i in range(1, 5):
-            data['moos_demo'][f'demo_distance_{i}_cm'] = float(i + 5)
+            data[f'moos_{i}']['demo'] = True
+            data[f'moos_{i}']['bezugsabstand_cm'] = None
+        validate(data)
+        data['moos_2']['demo'] = 'true'
+        with self.assertRaises(ValueError): validate(data)
+
+    def test_legacy_config_migrates_demo_without_changing_reference(self):
+        data = copy.deepcopy(load())
+        for i in range(1, 5):
+            del data[f'moos_{i}']['demo']
+        data['moos_1']['bezugsabstand_cm'] = None
+        data['moos_demo'] = {'demo_data': True, 'demo_distance_1_cm': 7.2}
         result = validate(upgrade(data))
-        self.assertEqual([result['moos_demo'][f'demo_distance_{i}_cm'] for i in range(1, 5)], [6, 7, 8, 9])
-
-    def test_demo_distances_may_be_null(self):
-        data = copy.deepcopy(load())
-        data['moos_demo']['demo_data'] = True
-        for i in range(1, 5):
-            data['moos_demo'][f'demo_distance_{i}_cm'] = None
-        self.assertEqual(validate(upgrade(data))['moos_demo']['demo_distance_1_cm'], None)
+        self.assertTrue(result['moos_1']['demo'])
+        self.assertIsNone(result['moos_1']['bezugsabstand_cm'])
+        self.assertNotIn('moos_demo', result)
+        self.assertIn('moos_demo', data)
 
     def test_lid_threshold_defaults_and_validation(self):
         data = copy.deepcopy(load())
