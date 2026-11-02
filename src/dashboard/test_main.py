@@ -5,14 +5,20 @@ from unittest.mock import patch
 
 from fastapi import WebSocketDisconnect
 
-from main import Hub, READINGS, Settings, make_payload, read_latest, render_page, sensor_stream
+from main import DISPLAY_ROWS, Hub, READINGS, Settings, make_payload, read_latest, render_page, sensor_stream
 
 
 class DashboardTests(unittest.TestCase):
     def test_plain_page_contains_every_sensor_value(self):
         page = render_page()
-        self.assertEqual(page.count("<tr><td>"), len(READINGS))
-        self.assertIn("SCD40 links – CO₂", page)
+        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS))
+        self.assertIn("<th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th>", page)
+        self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td id="left-scd40-co2_ppm">', page)
+        self.assertLess(page.index("<td>Temperatur</td>"), page.index("<td>Luftfeuchte</td>"))
+        self.assertLess(page.index("<td>Luftfeuchte</td>"), page.index("<td>Licht</td>"))
+        self.assertLess(page.index("<td>Licht</td>"), page.index("<td>CO₂</td>"))
+        for reading in READINGS:
+            self.assertIn(f'id="{reading.side}-{reading.sensor}-{reading.field}"', page)
         self.assertIn('new WebSocket(`${protocol}//${location.host}/ws`)', page)
         self.assertNotIn('http-equiv="refresh"', page)
         self.assertNotIn("<style", page)

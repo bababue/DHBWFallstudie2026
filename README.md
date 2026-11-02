@@ -55,8 +55,9 @@ alten Dienstnamen. Das alte Grafana-Datenvolume kann danach einmalig mit
 Die Container heißen `sensors`, `influxdb`, `dashboard` und `camera`.
 Sensoren, Steuerung und Kamera laufen vollständig in Docker Compose.
 
-Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es zeigt
-für jede Messgröße den Sensornamen und den letzten Wert ohne CSS. Der Browser
+Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es ordnet
+die aktuellen Werte nach Temperatur, Luftfeuchte, Licht und CO₂ und zeigt
+links und rechts nebeneinander, weiterhin ohne CSS. Der Browser
 lädt die Seite einmal und erhält neue Werte über eine WebSocket-Verbindung.
 Der Server prüft InfluxDB alle 2 Sekunden und sendet Änderungen sofort an alle
 verbundenen Browser. Messwerte, die älter als 180 Sekunden sind, erscheinen als

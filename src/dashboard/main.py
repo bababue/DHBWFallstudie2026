@@ -24,20 +24,23 @@ class Reading:
     side: str
     sensor: str
     field: str
-    label: str
     unit: str
     decimals: int
 
 
+DISPLAY_ROWS = (
+    ("Temperatur", "sht45", "temperature_c", "°C", 1),
+    ("Temperatur", "scd40", "temperature_c", "°C", 1),
+    ("Luftfeuchte", "sht45", "humidity_pct", "%", 1),
+    ("Luftfeuchte", "scd40", "humidity_pct", "%", 1),
+    ("Licht", "bh1750", "illuminance_lux", "lx", 0),
+    ("CO₂", "scd40", "co2_ppm", "ppm", 0),
+)
+
 READINGS = tuple(
-    Reading(side, sensor, field, f"{sensor.upper()} {side_label} – {label}", unit, decimals)
-    for side, side_label in (("left", "links"), ("right", "rechts"))
-    for sensor, fields in (
-        ("sht45", (("temperature_c", "Temperatur", "°C", 1), ("humidity_pct", "Luftfeuchte", "%", 1))),
-        ("bh1750", (("illuminance_lux", "Licht", "lx", 0),)),
-        ("scd40", (("co2_ppm", "CO₂", "ppm", 0), ("temperature_c", "Temperatur", "°C", 1), ("humidity_pct", "Luftfeuchte", "%", 1))),
-    )
-    for field, label, unit, decimals in fields
+    Reading(side, sensor, field, unit, decimals)
+    for _, sensor, field, unit, decimals in DISPLAY_ROWS
+    for side in ("left", "right")
 )
 
 
@@ -117,9 +120,10 @@ def make_payload(values: dict[tuple[str, str, str], float], error: bool = False,
 
 def render_page(camera_port: int = 8000) -> str:
     rows = "".join(
-        f'<tr><td>{html.escape(reading.label)}</td>'
-        f'<td id="{reading_id(reading)}">Verbinde…</td></tr>'
-        for reading in READINGS
+        f'<tr><td>{html.escape(label)}</td><td>{sensor.upper()}</td>'
+        f'<td id="left-{sensor}-{field}">Verbinde…</td>'
+        f'<td id="right-{sensor}-{field}">Verbinde…</td></tr>'
+        for label, sensor, field, _, _ in DISPLAY_ROWS
     )
     script = """
 <script>
@@ -212,7 +216,7 @@ connectCamera();
     return (
         '<!doctype html><html lang="de"><head><meta charset="utf-8">'
         "<title>Sensorwerte</title></head><body><h1>Sensorwerte</h1>"
-        "<table><thead><tr><th>Sensor</th><th>Aktueller Wert</th></tr></thead>"
+        "<table><thead><tr><th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th></tr></thead>"
         f"<tbody>{rows}</tbody></table>"
         '<h2>Kamera</h2><img id="camera" alt="Live-Bild der Kamera" width="640" height="360">'
         '<p id="camera-status">Verbinde…</p>'
