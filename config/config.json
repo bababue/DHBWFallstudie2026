@@ -12,7 +12,7 @@
   "wasserstand": {
     "trigger_gpio": 6,
     "echo_gpio": 13,
-    "sensor_boden_abstand_cm": 8.62
+    "sensor_boden_abstand_cm": 8.3
   },
   "moos_1": {
     "trigger_gpio": 9,
