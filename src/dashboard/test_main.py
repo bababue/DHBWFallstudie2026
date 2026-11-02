@@ -23,7 +23,8 @@ class DashboardTests(unittest.TestCase):
 
     def test_page_has_mode_and_camera(self):
         body = main.index().body.decode()
-        self.assertIn('Aktueller Modus', body)
+        self.assertIn('class="topbar"', body)
+        self.assertIn('id="mode"', body)
         self.assertIn('/camera/stream.mjpg', body)
         self.assertNotIn('led-slider', body)
         self.assertIn('id="debug-toggle"', body)
