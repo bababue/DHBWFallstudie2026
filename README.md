@@ -110,49 +110,14 @@ den Prozess. Die Abschaltung der alten Dienste ist nur einmalig nötig.
 Die Container heißen `sensors`, `influxdb`, `dashboard` und `camera`.
 Sensoren, OLED, Steuerung und Kamera laufen vollständig in Docker Compose.
 
-Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es ordnet
-die aktuellen Werte nach Temperatur, Luftfeuchte, Licht und CO₂ und zeigt
-links und rechts nebeneinander, weiterhin ohne CSS. Es zeigt Wasserstand
-und Abstand zur Wasseroberfläche sowie die einzelnen
-Moos-Abstände und kalibrierten Höhen. Der Wasserabstand ist der Median der
-Echos des aktuellen Messzyklus; weitere Medianwerte erscheinen nicht im Dashboard.
-Der Browser
-lädt die Seite einmal und erhält neue Werte über eine WebSocket-Verbindung.
-Der Server prüft InfluxDB alle 0,5 Sekunden und sendet Änderungen sofort an alle
-verbundenen Browser. Messwerte, die älter als 12 Sekunden sind, erscheinen als
-„kein aktueller Wert“. Die Zeiten lassen sich in `.env` über
-`DASHBOARD_POLL_SECONDS` und `DASHBOARD_MAX_AGE_SECONDS` ändern. Bei einer
-unterbrochenen Verbindung verbindet sich der Browser automatisch neu.
+Das Dashboard ist unter `http://moos.local:8080` erreichbar. Es zeigt den
+aktuellen Modus des OLED-Tasters und den Kamerastream. Der Modus wird über ein
+gemeinsames Volume zwischen Sensorprozess und Dashboard ausgetauscht. Fällt der
+Sensorprozess aus, meldet das Dashboard den Modus als nicht verfügbar.
 
-Auf derselben Seite erscheint der MJPEG-Livestream der Pi-Kamera. Der
-`camera`-Container startet `rpicam-vid` erst, wenn ein Browser den Stream
-öffnet, und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream
-ist über `http://moos.local:8080/camera/stream.mjpg` erreichbar. Der Kamera-Port
-ist nur im Compose-Netz erreichbar; `CAMERA_PORT` in `.env` legt ihn intern fest.
-Für den Kamerazugriff erhält der Container
-Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 16, 20 und 21.
-
-Die Regler für Licht, Lüfter und Pumpe senden ihre Werte über dieselbe
-WebSocket-Verbindung wie die Sensoranzeige. Die Vorlage setzt
-`ACTUATORS_ENABLED=true`. Bei Bedarf lässt sie sich mit
-`ACTUATORS_ENABLED=false` in `.env` abschalten. Nach einer Änderung an `.env` die
-Container mit `docker compose up -d --build` neu starten. Die Regler sind ohne
-Passwort bedienbar. Alle Ausgänge beginnen bei jedem Start mit 0 % und gehen in 5-%-Schritten
-von 0 bis 100 %; zwischen 5 und 100 % steigt die reale Leistung linear:
-
-| Gerät | GPIO | PWM | Real bei angezeigten 5 % | Anlauf aus 0 % |
-| --- | ---: | ---: | ---: | --- |
-| LED | 20 | 2000 Hz | 5 % | keiner |
-| Lüfter | 21 | 5 Hz | 25 % | bei 5–50 %: 0,5 s mit 100 % |
-| Pumpe | 16 | 5 Hz | 15 % | bei 5–30 %: 0,5 s mit 75 % |
-
-Pins und Frequenzen stehen in `.env`. Ein harter
-Prozessabbruch kann den letzten GPIO-Pegel bis zum Neustart stehen lassen.
-Die Steuerung ist für ein vertrauenswürdiges lokales Netzwerk gedacht, da die
-Webseite derzeit HTTP verwendet.
-
-Vor dem Start dürfen keine früheren Dienste die Kamera oder die GPIO-Pins 16,
-20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
+Der `camera`-Container startet `rpicam-vid`, wenn ein Browser den Stream öffnet,
+und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream ist auch
+unter `http://moos.local:8080/camera/stream.mjpg` erreichbar.
 
 InfluxDB ist unter `http://moos.local:8086` erreichbar.
 

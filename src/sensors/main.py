@@ -1,6 +1,7 @@
 """Read the I2C and water-level sensors and write samples to InfluxDB 2."""
 
 import logging
+import json
 import os
 import re
 import signal
@@ -198,6 +199,12 @@ def run():
             if version == displayed_version and now < next_display:
                 return
             next_display = now + 1
+            try:
+                with open("/run/moos/mode.tmp", "w") as state:
+                    json.dump({"mode": mode, "updated": time.time()}, state)
+                os.replace("/run/moos/mode.tmp", "/run/moos/mode.json")
+            except OSError as exc:
+                LOG.warning("Mode publication failed: %s", exc)
             try:
                 frame = (render(display_readings(display_values, now))
                          if show_info else render_mode(mode))
