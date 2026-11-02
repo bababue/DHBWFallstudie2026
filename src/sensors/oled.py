@@ -1,4 +1,4 @@
-"""SSD1306 driver and four views for the 0.96-inch 128x64 OLED.
+"""SSD1306 driver and sensor overview for the 0.96-inch 128x64 OLED.
 
 Das Bild wird im Speicher gezeichnet und nur dort übertragen, wo es sich geändert
 hat. Der I2C-Bus läuft in Software und braucht für ein ganzes Bild etwa 0,2 s.
@@ -123,40 +123,23 @@ def _value(readings, side, sensor, field, pattern):
     return "--" if value is None else pattern.format(value)
 
 
-def render(view, readings, controls, enabled):
-    from display import VIEWS
-
-    title, device = VIEWS[view]
+def render(readings):
+    """Draw the single sensor overview with SCD40 temperature/humidity backup."""
     image = Bild()
-    image.text(0, 0, title)
-    image.text_rechts(127, 0, f"{view + 1}/{len(VIEWS)}")
+    image.text(0, 0, "Sensoren")
     image.rechteck(0, 9, 128, 1)
-    if device is None:
-        image.text(37, 12, "Links")
-        image.text_rechts(127, 12, "Rechts")
-        rows = (
-            ("T", "sht45", "temperature_c", "{:.1f}°C"),
-            ("rF", "sht45", "humidity_pct", "{:.0f}%"),
-            ("CO2", "scd40", "co2_ppm", "{:.0f}"),
-            ("Lux", "bh1750", "illuminance_lux", "{:.0f}"),
-        )
-        for index, (label, sensor, field, pattern) in enumerate(rows):
-            y = 22 + index * 10
-            image.text(0, y, label)
-            image.text(37, y, _value(readings, "left", sensor, field, pattern))
-            image.text_rechts(127, y, _value(readings, "right", sensor, field, pattern))
-    elif not enabled:
-        image.text(12, 25, "Steuerung aus")
-        image.text(0, 55, "2x: naechste Ansicht")
-    else:
-        value = controls[device]
-        image.text(32, 16, f"{value}%", 2)
-        image.rechteck(8, 38, 112, 1)
-        image.rechteck(8, 45, 112, 1)
-        image.rechteck(8, 38, 1, 8)
-        image.rechteck(119, 38, 1, 8)
-        image.rechteck(10, 40, round(value * 108 / 100), 4)
-        image.text(0, 48, "Halten: 0%")
-        image.text(0, 56, "1x +5  2x weiter")
+    image.text(37, 12, "Links")
+    image.text_rechts(127, 12, "Rechts")
+    rows = (
+        ("T", "sht45", "temperature_c", "{:.1f}°C"),
+        ("rF", "sht45", "humidity_pct", "{:.0f}%"),
+        ("CO2", "scd40", "co2_ppm", "{:.0f}"),
+        ("Lux", "bh1750", "illuminance_lux", "{:.0f}"),
+    )
+    for index, (label, sensor, field, pattern) in enumerate(rows):
+        y = 22 + index * 10
+        image.text(0, y, label)
+        image.text(37, y, _value(readings, "left", sensor, field, pattern))
+        image.text_rechts(127, y, _value(readings, "right", sensor, field, pattern))
     return image.daten
 

@@ -26,6 +26,15 @@ class FakeBus:
 
 
 class SensorTests(unittest.TestCase):
+    def test_water_sensor_pins_and_floor_distance(self):
+        with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
+            config = Config.from_env()
+            self.assertEqual((config.water_trigger, config.water_echo), (6, 13))
+            self.assertEqual(config.water_floor_distance_cm, 8.62)
+            os.environ["WATER_ECHO_GPIO"] = "14"
+            with self.assertRaises(ValueError):
+                Config.from_env()
+
     def test_common_interval_keeps_margin_for_scd40(self):
         with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
             self.assertEqual(Config.from_env().interval, 6)

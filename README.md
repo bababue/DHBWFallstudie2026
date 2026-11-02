@@ -1,7 +1,8 @@
 # Moos-Pi: Sensoren
 
 Der `sensors`-Container liest auf dem Raspberry Pi 5 die drei I2C-Sensoren links
-und rechts und schreibt ihre Messwerte in InfluxDB 2. Das eigene Dashboard zeigt die Daten an.
+und rechts sowie den Ultraschallsensor für den Wasserstand. Er schreibt ihre
+Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 GPIO 12 wird nicht mehr mit PWM geschaltet.
 
 ## Konfiguration
@@ -9,7 +10,7 @@ GPIO 12 wird nicht mehr mit PWM geschaltet.
 Alle Pins (BCM-Nummern), I2C-Adressen, das Abtastintervall und die InfluxDB-
 Zugangsdaten stehen in `.env`. Die Vorlage ist `.env.example`.
 
-`sensors` liest alle sechs Sensoren alle 6 Sekunden. Der SCD40 liefert im
+`sensors` liest alle sieben Sensoren alle 6 Sekunden. Der SCD40 liefert im
 normalen periodischen Modus etwa alle 5 Sekunden neue CO₂-Werte; 6 Sekunden
 lassen dafür etwas Abstand und gelten auch als Mindestintervall dieser
 gemeinsamen Abfrageschleife. Das Dashboard fragt InfluxDB jede Sekunde ab
@@ -19,50 +20,45 @@ und zeigt Werte nach 30 Sekunden ohne neues Sample nicht mehr als aktuell an.
 cp .env.example .env
 ```
 
-Vor dem Start die Platzhalter für Passwörter und Token in `.env` durch eigene
-lange Werte ersetzen. Die Datei ist von Git ausgeschlossen. Bei einem bereits eingerichteten
-InfluxDB-Datenverzeichnis ändern neue Initialisierungswerte den bestehenden
-Benutzer oder Token nicht.
+Die Vorlage enthält `ohnemoosnixlos` als InfluxDB- und Steuerpasswort sowie
+einen Beispieltoken für eine **neue** InfluxDB-Installation. Die Datei `.env`
+ist von Git ausgeschlossen. Für einen bestehenden InfluxDB-Datenbestand muss
+`INFLUXDB_TOKEN` in `.env` mit einem dort bereits gültigen Token übereinstimmen:
+Neue Initialisierungswerte ändern bestehende Benutzer, Passwörter oder Tokens
+nicht. Die Vorlage aktiviert die Aktorsteuerung; vor deren Nutzung die
+Freilaufdioden und Verdrahtung prüfen.
 
 | Seite | SDA | SCL | Sensoren |
 | --- | ---: | ---: | --- |
 | links | GPIO 15 | GPIO 14 | SHT45 `0x44`, BH1750/GY-302 `0x23`, SCD40 `0x62` |
 | rechts | GPIO 23 | GPIO 24 | SHT45 `0x44`, BH1750/GY-302 `0x23`, SCD40 `0x62` |
 
+Der Wasserstandsensor nutzt Trigger GPIO 6 und Echo GPIO 13. Aus dem gemessenen
+Abstand zur Wasseroberfläche und dem Sensor-Boden-Abstand von 8,62 cm berechnet
+die Software die Wassertiefe in cm. Ohne Echo erscheint kein aktueller Wert.
+Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
+
 Die Busse sind Software-I2C. Der Code treibt eigene High-Bits aktiv, wie in der
 Übergabe für diesen Aufbau beschrieben; das ist nur bei geprüfter 3,3-V-Verdrahtung
-vertretbar. Der `sensors`-Container muss exklusiven Zugriff auf diese vier Pins
-haben. Eine andere Steuerung, die dieselben I2C-Busse benutzt, darf nicht
+vertretbar. Der `sensors`-Container muss exklusiven Zugriff auf die vier I2C-Pins
+sowie GPIO 6 und 13 haben. Eine andere Steuerung, die dieselben GPIOs benutzt, darf nicht
 gleichzeitig laufen.
 
 Der B24_1 an GPIO 12 wird noch nicht gelesen: Seine Versorgungsspannung ist laut
 Übergabe ungeprüft. `B24_1_ENABLED=true` wird deshalb bewusst abgewiesen.
 
-## OLED und Taster
+## OLED-Anzeige
 
 Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus. Der
 `sensors`-Container bedient es zusammen mit den Sensoren, damit nur ein Prozess
-GPIO 14 und 15 nutzt. Der Taster ist an GPIO 26 mit internem Pull-up gegen GND
-vorgesehen. `OLED_ENABLED=true` und `OLED_BUTTON_GPIO=26` stehen in `.env.example`.
+GPIO 14 und 15 nutzt. `OLED_ENABLED=true` steht in `.env.example`.
 
-Die Anzeige hat vier Ansichten: **Sensoren**, **Licht**, **Wasser** und **Luft**.
-Die Sensoransicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
+Das Display zeigt ausschließlich eine Sensorübersicht: links und rechts
+Temperatur und Luftfeuchte vom SHT45,
 CO₂ vom SCD40 sowie Helligkeit vom BH1750. Falls ein SHT45-Wert fehlt, dient
-der entsprechende SCD40-Wert als Backup. Licht steuert den LED-Streifen,
-Wasser die Pumpe und Luft den Lüfter.
-
-| Tastendruck | Wirkung |
-| --- | --- |
-| Doppelklick (Abstand höchstens 0,4 s) | Nächste Ansicht; nach Luft wieder Sensoren |
-| Einfacher Klick in einer Einstellansicht | Wert um 5 Prozentpunkte erhöhen, maximal 100 % |
-| Mindestens 1 s halten in einer Einstellansicht | Zugehörigen Wert sofort auf 0 % setzen |
-
-Ein Einzelklick in der Sensoransicht verändert nichts. Die Anzeige liest die
-aktuellen Stellwerte vom Dashboard und sendet Änderungen dorthin. Dafür nutzt
-sie dasselbe `CONTROL_PASSWORD` wie die Websteuerung. Solange
-`ACTUATORS_ENABLED=false` ist, zeigt sie „Steuerung aus“; die Einstellungen
-lassen sich dann nicht verändern. Vor dem Aktivieren der Ausgänge die
-Freilaufdioden und Verdrahtung prüfen, wie im Abschnitt zur Steuerung beschrieben.
+der entsprechende SCD40-Wert als Backup. Der Taster an GPIO 26 wird von der
+OLED-Software nicht verwendet. Licht, Pumpe und Lüfter werden ausschließlich
+über das Web-Dashboard eingestellt.
 
 ## Start
 
@@ -109,11 +105,12 @@ in `.env` kann den Port ändern. Für den Kamerazugriff erhält der Container
 Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 16, 20 und 21.
 
 Die Regler für Licht, Lüfter und Pumpe senden ihre Werte über dieselbe
-WebSocket-Verbindung wie die Sensoranzeige. Die Steuerung ist zunächst mit
-`ACTUATORS_ENABLED=false` abgeschaltet. Vor dem Einschalten die Freilaufdioden
-an Lüfter und Pumpe und die Verdrahtung prüfen. Dann `ACTUATORS_ENABLED=true` und ein
-langes `CONTROL_PASSWORD` in `.env` setzen und `docker compose up -d --build`
-ausführen. Das Passwort wird beim Verstellen im Dashboard eingegeben. Alle
+WebSocket-Verbindung wie die Sensoranzeige. Die Vorlage setzt
+`ACTUATORS_ENABLED=true`. Vor dem Einschalten die Freilaufdioden an Lüfter und
+Pumpe und die Verdrahtung prüfen; falls das noch aussteht,
+`ACTUATORS_ENABLED=false` in `.env` setzen. Nach einer Änderung an `.env` die
+Container mit `docker compose up -d --build` neu starten. Das Passwort wird
+beim Verstellen im Dashboard eingegeben. Alle
 Ausgänge beginnen bei jedem Start mit 0 %. Die Regler gehen in 5-%-Schritten
 von 0 bis 100 %; zwischen 5 und 100 % steigt die reale Leistung linear:
 
@@ -142,17 +139,19 @@ verloren.
 
 ## InfluxDB-Schema
 
-Measurement `moos_sensor`, Tags `side` (`left`/`right`) und `sensor`
-(`sht45`/`bh1750`/`scd40`):
+Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`) und `sensor`
+(`sht45`/`bh1750`/`scd40`/`ultrasonic`):
 
 | Sensor | Felder |
 | --- | --- |
 | SHT45 | `temperature_c`, `humidity_pct` |
 | BH1750 | `illuminance_lux` |
 | SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
+| Ultraschall | `water_level_cm` |
 
-Das sind zwölf Zeitreihen: sechs Messgrößen pro Seite. Für den SCD40 werden auch
-seine Temperatur und Luftfeuchtigkeit gespeichert, getrennt von den SHT45-Werten.
+Das sind dreizehn Zeitreihen: sechs Messgrößen pro Seite und der Wasserstand.
+Für den SCD40 werden auch seine Temperatur und Luftfeuchtigkeit gespeichert,
+getrennt von den SHT45-Werten.
 
 Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/33FD6951/662A593A/HT_DS_Datasheet_SHT4x.pdf),
 [SCD4x-Datenblatt](https://sensirion.com/media/documents/E0F04247/631EF271/CD_DS_SCD40_SCD41_Datasheet_D1.pdf),

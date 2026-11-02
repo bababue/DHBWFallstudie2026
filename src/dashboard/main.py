@@ -10,7 +10,7 @@ import secrets
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from influxdb_client import InfluxDBClient
 
@@ -36,12 +36,13 @@ DISPLAY_ROWS = (
     ("Licht", "bh1750", "illuminance_lux", "lx", 0),
     ("CO₂", "scd40", "co2_ppm", "ppm", 0),
 )
+WATER_READING = Reading("tank", "ultrasonic", "water_level_cm", "cm", 1)
 
 READINGS = tuple(
     Reading(side, sensor, field, unit, decimals)
     for _, sensor, field, unit, decimals in DISPLAY_ROWS
     for side in ("left", "right")
-)
+) + (WATER_READING,)
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,8 @@ def render_page(camera_port: int = 8000) -> str:
         f'<td id="right-{sensor}-{field}">Verbinde…</td></tr>'
         for label, sensor, field, _, _ in DISPLAY_ROWS
     )
+    rows += ('<tr><td>Wasserstand</td><td>Ultraschall</td>'
+             '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>')
     script = """
 <script>
 const sliders = {
@@ -310,38 +313,6 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="Sensorwerte", lifespan=lifespan)
-
-
-def _check_control_access(request: Request):
-    settings: Settings = request.app.state.settings
-    supplied = request.headers.get("x-control-password", "")
-    if not settings.control_password or not secrets.compare_digest(supplied, settings.control_password):
-        raise HTTPException(status_code=401, detail="Falsches Steuerpasswort")
-
-
-@app.get("/api/controls")
-def control_status(request: Request):
-    _check_control_access(request)
-    actuators = request.app.state.hub.actuators
-    return {"enabled": actuators is not None,
-            "values": actuators.status() if actuators is not None else {}}
-
-
-@app.post("/api/controls")
-async def set_control(request: Request):
-    _check_control_access(request)
-    hub: Hub = request.app.state.hub
-    if hub.actuators is None:
-        raise HTTPException(status_code=503, detail="Steuerung deaktiviert")
-    try:
-        command = await request.json()
-        if not isinstance(command, dict):
-            raise ValueError("Ungültiger Steuerbefehl")
-        values = await asyncio.to_thread(hub.actuators.set, command.get("device"), command.get("value"))
-    except (ValueError, RuntimeError, TypeError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    await hub.publish_current()
-    return {"enabled": True, "values": values}
 
 
 @app.get("/", response_class=HTMLResponse)

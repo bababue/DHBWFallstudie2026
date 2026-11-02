@@ -4,7 +4,7 @@ Stand der Quellen: Übergabe vom 1. November 2026 und aktueller Projektstand. Al
 
 ## Aufbau
 
-Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rechts), Bewässerungspumpe, Lüfter, LED-Streifen, OLED-Anzeige, Taster und Pi-Kamera. Jede Messstelle besitzt einen SHT45, einen GY-302/BH1750 und einen SCD40.
+Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rechts), einem Ultraschallsensor für den Wasserstand, Bewässerungspumpe, Lüfter, LED-Streifen, OLED-Anzeige, Taster und Pi-Kamera. Jede Messstelle besitzt einen SHT45, einen GY-302/BH1750 und einen SCD40.
 
 | Bauteil | Anzahl | Aufgabe / Anschluss |
 | --- | ---: | --- |
@@ -12,6 +12,7 @@ Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rec
 | SHT45 | 2 | **Primäre Messung von Temperatur und relativer Luftfeuchtigkeit**, je einer links und rechts |
 | GY-302 mit BH1750 | 2 | Beleuchtungsstärke in Lux, je einer links und rechts |
 | SCD40 | 2 | **Primäre Messung von CO₂** in ppm; seine Temperatur- und Feuchtewerte dienen nur als Backup zum SHT45, je einer links und rechts |
+| Ultraschallsensor für Wasserstand | 1 | Trigger an GPIO 6, Echo an GPIO 13; Abstand vom Sensor zum Boden: **86,2 mm**; Sensormodell nicht angegeben |
 | OLED, SSD1306 | 1 | 0,96 Zoll, 128 × 64 Pixel, am linken I²C-Bus; in der Übergabe um 180° gedreht angesteuert |
 | Taster | 1 | GPIO 26, gegen GND mit internem Pull-up vorgesehen |
 | Pi-Kamera, Sensor IMX708 | 1 | Anschluss CAM/DISP1; in der Übergabe als Kamera 0 erkannt |
@@ -31,8 +32,10 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 
 | GPIO / Anschluss | Hardwarefunktion | Dokumentierter Stand |
 | --- | --- | --- |
+| 6 | Trigger des Wasserstand-Ultraschallsensors | Ausgang für den Messimpuls |
 | 12 | ALLNET B24_1 | Versorgungsspannung des Moduls ungeprüft; kein PWM-Ausgang mehr |
-| 14 / 15 | I²C links: SCL / SDA | Auch vom veralteten HC-SR04-Versuchsaufbau beansprucht; nicht gleichzeitig nutzbar |
+| 13 | Echo des Wasserstand-Ultraschallsensors | Eingang für das Echo-Signal |
+| 14 / 15 | I²C links: SCL / SDA | Sensorbus links |
 | 16 | Pumpe, MOSFET-Gate | 5-Hz-PWM vorgesehen |
 | 20 | LED-Streifen, MOSFET-Gate | Im aktuellen Projekt 2.000-Hz-PWM vorgesehen; die PDF nennt 200 Hz |
 | 21 | Lüfter, MOSFET-Gate | 5-Hz-PWM vorgesehen |
@@ -57,11 +60,12 @@ Der dokumentierte 5-Hz-Betrieb führt bei kleinen Stellwerten zu einzelnen Impul
 - **Taster:** Die Belegung mit internem Pull-up und Kontakt nach GND wurde in der Übergabe angenommen, der echte Taster aber nicht bestätigt.
 - **OLED:** Die tatsächliche Orientierung nach der dokumentierten 180°-Drehung wurde noch nicht bestätigt.
 - **Freilaufdioden und Lastverhalten:** Zuordnung und Polung der Dioden sowie Wasserfluss und Lüfterlauf bei niedrigen Stellwerten sind offen.
-- **Alter Ultraschallsensor HC-SR04:** Ein Versuchsskript nennt Echo an GPIO 14 und Trigger an GPIO 15. Diese Pins gehören inzwischen zum linken Sensorbus; der Ultraschallsensor ist daher kein parallel nutzbarer Bestandteil der aktuellen Belegung.
+- **Wasserstand-Ultraschallsensor:** Die aktuelle Pinangabe ist Trigger GPIO 6 und Echo GPIO 13. Der Abstand vom Sensor zum Boden beträgt 86,2 mm. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; vor dem Anschluss sicherstellen, dass am Pi-Eingang höchstens 3,3 V anliegen.
 
 ## Quellen
 
 - [`Moos-Pi-Uebergabe.pdf`](../../../Downloads/Moos-Pi-Uebergabe.pdf) — Hardware- und Messangaben der Übergabe vom 1. November 2026 (außerhalb dieses Repositories).
 - [`README.md`](README.md) und [`.env.example`](.env.example) — aktuelle Projektbelegung der Sensoren und GPIOs.
 - [`../sshUserPfad/steuerung/steuerung.py`](../sshUserPfad/steuerung/steuerung.py), [`../sshUserPfad/steuerung/sensoren.py`](../sshUserPfad/steuerung/sensoren.py), [`../sshUserPfad/steuerung/anzeige.py`](../sshUserPfad/steuerung/anzeige.py) — dokumentierter lokaler Pi-Aufbau.
-- [`../sshUserPfad/ultraschall/ultraschall.py`](../sshUserPfad/ultraschall/ultraschall.py) — frühere, mit dem linken Sensorbus kollidierende Pinbelegung.
+- [`../sshUserPfad/ultraschall/ultraschall.py`](../sshUserPfad/ultraschall/ultraschall.py) — eigenständige Messung mit der aktuellen Pinbelegung.
+- Aktuelle Angaben zum Wasserstand-Ultraschallsensor: Nutzerangaben (Trigger GPIO 6, Echo GPIO 13; Sensor-Boden-Abstand 86,2 mm).

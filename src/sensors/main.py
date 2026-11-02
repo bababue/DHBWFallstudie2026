@@ -1,4 +1,4 @@
-"""Read the six installed I2C sensors and write samples to InfluxDB 2."""
+"""Read the I2C and water-level sensors and write samples to InfluxDB 2."""
 
 import logging
 import os
@@ -14,6 +14,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from display_runtime import run_display
+from water_level import WaterLevel
 
 
 LOG = logging.getLogger("moos.sensors")
@@ -31,6 +32,9 @@ class Config:
     left_scl: int
     right_sda: int
     right_scl: int
+    water_trigger: int
+    water_echo: int
+    water_floor_distance_cm: float
     delay_us: int
     sht45_address: int
     bh1750_address: int
@@ -51,6 +55,9 @@ class Config:
             left_scl=env_int("LEFT_I2C_SCL_GPIO", "14"),
             right_sda=env_int("RIGHT_I2C_SDA_GPIO", "23"),
             right_scl=env_int("RIGHT_I2C_SCL_GPIO", "24"),
+            water_trigger=env_int("WATER_TRIGGER_GPIO", "6"),
+            water_echo=env_int("WATER_ECHO_GPIO", "13"),
+            water_floor_distance_cm=float(os.getenv("WATER_FLOOR_DISTANCE_CM", "8.62")),
             delay_us=env_int("I2C_DELAY_US", "12"),
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
             bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
@@ -61,9 +68,12 @@ class Config:
             influx_bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
             influx_token=os.getenv("INFLUXDB_TOKEN", ""),
         )
-        pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl)
-        if len(set(pins)) != 4 or not all(0 <= pin <= 27 for pin in pins):
-            raise ValueError("I2C GPIO pins must be distinct BCM numbers 0..27")
+        pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl,
+                config.water_trigger, config.water_echo)
+        if len(set(pins)) != len(pins) or not all(0 <= pin <= 27 for pin in pins):
+            raise ValueError("Sensor GPIO pins must be distinct BCM numbers 0..27")
+        if not 0 < config.water_floor_distance_cm <= WaterLevel.MAX_DISTANCE_CM:
+            raise ValueError("WATER_FLOOR_DISTANCE_CM must be within the sensor range")
         if not re.fullmatch(r"/dev/gpiochip\d+", config.chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
         if config.interval < 6 or config.delay_us < 5:
@@ -94,6 +104,7 @@ def run():
     handle = lgpio.gpiochip_open(chip_number)
     buses = []
     scd_sensors = []
+    water_sensor = None
     bus_lock = Lock()
     readings_lock = Lock()
     readings = {}
@@ -111,15 +122,13 @@ def run():
             for side, bus, scd in zip(("left", "right"), buses, scd_sensors)
             for sensor in (SHT45(bus, config.sht45_address), BH1750(bus, config.bh1750_address), scd)
         ]
+        water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
+                                  config.water_floor_distance_cm)
+        sensors.append(("tank", water_sensor))
         if os.getenv("OLED_ENABLED", "true").lower() == "true":
-            button_pin = env_int("OLED_BUTTON_GPIO", "26")
-            used_pins = {config.left_sda, config.left_scl, config.right_sda, config.right_scl}
-            if button_pin in used_pins or not 0 <= button_pin <= 27:
-                raise ValueError("OLED button GPIO must be an unused BCM pin 0..27")
             display_thread = Thread(
                 target=run_display,
-                args=(lgpio, handle, button_pin, buses[0], bus_lock, readings,
-                      readings_lock, os.getenv("CONTROL_PASSWORD", ""), STOP),
+                args=(buses[0], bus_lock, readings, readings_lock, STOP),
                 daemon=True,
             )
             display_thread.start()
@@ -186,6 +195,11 @@ def run():
                 bus.close()
             except Exception:
                 LOG.exception("Could not release I2C pins")
+        if water_sensor is not None:
+            try:
+                water_sensor.close()
+            except Exception:
+                LOG.exception("Could not release water level sensor pins")
         lgpio.gpiochip_close(handle)
 
 
