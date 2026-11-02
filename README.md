@@ -37,8 +37,8 @@ nicht. Die Vorlage aktiviert die Aktorsteuerung.
 Der Wasserstandsensor nutzt Trigger GPIO 6 und Echo GPIO 13. Aus dem gemessenen
 Abstand zur Wasseroberfläche und dem Sensor-Boden-Abstand von 8,62 cm berechnet
 die Software die Wassertiefe in cm. Zusätzlich erscheint der Median der
-Wassertiefe aus allen gültigen Echos der letzten 60 Sekunden. Der gemessene
-Abstand (Median der Echos des aktuellen Messzyklus) bleibt als Rohwert sichtbar.
+Wassertiefe aus allen gültigen Echos der letzten 60 Sekunden. Der Rohabstand
+zeigt genau den aktuellen Echo-Messwert ohne Mittelung oder Glättung.
 Beim Start nutzt der Minutenmedian die bereits verfügbaren Messungen. Ohne Echo
 erscheint kein aktueller Wert.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
@@ -52,7 +52,7 @@ Zwei zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
 Jeder Kalibrierwert ist der Abstand vom Sensor zur moosfreien Bezugsfläche in cm.
 Ohne ihn wird nur der Rohabstand angezeigt. Mit ihm berechnet die Software die
-Mooshöhe je Messstelle. Je Sensor werden drei Echos pro Messzyklus gefiltert;
+Mooshöhe je Messstelle. Der Rohabstand zeigt jeweils genau eine aktuelle Messung;
 die Sensoren starten um zwei Sekunden versetzt und messen jeweils alle vier Sekunden.
 Für den gemeinsamen Wert nimmt die Software den Median der 60-Sekunden-Mediane
 beider gültigen, kalibrierten Messstellen. Bei zwei Werten entspricht das ihrem

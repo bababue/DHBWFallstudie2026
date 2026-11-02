@@ -9,7 +9,6 @@ from water_level import Ultrasonic
 
 class MossHeight(Ultrasonic):
     name = "ultrasonic"
-    SAMPLES = 3
     WINDOW_S = 60
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None):
@@ -18,14 +17,14 @@ class MossHeight(Ultrasonic):
         self.recent_distances = deque()
 
     def read(self):
-        distances = self.read_distances()
-        if not distances:
+        distance = self._distance_cm()
+        if distance is None:
             return None
         now = time.monotonic()
-        self.recent_distances.extend((now, distance) for distance in distances)
+        self.recent_distances.append((now, distance))
         while self.recent_distances and self.recent_distances[0][0] < now - self.WINDOW_S:
             self.recent_distances.popleft()
-        result = {"distance_cm": statistics.median(distances)}
+        result = {"distance_cm": distance}
         if self.empty_distance_cm is not None:
             result["height_cm"] = max(0.0, self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)

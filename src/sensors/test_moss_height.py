@@ -7,15 +7,14 @@ from moss_height import MossAggregate, MossHeight
 class MossHeightTests(unittest.TestCase):
     def test_raw_distance_is_available_before_calibration(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5)
-        with patch.object(sensor, "_distance_cm", side_effect=[8.0, None, 8.2]), \
-                patch("water_level.time.sleep"):
-            self.assertEqual(sensor.read(), {"distance_cm": 8.1})
+        with patch.object(sensor, "_distance_cm", return_value=8.2) as measure:
+            self.assertEqual(sensor.read(), {"distance_cm": 8.2})
+            measure.assert_called_once_with()
         sensor.close()
 
     def test_height_uses_its_own_reference_and_minute_median(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=20.0)
-        with patch.object(sensor, "_distance_cm", side_effect=[18.0] * 3 + [17.0] * 3), \
-                patch("water_level.time.sleep"), \
+        with patch.object(sensor, "_distance_cm", side_effect=[18.0, 17.0]), \
                 patch("moss_height.time.monotonic", side_effect=[0, 5]):
             first = sensor.read()
             second = sensor.read()

@@ -9,8 +9,6 @@ class Ultrasonic:
     SOUND_CM_PER_S = 34300
     MAX_DISTANCE_CM = 400
     START_TIMEOUT_S = 0.01
-    SAMPLE_PAUSE_S = 0.06
-    SAMPLES = 5
 
     def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int):
         self.gpio = gpio
@@ -40,16 +38,6 @@ class Ultrasonic:
                 return None
         return (time.perf_counter() - start) * self.SOUND_CM_PER_S / 2
 
-    def read_distances(self):
-        distances = []
-        for index in range(self.SAMPLES):
-            distance = self._distance_cm()
-            if distance is not None:
-                distances.append(distance)
-            if index < self.SAMPLES - 1:
-                time.sleep(self.SAMPLE_PAUSE_S)
-        return distances
-
     def close(self):
         self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
         self.gpio.gpio_free(self.handle, self.echo_pin)
@@ -67,12 +55,11 @@ class WaterLevel(Ultrasonic):
         self.recent_distances = deque()
 
     def read(self):
-        distances = self.read_distances()
-        if not distances:
+        distance = self._distance_cm()
+        if distance is None:
             return None
-        distance = statistics.median(distances)
         now = time.monotonic()
-        self.recent_distances.extend((now, value) for value in distances)
+        self.recent_distances.append((now, distance))
         while self.recent_distances and self.recent_distances[0][0] < now - self.MEDIAN_WINDOW_S:
             self.recent_distances.popleft()
         minute_distance = statistics.median(value for _, value in self.recent_distances)
