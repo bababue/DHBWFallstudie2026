@@ -67,7 +67,8 @@ Kalibrierung im leeren Behälter, mit ruhiger Oberfläche und freiem Schallweg:
 python3 scripts/calibrate_water.py
 ```
 
-Das Skript stoppt einen laufenden Sensorcontainer vorübergehend, misst 200 Echos
+Das Skript fragt zuerst, ob der Tank leer ist. Bei angegebener Wassertiefe muss
+diese stattdessen bestätigt werden. Danach stoppt es einen laufenden Sensorcontainer vorübergehend, misst 200 Echos
 im Container und startet ihn danach wieder. Bei ausreichender Messqualität fragt
 es nach der Messung, ob das Ergebnis gespeichert werden soll. Bei bekannter
 Wassertiefe kann `--water-height 1.5` angegeben werden.

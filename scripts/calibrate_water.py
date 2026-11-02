@@ -27,6 +27,16 @@ def main():
     if not math.isfinite(args.water_height) or args.water_height < 0:
         parser.error('Wassertiefe muss eine gültige, nicht negative Zahl sein')
     if not args.inside:
+        prompt = ('Ist der Wassertank leer? [j/N] ' if args.water_height == 0 else
+                  f'Beträgt die Wassertiefe {args.water_height:g} cm? [j/N] ')
+        try:
+            answer = input(prompt).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print('\nKalibrierung abgebrochen.')
+            return 1
+        if answer not in ('j', 'ja', 'y', 'yes'):
+            print('Kalibrierung abgebrochen.')
+            return 0
         root = Path(__file__).resolve().parents[1]
         config_path = root / 'config' / 'config.json'
         original = config_path.read_bytes()
