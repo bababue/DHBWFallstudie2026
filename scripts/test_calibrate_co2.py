@@ -1,7 +1,8 @@
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from calibrate_co2 import calibrate_sensor, main, stable_readings
+from calibrate_co2 import calibrate_sensor, confirm_while_measuring, main, stable_readings
 from sensors import crc8
 
 
@@ -23,6 +24,15 @@ class CalibrationTests(unittest.TestCase):
         self.assertIn('PYTHONPATH=/app', invocation)
         self.assertIn('/tmp/calibrate_co2.py', invocation)
         self.assertEqual(restart[-2:], ['start', 'sensors'])
+
+    def test_measurement_continues_while_waiting_for_confirmation(self):
+        measure = MagicMock()
+        def delayed_input(_):
+            time.sleep(0.05)
+            return 'j'
+        with patch('builtins.input', side_effect=delayed_input):
+            self.assertTrue(confirm_while_measuring(430, measure, interval=0.005))
+        self.assertGreater(measure.call_count, 0)
 
     def test_stability_requires_enough_recent_values_without_large_jumps(self):
         self.assertIsNone(stable_readings([(0, 400)] * 7, 0))

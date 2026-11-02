@@ -6,6 +6,7 @@ import statistics
 import subprocess
 import sys
 import time
+from threading import Event, Thread
 from pathlib import Path
 
 MEASUREMENT_SECONDS = 300
@@ -20,6 +21,23 @@ def stable_readings(samples, now):
     if len(recent) < MIN_RECENT_SAMPLES or max(recent) - min(recent) > MAX_SPREAD_PPM:
         return None
     return statistics.median(recent)
+
+
+def confirm_while_measuring(reference_ppm, measure, interval=INTERVAL_SECONDS):
+    """Keep sensor readings fresh while the user decides, without a timeout."""
+    stop = Event()
+
+    def loop():
+        while not stop.wait(interval):
+            measure()
+
+    thread = Thread(target=loop, daemon=True)
+    thread.start()
+    try:
+        return input(f'Sensoren auf {reference_ppm} ppm kalibrieren? [j/N] ').strip().lower() in ('j', 'ja', 'y', 'yes')
+    finally:
+        stop.set()
+        thread.join()
 
 
 def calibrate_sensor(sensor, reference_ppm, sleep=time.sleep):
@@ -66,40 +84,47 @@ def measure_and_calibrate(reference_ppm):
             return 1
         started = time.monotonic()
         print('Messung läuft fünf Minuten. Kasten geöffnet draußen stehen lassen, nicht auf die Sensoren atmen.', flush=True)
-        while time.monotonic() - started < MEASUREMENT_SECONDS:
-            time.sleep(INTERVAL_SECONDS)
+        def measure(verbose=True):
             for side, sensor in sensors.items():
                 try:
                     reading = sensor.read()
                     if reading is not None:
                         value = reading['co2_ppm']
                         if 0 < value <= 40000:
-                            samples[side].append((time.monotonic(), value))
-                            print(f'{side}: {value:.0f} ppm', flush=True)
+                            now = time.monotonic()
+                            samples[side].append((now, value))
+                            samples[side][:] = [(at, val) for at, val in samples[side]
+                                                if now - at <= STABILITY_WINDOW_SECONDS]
+                            if verbose:
+                                print(f'{side}: {value:.0f} ppm', flush=True)
                 except (OSError, ValueError, lgpio.error) as exc:
-                    print(f'{side}: Messung fehlgeschlagen: {exc}', flush=True)
+                    if verbose:
+                        print(f'{side}: Messung fehlgeschlagen: {exc}', flush=True)
+
+        while time.monotonic() - started < MEASUREMENT_SECONDS:
+            time.sleep(INTERVAL_SECONDS)
+            measure()
         now = time.monotonic()
-        eligible = {}
         for side in sensors:
             median = stable_readings(samples[side], now)
             if median is None:
-                print(f'{side}: Zu wenige oder zu stark schwankende Messwerte; keine Kalibrierung.', flush=True)
+                print(f'{side}: Zu wenige oder zu stark schwankende Messwerte.', flush=True)
             else:
-                eligible[side] = median
                 print(f'{side}: stabiler Median {median:.0f} ppm; Referenz {reference_ppm} ppm.', flush=True)
-        if not eligible:
-            return 1
         try:
-            answer = input(f'Sensoren auf {reference_ppm} ppm kalibrieren? [j/N] ').strip().lower()
+            confirmed = confirm_while_measuring(reference_ppm, lambda: measure(verbose=False))
         except (EOFError, KeyboardInterrupt):
             print('\nKalibrierung abgebrochen.')
             return 1
-        if answer not in ('j', 'ja', 'y', 'yes'):
+        if not confirmed:
             print('Kalibrierung abgebrochen.')
             return 0
-        # An excessively long pause would invalidate the stability check.
-        if time.monotonic() - now > 30:
-            print('Bestätigung zu spät; bitte erneut messen.')
+        now = time.monotonic()
+        eligible = [side for side in sensors if stable_readings(samples[side], now) is not None]
+        for side in sensors:
+            if side not in eligible:
+                print(f'{side}: Zu wenige oder zu stark schwankende aktuelle Messwerte; keine Kalibrierung.', flush=True)
+        if not eligible:
             return 1
         failed = False
         for side in eligible:
