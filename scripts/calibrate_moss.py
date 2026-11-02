@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Calibrate the four moss distance sensors against the paper reference."""
 import argparse
+import hashlib
+import json
 import math
 import os
 import statistics
@@ -10,7 +12,9 @@ import tempfile
 import time
 from pathlib import Path
 
-SAMPLE_COUNT = 20
+SAMPLE_COUNT = 200
+SAMPLE_INTERVAL_SECONDS = 0.1
+RESULT_PREFIX = "MOOS_KALIBRIERUNG_JSON="
 MAX_DEVIATION_CM = 0.3
 
 
@@ -37,14 +41,52 @@ def main():
             return 1
         root = Path(__file__).resolve().parents[1]
         command = ['docker', 'compose']
+        config_path = root / 'config' / 'config.json'
+        original = config_path.read_bytes()
+        revision = hashlib.sha256(original).digest()
         running = subprocess.check_output(command + ['ps', '--status', 'running', '--services'], cwd=root, text=True).splitlines()
         resume = 'sensors' in running
         try:
             if resume:
                 subprocess.run(command + ['stop', 'sensors'], cwd=root, check=True)
-            invocation = command + ['run', '--rm', '--no-deps', '-T', '-v', str(root / 'config') + ':/config',
-                                    'sensors', 'python', '-', '--inside']
-            return subprocess.run(invocation, cwd=root, input=Path(__file__).read_text(), text=True).returncode
+            invocation = command + ['run', '--rm', '--no-deps', '-T', 'sensors', 'python', '-', '--inside']
+            with subprocess.Popen(invocation, cwd=root, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  text=True, bufsize=1) as process:
+                process.stdin.write(Path(__file__).read_text())
+                process.stdin.close()
+                results = None
+                for line in process.stdout:
+                    if line.startswith(RESULT_PREFIX):
+                        results = json.loads(line[len(RESULT_PREFIX):])
+                    else:
+                        print(line, end='', flush=True)
+                code = process.wait()
+            if code != 0 or not results:
+                return code or 1
+            if hashlib.sha256(config_path.read_bytes()).digest() != revision:
+                print('Konfiguration wurde zwischenzeitlich geändert; keine Werte gespeichert.')
+                return 1
+            sys.path.insert(0, str(root / 'src'))
+            import configuration
+            config = configuration.upgrade(json.loads(original))
+            for index, distance in results.items():
+                config[f'moos_{index}']['bezugsabstand_cm'] = distance
+            configuration.validate(config)
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(mode='w', dir=config_path.parent, delete=False) as output:
+                    temporary = Path(output.name)
+                    os.fchmod(output.fileno(), config_path.stat().st_mode & 0o777)
+                    json.dump(config, output, indent=2, ensure_ascii=False)
+                    output.write('\n')
+                    output.flush()
+                    os.fsync(output.fileno())
+                os.replace(temporary, config_path)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+            print('Bezugsabstände in config/config.json gespeichert.')
+            return 0
         finally:
             if resume:
                 subprocess.run(command + ['start', 'sensors'], cwd=root, check=True)
@@ -53,7 +95,6 @@ def main():
     import configuration
     from moss_height import MossHeight
     config = configuration.load()
-    revision = configuration.revision()
     chip = int(os.getenv('GPIOCHIP_DEVICE', '/dev/gpiochip0').removeprefix('/dev/gpiochip'))
     handle = lgpio.gpiochip_open(chip)
     results = {}
@@ -64,9 +105,10 @@ def main():
             try:
                 sensor = MossHeight(lgpio, handle, settings['trigger_gpio'], settings['echo_gpio'])
                 samples = []
+                print(f'Moos {index}: messe {SAMPLE_COUNT} Werte …', flush=True)
                 for _ in range(SAMPLE_COUNT):
                     samples.append(sensor._distance_cm())
-                    time.sleep(.08)
+                    time.sleep(SAMPLE_INTERVAL_SECONDS)
                 result = reference(samples)
                 if result is None:
                     print(f'Moos {index}: keine ausreichend stabilen Messungen; bisheriger Wert bleibt erhalten.', flush=True)
@@ -83,27 +125,7 @@ def main():
     if not results:
         print('Kein Sensor konnte kalibriert werden.')
         return 1
-    if configuration.revision() != revision:
-        print('Konfiguration wurde zwischenzeitlich geändert; keine Werte gespeichert.')
-        return 1
-    for index, distance in results.items():
-        config[f'moos_{index}']['bezugsabstand_cm'] = distance
-    configuration.validate(config)
-    import json
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', dir=configuration.PATH.parent, delete=False) as output:
-            temporary = Path(output.name)
-            os.fchmod(output.fileno(), 0o644)
-            json.dump(config, output, indent=2, ensure_ascii=False)
-            output.write('\n')
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, configuration.PATH)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    print('Bezugsabstände in config/config.json gespeichert.')
+    print(RESULT_PREFIX + json.dumps(results), flush=True)
     return 0
 
 

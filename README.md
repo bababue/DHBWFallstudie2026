@@ -78,7 +78,7 @@ Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
 Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
 ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst
-das Skript jeden Sensor und speichert stabile Bezugsabstände automatisch in
+das Skript jeden Sensor 200-mal mit 0,1 Sekunden Pause und speichert stabile Bezugsabstände automatisch in
 `config/config.json`. Nicht angeschlossene oder instabile Sensoren behalten ihren
 bisherigen Wert. Der Sensorcontainer wird währenddessen angehalten und danach
 wieder gestartet, falls er zuvor lief.
