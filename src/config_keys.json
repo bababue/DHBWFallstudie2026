@@ -118,5 +118,25 @@
   "MOSS_4_EMPTY_DISTANCE_CM": [
     "moos_4",
     "bezugsabstand_cm"
+  ],
+  "MOSS_DEMO_DATA": [
+    "moos_demo",
+    "demo_data"
+  ],
+  "MOSS_1_DEMO_DISTANCE_CM": [
+    "moos_demo",
+    "demo_distance_1_cm"
+  ],
+  "MOSS_2_DEMO_DISTANCE_CM": [
+    "moos_demo",
+    "demo_distance_2_cm"
+  ],
+  "MOSS_3_DEMO_DISTANCE_CM": [
+    "moos_demo",
+    "demo_distance_3_cm"
+  ],
+  "MOSS_4_DEMO_DISTANCE_CM": [
+    "moos_demo",
+    "demo_distance_4_cm"
   ]
 }

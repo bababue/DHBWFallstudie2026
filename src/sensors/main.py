@@ -16,7 +16,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from configuration import setting, load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, start_button_reader
-from moss_height import MossAggregate, MossHeight
+from moss_height import MossAggregate, MossHeight, WaterNoise
 from oled import Oled, render, render_mode
 from schedule import ScheduledRead
 from storage import BufferedWriter
@@ -175,9 +175,12 @@ def run():
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
                                   config.water_floor_distance_cm, options=load()["wasserstand"])
         sensors.append(("tank", water_sensor))
+        demo = load()["moos_demo"]
+        water_noise = WaterNoise()
         for index, ((trigger, echo), empty_distance) in enumerate(
                 zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
-            sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance)
+            sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance,
+                                demo_distance_cm=demo[f"demo_distance_{index}_cm"] if demo["demo_data"] else None)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
@@ -242,6 +245,7 @@ def run():
                             display_values.clear()
                             water_sensor.recent.clear()
                             water_sensor.last_sample = None
+                            water_noise.samples.clear()
                             for sensor in moss_sensors:
                                 sensor.recent_distances.clear()
                             moss_aggregate.latest.clear()
@@ -282,6 +286,8 @@ def run():
                         fields = None
                         error = False
                         try:
+                            if isinstance(sensor, MossHeight) and sensor.demo_distance_cm is not None:
+                                sensor.demo_sigma_cm = water_noise.sigma(time.monotonic())
                             if is_co2 and side not in started:
                                 sensor.start()
                                 started.add(side)
@@ -296,6 +302,8 @@ def run():
                             LOG.warning("%s/%s read failed: %s", side, sensor.name, exc)
                             error = True
                         finished = time.monotonic()
+                        if sensor is water_sensor and fields and 'distance_cm' in fields:
+                            water_noise.add(finished, fields['distance_cm'])
                         task.advance(finished)
                         if is_co2 and side in started and finished - last_co2[side] > 30:
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)

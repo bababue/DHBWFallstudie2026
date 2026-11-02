@@ -44,5 +44,12 @@
     "trigger_gpio": 17,
     "echo_gpio": 27,
     "bezugsabstand_cm": null
+  },
+  "moos_demo": {
+    "demo_data": true,
+    "demo_distance_1_cm": 8.0,
+    "demo_distance_2_cm": 8.0,
+    "demo_distance_3_cm": 8.0,
+    "demo_distance_4_cm": 8.0
   }
 }

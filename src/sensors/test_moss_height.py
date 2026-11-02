@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from moss_height import MossAggregate, MossHeight
+from moss_height import MossAggregate, MossHeight, WaterNoise
 
 
 class MossHeightTests(unittest.TestCase):
@@ -20,9 +20,42 @@ class MossHeightTests(unittest.TestCase):
     def test_raw_distance_is_available_before_calibration(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5)
         with patch.object(sensor, "_distance_cm", return_value=8.2) as measure:
-            self.assertEqual(sensor.read(), {"distance_cm": 8.2})
+            self.assertEqual(sensor.read(), {"distance_cm": 8.2, "demo_data": False})
             measure.assert_called_once_with()
         sensor.close()
+
+    def test_demo_uses_simulated_value_without_gpio_and_calculates_height(self):
+        gpio = MagicMock()
+        sensor = MossHeight(gpio, 1, 0, 5, empty_distance_cm=10,
+                            demo_distance_cm=8, demo_sigma_cm=0.1)
+        with patch('moss_height.random.gauss', return_value=8.05) as draw:
+            fields = sensor.read()
+        draw.assert_called_once_with(8, 0.1)
+        self.assertAlmostEqual(fields['height_cm'], 1.95)
+        self.assertTrue(fields['demo_data'])
+        sensor.close()
+        gpio.gpio_claim_output.assert_not_called()
+        gpio.gpio_free.assert_not_called()
+
+    def test_demo_without_calibration_uses_demo_distance_as_reference(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5, demo_distance_cm=8, demo_sigma_cm=0.1)
+        with patch('moss_height.random.gauss', return_value=7.9):
+            self.assertAlmostEqual(sensor.read()['height_cm'], 0.1)
+
+    def test_demo_waits_for_water_data_and_uses_measured_standard_deviation(self):
+        noise = WaterNoise()
+        for index, value in enumerate([7.8, 7.9, 8.0, 8.1]):
+            noise.add(index, value)
+        self.assertIsNone(noise.sigma(4))
+        sensor = MossHeight(MagicMock(), 1, 0, 5, demo_distance_cm=6)
+        self.assertIsNone(sensor.read())
+        noise.add(4, 8.2)
+        sensor.demo_sigma_cm = noise.sigma(4)
+        self.assertAlmostEqual(sensor.demo_sigma_cm, 0.158113883, places=6)
+        with patch('moss_height.random.gauss', return_value=6.05) as draw:
+            self.assertTrue(sensor.read()['demo_data'])
+        draw.assert_called_once_with(6, sensor.demo_sigma_cm)
+        self.assertIsNone(noise.sigma(65))
 
     def test_height_uses_its_own_reference_and_minute_median(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=20.0)

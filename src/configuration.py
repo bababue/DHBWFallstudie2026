@@ -14,6 +14,13 @@ def upgrade(data):
         data = dict(data)
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
+        data.setdefault("moos_demo", {"demo_data": False})
+        if isinstance(data["moos_demo"], dict):
+            demo = dict(data["moos_demo"])
+            old_distance = demo.pop("demo_distance_cm", 8.0)
+            for index in range(1, 5):
+                demo.setdefault(f"demo_distance_{index}_cm", old_distance)
+            data["moos_demo"] = demo
     return data
 
 
@@ -32,6 +39,10 @@ def validate(data):
     for name, (group, key) in KEYS.items():
         value = data[group][key]
         if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
+            continue
+        if name == 'MOSS_DEMO_DATA':
+            if type(value) is not bool:
+                raise ValueError(f'{group}.{key}: true oder false erforderlich')
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError(f'{group}.{key}: gültige Zahl erforderlich')
