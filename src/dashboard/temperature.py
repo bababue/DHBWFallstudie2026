@@ -8,7 +8,7 @@ PERIODS = {'10m': ('10m', '2s', 'last'), '1h': ('1h', '10s', 'last'), '24h': ('2
 def combine(readings, unit="°"):
     selected = []
     for side in ('left', 'right'):
-        for sensor in ('sht45', 'scd40'):
+        for sensor in (('scd40',) if unit == 'ppm' else ('sht45', 'scd40')):
             value = readings.get((side, sensor))
             if isinstance(value, (int, float)) and isfinite(value):
                 selected.append((side, sensor, value))
@@ -21,8 +21,8 @@ def combine(readings, unit="°"):
     for side, label in (('left', 'L'), ('right', 'R')):
         if side in by_side:
             sensor, reading = by_side[side]
-            text = f'{reading:.1f}'.replace('.', ',')
-            lines.append(f"{label}: {text}{unit}{' (fallback)' if sensor == 'scd40' else ''}")
+            text = (f'{reading:.0f}' if unit == 'ppm' else f'{reading:.1f}').replace('.', ',')
+            lines.append(f"{label}: {text}{unit}{' (fallback)' if sensor == 'scd40' and unit != 'ppm' else ''}")
         else:
             lines.append(f'{label}: –')
     if len(selected) == 2:

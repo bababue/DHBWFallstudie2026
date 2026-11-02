@@ -4,6 +4,12 @@ from temperature import combine
 
 
 class TemperatureTests(unittest.TestCase):
+    def test_co2_uses_scd40_as_primary(self):
+        result = combine({('left', 'scd40'): 500, ('right', 'scd40'): 600,
+                          ('left', 'sht45'): 20}, 'ppm')
+        self.assertEqual(result['value'], 550)
+        self.assertNotIn('fallback', result['source'])
+
     def test_humidity_uses_percent_and_same_sensor_priority(self):
         result = combine({('left', 'sht45'): 60, ('right', 'scd40'): 62}, '%')
         self.assertEqual(result['value'], 61)
