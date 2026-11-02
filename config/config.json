@@ -45,6 +45,9 @@
     "echo_gpio": 27,
     "bezugsabstand_cm": null
   },
+  "deckel": {
+    "offen_abstand_cm": 12.0
+  },
   "moos_demo": {
     "demo_data": true,
     "demo_distance_1_cm": 6.940,

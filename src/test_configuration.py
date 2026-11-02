@@ -48,3 +48,11 @@ class ConfigurationTests(unittest.TestCase):
         for i in range(1, 5):
             data['moos_demo'][f'demo_distance_{i}_cm'] = None
         self.assertEqual(validate(upgrade(data))['moos_demo']['demo_distance_1_cm'], None)
+
+    def test_lid_threshold_defaults_and_validation(self):
+        data = copy.deepcopy(load())
+        del data['deckel']
+        self.assertEqual(validate(upgrade(data))['deckel']['offen_abstand_cm'], 12.0)
+        data = upgrade(data)
+        data['deckel']['offen_abstand_cm'] = 0
+        with self.assertRaises(ValueError): validate(data)

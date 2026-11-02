@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from moss_height import MossAggregate, MossHeight, WaterNoise
+from moss_height import LidMonitor, MossAggregate, MossHeight, WaterNoise
 
 
 class MossHeightTests(unittest.TestCase):
@@ -67,6 +67,31 @@ class MossHeightTests(unittest.TestCase):
         self.assertEqual(second["height_cm"], 3.0)
         self.assertEqual(second["height_median_1m_cm"], 2.5)
         sensor.close()
+
+    def test_lid_uses_three_valid_readings_per_sensor_and_keeps_state_on_failure(self):
+        lid = LidMonitor(12)
+        self.assertFalse(lid.update("moss1", 13))
+        self.assertFalse(lid.update("moss1", None))
+        self.assertFalse(lid.update("moss1", 13))
+        self.assertFalse(lid.update("moss1", 13))
+        self.assertTrue(lid.update("moss1", 13))
+        self.assertTrue(lid.update("moss1", None))
+        for _ in range(3):
+            self.assertTrue(lid.update("moss2", 8))
+        self.assertTrue(lid.update("moss1", 12))
+        self.assertTrue(lid.update("moss1", 12))
+        self.assertFalse(lid.update("moss1", 12))
+
+    def test_lid_requires_each_open_sensor_to_close(self):
+        lid = LidMonitor(12)
+        for side in ("moss1", "moss2"):
+            for _ in range(3):
+                lid.update(side, 13)
+        for _ in range(3):
+            self.assertTrue(lid.update("moss1", 7))
+        for _ in range(2):
+            self.assertTrue(lid.update("moss2", 7))
+        self.assertFalse(lid.update("moss2", 7))
 
     def test_aggregate_needs_both_recent_calibrated_sensors(self):
         aggregate = MossAggregate()

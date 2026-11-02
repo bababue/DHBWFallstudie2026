@@ -90,3 +90,26 @@ class MossAggregate:
         if len(values) < self.MIN_SENSORS:
             return None
         return {"height_median_cm": statistics.median(values)}
+
+
+class LidMonitor:
+    """Debounce each sensor independently; missing echoes never imply closure."""
+
+    REQUIRED_READINGS = 3
+
+    def __init__(self, threshold_cm):
+        self.threshold_cm = threshold_cm
+        self._state = {}
+        self._pending = {}
+
+    def update(self, side, distance):
+        if distance is None or not 0 < distance <= MossHeight.MAX_DISTANCE_CM:
+            self._pending.pop(side, None)
+            return any(self._state.values())
+        opened = distance > self.threshold_cm
+        previous, count = self._pending.get(side, (None, 0))
+        count = count + 1 if previous == opened else 1
+        self._pending[side] = (opened, count)
+        if count >= self.REQUIRED_READINGS:
+            self._state[side] = opened
+        return any(self._state.values())

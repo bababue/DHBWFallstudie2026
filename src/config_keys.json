@@ -138,5 +138,9 @@
   "MOSS_4_DEMO_DISTANCE_CM": [
     "moos_demo",
     "demo_distance_4_cm"
+  ],
+  "LID_OPEN_DISTANCE_CM": [
+    "deckel",
+    "offen_abstand_cm"
   ]
 }

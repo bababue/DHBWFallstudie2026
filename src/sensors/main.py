@@ -16,7 +16,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from configuration import setting, load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, start_button_reader
-from moss_height import MossAggregate, MossHeight, WaterNoise
+from moss_height import LidMonitor, MossAggregate, MossHeight, WaterNoise
 from oled import Oled, render, render_mode
 from schedule import ScheduledRead
 from storage import BufferedWriter
@@ -187,6 +187,7 @@ def run():
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
+        lid = LidMonitor(load()["deckel"]["offen_abstand_cm"])
         modes = ButtonModes()
         button_thread = start_button_reader(lgpio, handle, config.button_pin, STOP, modes)
         button_claimed = True
@@ -208,6 +209,7 @@ def run():
         displayed_version = None
         maintenance_active = False
         next_stop_attempt = 0.0
+        lid_next_due = {}
 
         def refresh_display():
             nonlocal next_display, displayed_version
@@ -249,6 +251,8 @@ def run():
                             water_sensor.recent.clear()
                             water_sensor.last_sample = None
                             water_noise.samples.clear()
+                            lid_next_due = {side: now + (int(side[-1]) - 1) * config.moss_interval / 4
+                                            for side, sensor in sensors if isinstance(sensor, MossHeight)}
                             for sensor in moss_sensors:
                                 sensor.recent_distances.clear()
                             moss_aggregate.latest.clear()
@@ -262,6 +266,17 @@ def run():
                                         started.remove(side)
                                     except (OSError, ValueError, lgpio.error) as exc:
                                         LOG.warning("%s/scd40 stop failed: %s", side, exc)
+                        # Only check the lid here; do not publish or retain sensor readings.
+                        for side, sensor in sensors:
+                            if not isinstance(sensor, MossHeight) or now < lid_next_due[side]:
+                                continue
+                            lid_next_due[side] = time.monotonic() + config.moss_interval
+                            try:
+                                distance = sensor._distance_cm()
+                            except (OSError, ValueError, lgpio.error) as exc:
+                                LOG.warning("%s lid check failed: %s", side, exc)
+                                distance = None
+                            modes.set_lid_open(lid.update(side, distance))
                         refresh_display()
                         STOP.wait(0.05)
                         continue
@@ -270,6 +285,9 @@ def run():
                         # Restart every SCD40, including a sensor whose stop failed.
                         started.clear()
                         last_co2.clear()
+                        for sensor in moss_sensors:
+                            if sensor.demo_distance_cm is not None:
+                                sensor.demo_sigma_cm = None
                         for task in tasks:
                             task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 4
                                                    if isinstance(task.sensor, MossHeight) else 0)
@@ -290,7 +308,9 @@ def run():
                         error = False
                         try:
                             if isinstance(sensor, MossHeight) and sensor.demo_distance_cm is not None:
-                                sensor.demo_sigma_cm = water_noise.sigma(time.monotonic())
+                                sigma = water_noise.sigma(time.monotonic())
+                                if sigma is not None:
+                                    sensor.demo_sigma_cm = sigma
                             if is_co2 and side not in started:
                                 sensor.start()
                                 started.add(side)
@@ -305,6 +325,8 @@ def run():
                             LOG.warning("%s/%s read failed: %s", side, sensor.name, exc)
                             error = True
                         finished = time.monotonic()
+                        if isinstance(sensor, MossHeight):
+                            modes.set_lid_open(lid.update(side, fields.get("distance_cm") if fields else None))
                         if sensor is water_sensor and fields and 'distance_cm' in fields:
                             water_noise.add(finished, fields['distance_cm'])
                         task.advance(finished)

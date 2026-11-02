@@ -14,6 +14,7 @@ def upgrade(data):
         data = dict(data)
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
+        data.setdefault("deckel", {"offen_abstand_cm": 12.0})
         data.setdefault("moos_demo", {"demo_data": False})
         if isinstance(data["moos_demo"], dict):
             demo = dict(data["moos_demo"])

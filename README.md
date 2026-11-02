@@ -241,3 +241,12 @@ getrennt von den SHT45-Werten.
 Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/33FD6951/662A593A/HT_DS_Datasheet_SHT4x.pdf),
 [SCD4x-Datenblatt](https://sensirion.com/media/documents/E0F04247/631EF271/CD_DS_SCD40_SCD41_Datasheet_D1.pdf),
 [InfluxDB-Compose-Einrichtung](https://docs.influxdata.com/influxdb/v2/install/use-docker-compose/).
+
+Die Deckelerkennung verwendet `deckel.offen_abstand_cm` (Standard: 12 cm).
+Drei gültige Messungen eines Moossensors oberhalb der Grenze aktivieren
+MAINTENANCE und sperren den Taster für Moduswechsel. Erst drei gültige
+Messungen auf oder unter der Grenze von jedem zuvor geöffnet erkannten Sensor
+schalten zurück auf AUTO. Fehlende Echos bestätigen keinen Zustandswechsel.
+Während MAINTENANCE laufen ausschließlich diese Prüfungen weiter; sie werden
+nicht als Sensordaten gespeichert. Bei deaktivierten Demo-Sensoren entfällt
+auch deren Deckelprüfung.
