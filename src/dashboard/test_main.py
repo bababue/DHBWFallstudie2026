@@ -11,10 +11,11 @@ from main import DISPLAY_ROWS, Hub, READINGS, Settings, make_payload, read_lates
 class DashboardTests(unittest.TestCase):
     def test_plain_page_contains_every_sensor_value(self):
         page = render_page()
-        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 1)
+        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 2)
         self.assertIn("<th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th>", page)
         self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td id="left-scd40-co2_ppm">', page)
         self.assertIn('<tr><td>Wasserstand</td><td>Ultraschall</td><td id="tank-ultrasonic-water_level_cm"', page)
+        self.assertIn('id="tank-ultrasonic-distance_cm"', page)
         self.assertLess(page.index("<td>Temperatur</td>"), page.index("<td>Luftfeuchte</td>"))
         self.assertLess(page.index("<td>Luftfeuchte</td>"), page.index("<td>Licht</td>"))
         self.assertLess(page.index("<td>Licht</td>"), page.index("<td>CO₂</td>"))
@@ -31,10 +32,12 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('stream.mjpg', page)
 
     def test_payload_formats_live_values_and_missing_values(self):
-        payload = make_payload({("left", "scd40", "co2_ppm"): 512.0})
+        payload = make_payload({("left", "scd40", "co2_ppm"): 512.0,
+                                ("tank", "ultrasonic", "distance_cm"): 3.1})
         self.assertEqual(payload["readings"]["left-scd40-co2_ppm"], "512 ppm")
         self.assertEqual(payload["readings"]["right-bh1750-illuminance_lux"], "kein aktueller Wert")
         self.assertEqual(payload["readings"]["tank-ultrasonic-water_level_cm"], "kein aktueller Wert")
+        self.assertEqual(payload["readings"]["tank-ultrasonic-distance_cm"], "3.1 cm")
         self.assertEqual(len(payload["readings"]), len(READINGS))
         self.assertFalse(payload["controls_enabled"])
 

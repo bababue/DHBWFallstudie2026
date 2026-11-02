@@ -10,7 +10,9 @@ class WaterLevelTests(unittest.TestCase):
         sensor = WaterLevel(gpio, 1, 6, 13, 8.62)
         with patch.object(sensor, "_distance_cm", side_effect=[3.0, None, 3.2, 3.1, None]), \
                 patch("water_level.time.sleep"):
-            self.assertAlmostEqual(sensor.read()["water_level_cm"], 5.52)
+            fields = sensor.read()
+            self.assertAlmostEqual(fields["distance_cm"], 3.1)
+            self.assertAlmostEqual(fields["water_level_cm"], 5.52)
         with patch.object(sensor, "_distance_cm", return_value=None), \
                 patch("water_level.time.sleep"):
             self.assertIsNone(sensor.read())

@@ -37,12 +37,13 @@ DISPLAY_ROWS = (
     ("CO₂", "scd40", "co2_ppm", "ppm", 0),
 )
 WATER_READING = Reading("tank", "ultrasonic", "water_level_cm", "cm", 1)
+WATER_DISTANCE_READING = Reading("tank", "ultrasonic", "distance_cm", "cm", 1)
 
 READINGS = tuple(
     Reading(side, sensor, field, unit, decimals)
     for _, sensor, field, unit, decimals in DISPLAY_ROWS
     for side in ("left", "right")
-) + (WATER_READING,)
+) + (WATER_READING, WATER_DISTANCE_READING)
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,9 @@ def render_page(camera_port: int = 8000) -> str:
         for label, sensor, field, _, _ in DISPLAY_ROWS
     )
     rows += ('<tr><td>Wasserstand</td><td>Ultraschall</td>'
-             '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>')
+             '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>'
+             '<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td>'
+             '<td id="tank-ultrasonic-distance_cm" colspan="2">Verbinde…</td></tr>')
     script = """
 <script>
 const sliders = {

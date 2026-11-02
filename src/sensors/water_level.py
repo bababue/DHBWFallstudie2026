@@ -53,7 +53,10 @@ class WaterLevel:
         if not distances:
             return None
         distance = statistics.median(distances)
-        return {"water_level_cm": max(0.0, self.floor_distance_cm - distance)}
+        return {
+            "distance_cm": distance,
+            "water_level_cm": max(0.0, self.floor_distance_cm - distance),
+        }
 
     def close(self):
         self.gpio.gpio_write(self.handle, self.trigger_pin, 0)

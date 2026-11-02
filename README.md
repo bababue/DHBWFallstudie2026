@@ -35,7 +35,8 @@ Freilaufdioden und Verdrahtung prüfen.
 
 Der Wasserstandsensor nutzt Trigger GPIO 6 und Echo GPIO 13. Aus dem gemessenen
 Abstand zur Wasseroberfläche und dem Sensor-Boden-Abstand von 8,62 cm berechnet
-die Software die Wassertiefe in cm. Ohne Echo erscheint kein aktueller Wert.
+die Software die Wassertiefe in cm. Der gemessene Abstand (Median der gültigen
+Echos) erscheint daneben als Rohwert. Ohne Echo erscheint kein aktueller Wert.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
 Die Busse sind Software-I2C. Der Code treibt eigene High-Bits aktiv, wie in der
@@ -147,9 +148,9 @@ Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`) und `sensor`
 | SHT45 | `temperature_c`, `humidity_pct` |
 | BH1750 | `illuminance_lux` |
 | SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
-| Ultraschall | `water_level_cm` |
+| Ultraschall | `water_level_cm`, `distance_cm` |
 
-Das sind dreizehn Zeitreihen: sechs Messgrößen pro Seite und der Wasserstand.
+Das sind vierzehn Zeitreihen: sechs Messgrößen pro Seite, Wasserstand und Abstand.
 Für den SCD40 werden auch seine Temperatur und Luftfeuchtigkeit gespeichert,
 getrennt von den SHT45-Werten.
 
