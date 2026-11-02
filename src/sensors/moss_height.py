@@ -12,7 +12,7 @@ class MossHeight(Ultrasonic):
     WINDOW_S = 60
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None):
-        super().__init__(gpio, handle, trigger_pin, echo_pin)
+        super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
         self.empty_distance_cm = empty_distance_cm
         self.recent_distances = deque()
 

@@ -94,5 +94,29 @@
   "WATER_MAX_LEVEL_CM": [
     "wasserstand",
     "max_fuellhoehe_cm"
+  ],
+  "MOSS_3_TRIGGER_GPIO": [
+    "moos_3",
+    "trigger_gpio"
+  ],
+  "MOSS_3_ECHO_GPIO": [
+    "moos_3",
+    "echo_gpio"
+  ],
+  "MOSS_3_EMPTY_DISTANCE_CM": [
+    "moos_3",
+    "bezugsabstand_cm"
+  ],
+  "MOSS_4_TRIGGER_GPIO": [
+    "moos_4",
+    "trigger_gpio"
+  ],
+  "MOSS_4_ECHO_GPIO": [
+    "moos_4",
+    "echo_gpio"
+  ],
+  "MOSS_4_EMPTY_DISTANCE_CM": [
+    "moos_4",
+    "bezugsabstand_cm"
   ]
 }

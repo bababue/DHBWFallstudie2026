@@ -71,10 +71,10 @@ class Config:
             moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
                              env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
                             for index, (trigger, echo) in enumerate(
-                                ((9, 11), (0, 5)), start=1)),
+                                ((9, 11), (0, 5), (22, 10), (17, 27)), start=1)),
             moss_empty_distances_cm=tuple(
                 float(value) if (value := setting(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
-                for index in range(1, 3)),
+                for index in range(1, 5)),
             moss_interval=float(setting("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
             delay_us=env_int("I2C_DELAY_US", "12"),
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
@@ -189,7 +189,7 @@ def run():
         for side, sensor in sensors:
             if isinstance(sensor, MossHeight):
                 interval = config.moss_interval
-                first_due = start_time + (int(side[-1]) - 1) * interval / 2
+                first_due = start_time + (int(side[-1]) - 1) * interval / 4
             else:
                 interval = config.co2_poll_interval if isinstance(sensor, SCD40) else config.fast_interval
                 first_due = start_time
@@ -264,7 +264,7 @@ def run():
                         started.clear()
                         last_co2.clear()
                         for task in tasks:
-                            task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 2
+                            task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 4
                                                    if isinstance(task.sensor, MossHeight) else 0)
                         LOG.info("Maintenance ended: measurements resumed")
                     due = [task for task in tasks if task.ready(now)]

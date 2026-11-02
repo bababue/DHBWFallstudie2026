@@ -1,7 +1,7 @@
 # Moos-Pi: Sensoren
 
 Der `sensors`-Container liest auf dem Raspberry Pi 5 die drei I2C-Sensoren links
-und rechts sowie drei Ultraschallsensoren für Wasserstand und Mooshöhe. Er schreibt
+und rechts sowie fünf Ultraschallsensoren für Wasserstand und Mooshöhe. Er schreibt
 ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
@@ -77,12 +77,14 @@ Messqualität. Bei bekannter Wassertiefe kann `--water-height 1.5` angegeben wer
 Die Kalibrierung ersetzt nicht die Prüfung des Mindestabstands laut Sensordatenblatt.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
-Zwei zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
+Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
 | Sensor | Trigger | Echo | Kalibrierwert in `config/config.json` |
 | --- | ---: | ---: | --- |
 | Moos 1 | GPIO 9 | GPIO 11 | `moos_1.bezugsabstand_cm` |
 | Moos 2 | GPIO 0 | GPIO 5 | `moos_2.bezugsabstand_cm` |
+| Moos 3 | GPIO 22 | GPIO 10 | `moos_3.bezugsabstand_cm` |
+| Moos 4 | GPIO 17 | GPIO 27 | `moos_4.bezugsabstand_cm` |
 
 Jeder Kalibrierwert ist der Abstand vom Sensor zur moosfreien Bezugsfläche in cm.
 Ohne ihn wird nur der Rohabstand angezeigt. Mit ihm berechnet die Software die

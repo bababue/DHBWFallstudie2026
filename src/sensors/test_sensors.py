@@ -45,11 +45,11 @@ class SensorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Config.from_config()
 
-    def test_two_moss_sensor_pins_and_optional_references(self):
+    def test_four_moss_sensor_pins_and_optional_references(self):
         with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
             config = Config.from_config()
-            self.assertEqual(config.moss_pins, ((9, 11), (0, 5)))
-            self.assertEqual(config.moss_empty_distances_cm, (None,) * 2)
+            self.assertEqual(config.moss_pins, ((9, 11), (0, 5), (22, 10), (17, 27)))
+            self.assertEqual(config.moss_empty_distances_cm, (None,) * 4)
             os.environ["MOSS_1_EMPTY_DISTANCE_CM"] = "20.5"
             self.assertEqual(Config.from_config().moss_empty_distances_cm[0], 20.5)
             os.environ["MOSS_2_ECHO_GPIO"] = "13"

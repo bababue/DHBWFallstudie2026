@@ -11,14 +11,14 @@ class Ultrasonic:
     MAX_DISTANCE_CM = 400
     START_TIMEOUT_S = 0.01
 
-    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int):
+    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int, pull_down=False):
         self.gpio = gpio
         self.handle = handle
         self.trigger_pin = trigger_pin
         self.echo_pin = echo_pin
         gpio.gpio_claim_output(handle, trigger_pin, 0)
         try:
-            gpio.gpio_claim_input(handle, echo_pin)
+            gpio.gpio_claim_input(handle, echo_pin, gpio.SET_PULL_DOWN) if pull_down else gpio.gpio_claim_input(handle, echo_pin)
         except Exception:
             gpio.gpio_free(handle, trigger_pin)
             raise

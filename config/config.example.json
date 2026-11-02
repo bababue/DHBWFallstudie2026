@@ -34,5 +34,15 @@
     "schnelle_sensoren_s": 1.0,
     "moos_s": 4.0,
     "co2_bereitschaft_s": 0.5
+  },
+  "moos_3": {
+    "trigger_gpio": 22,
+    "echo_gpio": 10,
+    "bezugsabstand_cm": null
+  },
+  "moos_4": {
+    "trigger_gpio": 17,
+    "echo_gpio": 27,
+    "bezugsabstand_cm": null
   }
 }

@@ -9,6 +9,14 @@ PATH = Path('/config/config.json') if Path('/config').exists() else Path(__file_
 KEYS = json.loads(Path(__file__).with_name('config_keys.json').read_text())
 
 
+def upgrade(data):
+    if isinstance(data, dict):
+        data = dict(data)
+        data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
+        data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
+    return data
+
+
 def validate(data):
     expected = {}
     for group, key in KEYS.values():
@@ -52,7 +60,7 @@ def validate(data):
 
 
 def load():
-    return validate(json.loads(PATH.read_text()))
+    return validate(upgrade(json.loads(PATH.read_text())))
 
 
 def setting(name, default=None):

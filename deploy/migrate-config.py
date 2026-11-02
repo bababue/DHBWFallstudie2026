@@ -18,7 +18,7 @@ if not marker.exists():
     if env_path.exists():
         lines = env_path.read_text().splitlines()
         values = dict(line.split('=', 1) for line in lines if '=' in line and not line.lstrip().startswith('#'))
-        data = json.loads(path.read_text())
+        data = configuration.upgrade(json.loads(path.read_text()))
         for name, (group, key) in configuration.KEYS.items():
             if name in values:
                 raw = values[name].strip().strip('\"\'')
