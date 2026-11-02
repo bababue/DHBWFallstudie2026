@@ -13,7 +13,7 @@ from threading import Event
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-from configuration import setting
+from configuration import setting, load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, start_button_reader
 from moss_height import MossAggregate, MossHeight
@@ -167,7 +167,7 @@ def run():
             for sensor in (SHT45(bus, config.sht45_address), BH1750(bus, config.bh1750_address), scd)
         ]
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
-                                  config.water_floor_distance_cm)
+                                  config.water_floor_distance_cm, options=load()["wasserstand"])
         sensors.append(("tank", water_sensor))
         for index, ((trigger, echo), empty_distance) in enumerate(
                 zip(config.moss_pins, config.moss_empty_distances_cm), start=1):

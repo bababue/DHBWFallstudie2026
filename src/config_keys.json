@@ -82,5 +82,17 @@
   "CO2_READY_POLL_SECONDS": [
     "messintervalle",
     "co2_bereitschaft_s"
+  ],
+  "WATER_FILTER_SAMPLES": [
+    "wasserstand",
+    "filter_messungen"
+  ],
+  "WATER_MAX_SPREAD_CM": [
+    "wasserstand",
+    "max_streuung_cm"
+  ],
+  "WATER_MAX_LEVEL_CM": [
+    "wasserstand",
+    "max_fuellhoehe_cm"
   ]
 }

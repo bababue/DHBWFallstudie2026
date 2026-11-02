@@ -17,13 +17,13 @@ def validate(data):
         raise ValueError('Die Konfigurationsbereiche müssen vollständig erhalten bleiben.')
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
-              'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000)}
+              'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000), 'WATER_FILTER_SAMPLES': (3, 31), 'WATER_MAX_SPREAD_CM': (.01, 5)}
     for group, keys in expected.items():
         if not isinstance(data[group], dict) or set(data[group]) != keys:
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
     for name, (group, key) in KEYS.items():
         value = data[group][key]
-        if value is None and name.endswith('EMPTY_DISTANCE_CM'):
+        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError(f'{group}.{key}: gültige Zahl erforderlich')
@@ -40,6 +40,12 @@ def validate(data):
                 raise ValueError(f'{group}.{key}: erlaubter Bereich {low} bis {high}')
             if name == 'I2C_DELAY_US' and type(value) is not int:
                 raise ValueError('i2c.taktpause_us: ganze Zahl erforderlich')
+    count = data['wasserstand']['filter_messungen']
+    if type(count) is not int or count % 2 == 0:
+        raise ValueError('wasserstand.filter_messungen: ungerade ganze Zahl erforderlich')
+    maximum = data['wasserstand']['max_fuellhoehe_cm']
+    if maximum is not None and maximum >= data['wasserstand']['sensor_boden_abstand_cm']:
+        raise ValueError('Maximale Füllhöhe muss kleiner als der Sensor-Boden-Abstand sein')
     if len(pins) != len(set(pins)):
         raise ValueError('Jeder GPIO darf nur einmal vergeben sein.')
     return data

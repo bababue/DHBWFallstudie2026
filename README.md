@@ -50,11 +50,32 @@ nicht.
 
 Der Wasserstandsensor nutzt Trigger GPIO 6 und Echo GPIO 13. Aus dem gemessenen
 Abstand zur Wasseroberfläche und dem Sensor-Boden-Abstand von 8,62 cm berechnet
-die Software die Wassertiefe in cm. Zusätzlich erscheint der Median der
-Wassertiefe aus allen gültigen Echos der letzten 60 Sekunden. Der Rohabstand
-zeigt genau den aktuellen Echo-Messwert ohne Mittelung oder Glättung.
-Beim Start nutzt der Minutenmedian die bereits verfügbaren Messungen. Ohne Echo
-erscheint kein aktueller Wert.
+die Software die Wassertiefe in cm. Der Rohabstand bleibt unverändert sichtbar.
+Echozeiten werden über GPIO-Flanken mit Nanosekunden-Zeitstempeln erfasst.
+Die Füllhöhe verwendet einen kurzen Medianfilter: `filter_messungen` bestimmt
+die Anzahl (Standard 5); mindestens eine Mehrheit muss innerhalb von
+`max_streuung_cm` um den Median liegen. Erst dann wird `water_level_cm` geschrieben.
+Ein fehlendes Echo oder eine Messpause über 12 Sekunden leert den Filter.
+`measurement_stable` kennzeichnet den Messzustand.
+
+`wasserstand.max_fuellhoehe_cm` ist die maximale erlaubte Füllhöhe. `null`
+bedeutet noch nicht festgelegt. `max_level_reached` meldet eine Überschreitung
+bereits beim einzelnen Rohwert und zusätzlich beim gefilterten Wert.
+Diese Meldung schaltet bislang keine Pumpe; eine unabhängige Hardwareabschaltung
+(z. B. Schwimmerschalter) muss separat eingebaut werden. Ein dauerhaftes Hindernis
+im Schallweg kann auch einen Medianfilter täuschen.
+
+Kalibrierung im leeren Behälter, mit ruhiger Oberfläche und freiem Schallweg:
+
+```sh
+python3 calibrate_water.py
+python3 calibrate_water.py --write
+```
+
+Das Skript stoppt einen laufenden Sensorcontainer vorübergehend, misst 80 Echos
+im Container und startet ihn danach wieder. Es speichert nur bei ausreichender
+Messqualität. Bei bekannter Wassertiefe kann `--water-height 1.5` angegeben werden.
+Die Kalibrierung ersetzt nicht die Prüfung des Mindestabstands laut Sensordatenblatt.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
 Zwei zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
@@ -182,7 +203,7 @@ und `sensor` (`sht45`/`bh1750`/`scd40`/`ultrasonic`/`aggregate`):
 | SHT45 | `temperature_c`, `humidity_pct` |
 | BH1750 | `illuminance_lux` |
 | SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
-| Ultraschall | `water_level_cm`, `water_level_median_1m_cm`, `distance_cm` |
+| Ultraschall | `distance_cm`, `distance_filtered_cm`, `water_level_cm`, `measurement_stable`, `max_level_configured`, `max_level_reached` (wenn Grenze gesetzt) |
 | Moos-Ultraschall 1–2 | `distance_cm`; nach Kalibrierung auch `height_cm`, `height_median_1m_cm` |
 | Moos-Aggregat | `height_median_cm` bei zwei gültigen Messstellen |
 
