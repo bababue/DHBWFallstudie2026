@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Calibrate the four moss distance sensors against the paper reference."""
+import argparse
+import math
+import os
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+SAMPLE_COUNT = 20
+MAX_DEVIATION_CM = 0.3
+
+
+def reference(samples):
+    valid = [value for value in samples if value is not None and math.isfinite(value) and 0 < value <= 400]
+    if len(valid) < SAMPLE_COUNT * 0.8:
+        return None
+    center = statistics.median(valid)
+    accepted = [value for value in valid if abs(value - center) <= MAX_DEVIATION_CM]
+    if len(accepted) < len(valid) * 0.8:
+        return None
+    return round(statistics.median(accepted), 3)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Moossensoren mit Kalibrierungszettel auf Null setzen.')
+    parser.add_argument('--inside', action='store_true', help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if not args.inside:
+        try:
+            input('Bitte leg den kalibrierungszettel auf die halterung.\nDrücke Enter, um zu starten. ')
+        except (EOFError, KeyboardInterrupt):
+            print('\nKalibrierung abgebrochen.')
+            return 1
+        root = Path(__file__).resolve().parents[1]
+        command = ['docker', 'compose']
+        running = subprocess.check_output(command + ['ps', '--status', 'running', '--services'], cwd=root, text=True).splitlines()
+        resume = 'sensors' in running
+        try:
+            if resume:
+                subprocess.run(command + ['stop', 'sensors'], cwd=root, check=True)
+            invocation = command + ['run', '--rm', '--no-deps', '-T', '-v', str(root / 'config') + ':/config',
+                                    'sensors', 'python', '-', '--inside']
+            return subprocess.run(invocation, cwd=root, input=Path(__file__).read_text(), text=True).returncode
+        finally:
+            if resume:
+                subprocess.run(command + ['start', 'sensors'], cwd=root, check=True)
+
+    import lgpio
+    import configuration
+    from moss_height import MossHeight
+    config = configuration.load()
+    revision = configuration.revision()
+    chip = int(os.getenv('GPIOCHIP_DEVICE', '/dev/gpiochip0').removeprefix('/dev/gpiochip'))
+    handle = lgpio.gpiochip_open(chip)
+    results = {}
+    try:
+        for index in range(1, 5):
+            settings = config[f'moos_{index}']
+            sensor = None
+            try:
+                sensor = MossHeight(lgpio, handle, settings['trigger_gpio'], settings['echo_gpio'])
+                samples = []
+                for _ in range(SAMPLE_COUNT):
+                    samples.append(sensor._distance_cm())
+                    time.sleep(.08)
+                result = reference(samples)
+                if result is None:
+                    print(f'Moos {index}: keine ausreichend stabilen Messungen; bisheriger Wert bleibt erhalten.', flush=True)
+                else:
+                    results[index] = result
+                    print(f'Moos {index}: {result:.3f} cm', flush=True)
+            except (OSError, ValueError, lgpio.error) as exc:
+                print(f'Moos {index}: Messung fehlgeschlagen ({exc}); bisheriger Wert bleibt erhalten.', flush=True)
+            finally:
+                if sensor is not None:
+                    sensor.close()
+    finally:
+        lgpio.gpiochip_close(handle)
+    if not results:
+        print('Kein Sensor konnte kalibriert werden.')
+        return 1
+    if configuration.revision() != revision:
+        print('Konfiguration wurde zwischenzeitlich geändert; keine Werte gespeichert.')
+        return 1
+    for index, distance in results.items():
+        config[f'moos_{index}']['bezugsabstand_cm'] = distance
+    configuration.validate(config)
+    import json
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', dir=configuration.PATH.parent, delete=False) as output:
+            temporary = Path(output.name)
+            os.fchmod(output.fileno(), 0o644)
+            json.dump(config, output, indent=2, ensure_ascii=False)
+            output.write('\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, configuration.PATH)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    print('Bezugsabstände in config/config.json gespeichert.')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

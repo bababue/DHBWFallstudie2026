@@ -4,11 +4,17 @@ from temperature import combine
 
 
 class TemperatureTests(unittest.TestCase):
+    def test_light_difference_uses_unrounded_values(self):
+        result = combine({('left', 'bh1750'): 11.68, ('right', 'bh1750'): 17.52}, 'lx')
+        self.assertAlmostEqual(result['value'], 14.6)
+        self.assertEqual(result['source'], 'L: 11,7lx\nR: 17,5lx\n+50,0%')
+
     def test_co2_uses_scd40_as_primary(self):
         result = combine({('left', 'scd40'): 500, ('right', 'scd40'): 600,
                           ('left', 'sht45'): 20}, 'ppm')
         self.assertEqual(result['value'], 550)
         self.assertNotIn('fallback', result['source'])
+        self.assertEqual(result['source'].splitlines()[-1], '+20,0%')
 
     def test_humidity_uses_percent_and_same_sensor_priority(self):
         result = combine({('left', 'sht45'): 60, ('right', 'scd40'): 62}, '%')

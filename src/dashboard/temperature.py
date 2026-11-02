@@ -25,7 +25,7 @@ def combine(readings, unit="°"):
     for side, label in (('left', 'L'), ('right', 'R')):
         if side in by_side:
             sensor, reading = by_side[side]
-            text = (f'{reading:.0f}' if unit in ('ppm', 'lx') else f'{reading:.1f}').replace('.', ',')
+            text = (f'{reading:.0f}' if unit == 'ppm' else f'{reading:.1f}').replace('.', ',')
             lines.append(f"{label}: {text}{unit}{' (fallback)' if sensor == 'scd40' and unit != 'ppm' else ''}")
         else:
             lines.append(f'{label}: –')

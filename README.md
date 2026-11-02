@@ -7,8 +7,8 @@ ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 ## Konfiguration
 
 Hardwareparameter und Messintervalle stehen in der versionierten Datei
-`config/config.json`. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
-prüft Struktur, Wertebereiche und doppelt vergebene GPIOs. Sensoränderungen
+`config/config.json`. Änderungen können direkt in der Datei vorgenommen werden;
+die Software prüft Struktur, Wertebereiche und doppelt vergebene GPIOs. Sensoränderungen
 starten den Sensorcontainer automatisch neu (der angezeigte Modus beginnt wieder
 in AUTO). `null` bei einem Moos-Bezugsabstand bedeutet „noch nicht kalibriert“.
 I²C-Adressen sind dezimale Zahlen: 68 = 0x44, 35 = 0x23, 98 = 0x62.
@@ -16,10 +16,8 @@ I²C-Adressen sind dezimale Zahlen: 68 = 0x44, 35 = 0x23, 98 = 0x62.
 `.env` enthält die InfluxDB-Verbindung, Zugangsdaten und das GPIO-Gerät für
 Compose. Die Hardwareparameter werden aus `config/config.json` gelesen.
 
-Änderungen im Web-Editor verändern die versionierte Datei auf dem Pi. Solche
-Änderungen müssen vor einem Git-Update übernommen oder gesichert werden; sie
-können sonst den automatischen Deploy verhindern. Der Editor ist wie das
-Dashboard für das vertrauenswürdige lokale Netz vorgesehen.
+Lokale Änderungen an der versionierten Datei können den automatischen Deploy
+verhindern und müssen vor einem Git-Update übernommen oder gesichert werden.
 
 `sensors` liest SHT45, BH1750 und den Wasserstandsensor unabhängig voneinander
 etwa jede Sekunde. Beim SCD40 prüft es alle 0,5 Sekunden, ob ein neuer CO₂-Wert
@@ -77,6 +75,13 @@ Die Kalibrierung ersetzt nicht die Prüfung des Mindestabstands laut Sensordaten
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
 Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
+
+Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
+ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst
+das Skript jeden Sensor und speichert stabile Bezugsabstände automatisch in
+`config/config.json`. Nicht angeschlossene oder instabile Sensoren behalten ihren
+bisherigen Wert. Der Sensorcontainer wird währenddessen angehalten und danach
+wieder gestartet, falls er zuvor lief.
 
 | Sensor | Trigger | Echo | Kalibrierwert in `config/config.json` |
 | --- | ---: | ---: | --- |
