@@ -46,9 +46,13 @@ Auf dem Pi mit Docker Compose:
 # Einmalig bei einer Migration vom alten Aufbau:
 sudo systemctl disable --now kamera-live moos-steuerung
 
-docker compose up -d --build --remove-orphans
+./start.sh
 docker compose logs -f sensors
 ```
+
+`start.sh` holt zuerst die neuesten Git-Änderungen mit `git pull --ff-only`
+und startet danach die Container mit frischen Images. Wenn lokale Änderungen
+einen Pull verhindern, stoppt das Skript vor dem Docker-Start.
 
 Der frühere Dienst `kamera-live` belegt Port 8000 und die Kamera;
 `moos-steuerung` nutzt dieselben GPIO-Pins wie die Docker-Steuerung. Falls
