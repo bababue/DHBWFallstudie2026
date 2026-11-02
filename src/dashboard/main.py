@@ -12,6 +12,7 @@ from influxdb_client import InfluxDBClient
 
 from configuration import setting
 from actuators import Actuators
+from automatic import AutomaticControl
 
 from temperature import PERIODS, combine
 
@@ -22,16 +23,19 @@ LOG = logging.getLogger('moos.dashboard')
 
 
 actuators = None
+automatic = None
 
 
 @app.on_event('startup')
 def start_actuators():
-    global actuators
+    global actuators, automatic
     try:
         import lgpio
         actuators = Actuators(lgpio, setting('GPIOCHIP_DEVICE', '/dev/gpiochip0'),
                               int(setting('LED_GPIO')), int(setting('FAN_GPIO')), int(setting('PUMP_GPIO')),
                               int(setting('LED_PWM_HZ')), int(setting('FAN_PWM_HZ')), int(setting('PUMP_PWM_HZ')))
+        automatic = AutomaticControl(actuators, lambda: mode_state().get('mode'))
+        automatic.start()
     except Exception:
         LOG.exception('Aktoren konnten nicht initialisiert werden')
         actuators = None
@@ -39,7 +43,10 @@ def start_actuators():
 
 @app.on_event('shutdown')
 def stop_actuators():
-    global actuators
+    global actuators, automatic
+    if automatic is not None:
+        automatic.close()
+        automatic = None
     if actuators is not None:
         actuators.close()
         actuators = None
@@ -54,12 +61,12 @@ def actuator_status():
 
 @app.post('/api/actuators/{device}')
 def set_actuator(device: str, body: dict):
-    if mode_state().get('mode') != 'MAINTENANCE':
-        return Response('Nur im Maintenance-Modus verfügbar', status_code=409)
-    if actuators is None:
+    if actuators is None or automatic is None:
         return Response('Steuerung nicht verfügbar', status_code=503)
     try:
-        return actuators.set(device, body.get('value'))
+        return automatic.set_manual(device, body.get('value'))
+    except PermissionError:
+        return Response('Nur im Maintenance-Modus verfügbar', status_code=409)
     except ValueError:
         return Response('Ungültiger Stellwert', status_code=400)
     except Exception:

@@ -137,6 +137,8 @@ Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` laufen die
 Sensoren weiter und ihre aktuellen Werte werden angezeigt, aber nicht in
 InfluxDB gespeichert. Im Dashboard sind die Graphen währenddessen ausgeblendet.
+Im AUTO-Modus setzt die automatische Steuerung Lüfter, Pumpe und Licht derzeit
+auf 0 %. Beim Verlassen von MAINTENANCE werden diese Sollwerte wieder übernommen.
 Im Maintenance-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
 werden die Ausgänge auf 0 gesetzt. Die GPIOs und PWM-Frequenzen stehen unter

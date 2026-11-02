@@ -43,7 +43,8 @@ class DashboardTests(unittest.TestCase):
         controller = MagicMock()
         controller.status.return_value = {'fan': 20, 'pump': 0, 'led': 40}
         controller.set.return_value = {'fan': 30, 'pump': 0, 'led': 40}
-        with patch.object(main, 'actuators', controller):
+        automatic = main.AutomaticControl(controller, lambda: main.mode_state().get('mode'))
+        with patch.object(main, 'actuators', controller), patch.object(main, 'automatic', automatic):
             self.assertEqual(main.actuator_status()['fan'], 20)
             with patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
                 self.assertEqual(main.set_actuator('fan', {'value': 30}).status_code, 409)
