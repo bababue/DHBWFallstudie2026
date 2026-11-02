@@ -57,7 +57,7 @@ class DashboardTests(unittest.TestCase):
             result = main.temperature('24h')
         self.assertEqual(result['current']['value'], 21)
         self.assertEqual(result['points'][0]['value'], 21)
-        self.assertIn('Backup', result['points'][0]['source'])
+        self.assertIn('(fallback)', result['points'][0]['source'])
         self.assertEqual(result['window_seconds'], 60)
         calls = client.query_api.return_value.query.call_args_list
         self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[1].args[0])

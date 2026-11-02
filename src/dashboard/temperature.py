@@ -16,9 +16,16 @@ def combine(readings):
     if not selected:
         return {'value': None, 'source': 'Keine aktuellen Messwerte'}
     value = sum(item[2] for item in selected) / len(selected)
-    labels = [f"{'links' if side == 'left' else 'rechts'}: {sensor.upper()}"
-              f"{' (Backup)' if sensor == 'scd40' else ''}" for side, sensor, _ in selected]
-    source = ('Nur ' if len(selected) == 1 else '') + ', '.join(labels)
-    if len(selected) == 2 and abs(selected[0][2] - selected[1][2]) >= 2:
-        source += f" · Unterschied: {abs(selected[0][2] - selected[1][2]):.1f} °C"
-    return {'value': value, 'source': source}
+    by_side = {side: (sensor, reading) for side, sensor, reading in selected}
+    lines = []
+    for side, label in (('left', 'L'), ('right', 'R')):
+        if side in by_side:
+            sensor, reading = by_side[side]
+            text = f'{reading:.1f}'.replace('.', ',')
+            lines.append(f"{label}: {text}°{' (fallback)' if sensor == 'scd40' else ''}")
+        else:
+            lines.append(f'{label}: –')
+    if len(selected) == 2:
+        difference = by_side['right'][1] - by_side['left'][1]
+        lines.append(f'{difference:+.1f}°'.replace('.', ','))
+    return {'value': value, 'source': '\n'.join(lines)}
