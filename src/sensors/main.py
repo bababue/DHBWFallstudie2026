@@ -126,9 +126,9 @@ def sample_points(side: str, sensor_name: str, fields: dict[str, float] | None, 
 
 
 def update_display_values(values, side, sensor, fields, now, max_age=12):
-    """Keep only recent fields; failed reads clear that sensor immediately."""
+    """Retain each latest field for the dashboard's 12-second window."""
     for key in tuple(values):
-        if key[:2] == (side, sensor) or now - values[key][1] > max_age:
+        if now - values[key][1] > max_age:
             del values[key]
     if fields:
         values.update({(side, sensor, field): (value, now) for field, value in fields.items()})
@@ -138,14 +138,19 @@ def display_readings(values, now, max_age=12):
     return {key: value for key, (value, sampled) in values.items() if now - sampled <= max_age}
 
 
+def should_store_sample(mode_before, mode_after):
+    return mode_before != "MAINTENANCE" and mode_after != "MAINTENANCE"
+
+
 def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
     # The shared volume survives restarts; do not show its previous mode.
-    try:
-        os.unlink('/run/moos/mode.json')
-    except FileNotFoundError:
-        pass
+    for path in ('/run/moos/mode.json', '/run/moos/readings.json'):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
 
     config = Config.from_config()
     from configuration import revision
@@ -210,8 +215,6 @@ def run():
         published_mode = None
         mode_since = time.time()
         maintenance_active = False
-        next_stop_attempt = 0.0
-        lid_next_due = {}
 
         def refresh_display():
             nonlocal next_display, displayed_version, published_mode, mode_since
@@ -227,6 +230,14 @@ def run():
                 with open("/run/moos/mode.tmp", "w") as state:
                     json.dump({"mode": mode, "updated": time.time(), "since": mode_since}, state)
                 os.replace("/run/moos/mode.tmp", "/run/moos/mode.json")
+                wall_now = time.time()
+                readings = [dict(side=side, sensor=sensor, field=field, value=value,
+                                 sampled=wall_now - (now - sampled))
+                            for (side, sensor, field), (value, sampled) in display_values.items()
+                            if now - sampled <= 12]
+                with open("/run/moos/readings.tmp", "w") as state:
+                    json.dump({"updated": wall_now, "readings": readings}, state, allow_nan=False)
+                os.replace("/run/moos/readings.tmp", "/run/moos/readings.json")
             except OSError as exc:
                 LOG.warning("Mode publication failed: %s", exc)
             try:
@@ -249,54 +260,18 @@ def run():
                         break
                     now = time.monotonic()
                     mode, show_info, version = modes.snapshot()
-                    if mode == "MAINTENANCE":
-                        if not maintenance_active:
-                            maintenance_active = True
-                            display_values.clear()
-                            water_sensor.recent.clear()
-                            water_sensor.last_sample = None
-                            water_noise.samples.clear()
-                            lid_next_due = {side: now + (int(side[-1]) - 1) * config.moss_interval / 4
-                                            for side, sensor in sensors if isinstance(sensor, MossHeight)}
-                            for sensor in moss_sensors:
-                                sensor.recent_distances.clear()
-                            moss_aggregate.latest.clear()
-                            LOG.info("Maintenance: measurements paused")
-                        if started and now >= next_stop_attempt:
-                            next_stop_attempt = now + 2
-                            for side, sensor in zip(("left", "right"), scd_sensors):
-                                if side in started:
-                                    try:
-                                        sensor.stop()
-                                        started.remove(side)
-                                    except (OSError, ValueError, lgpio.error) as exc:
-                                        LOG.warning("%s/scd40 stop failed: %s", side, exc)
-                        # Only check the lid here; do not publish or retain sensor readings.
-                        for side, sensor in sensors:
-                            if not isinstance(sensor, MossHeight) or now < lid_next_due[side]:
-                                continue
-                            lid_next_due[side] = time.monotonic() + config.moss_interval
-                            try:
-                                distance = sensor._distance_cm()
-                            except (OSError, ValueError, lgpio.error) as exc:
-                                LOG.warning("%s lid check failed: %s", side, exc)
-                                distance = None
-                            modes.set_lid_open(lid.update(side, distance))
-                        refresh_display()
-                        STOP.wait(0.05)
-                        continue
-                    if maintenance_active:
+                    if mode == "MAINTENANCE" and not maintenance_active:
+                        maintenance_active = True
+                        LOG.info("Maintenance: measurements continue without storage")
+                    elif mode != "MAINTENANCE" and maintenance_active:
                         maintenance_active = False
-                        # Restart every SCD40, including a sensor whose stop failed.
-                        started.clear()
-                        last_co2.clear()
+                        # Keep maintenance samples out of post-maintenance filters.
+                        water_sensor.recent.clear()
+                        water_sensor.last_sample = None
                         for sensor in moss_sensors:
-                            if sensor.demo_enabled:
-                                sensor.demo_sigma_cm = None
-                        for task in tasks:
-                            task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 4
-                                                   if isinstance(task.sensor, MossHeight) else 0)
-                        LOG.info("Maintenance ended: measurements resumed")
+                            sensor.recent_distances.clear()
+                        moss_aggregate.latest.clear()
+                        LOG.info("Maintenance ended: storage resumed")
                     due = [task for task in tasks if task.ready(now)]
                     if not due and now < next_display and version == displayed_version:
                         STOP.wait(max(0, min(0.05, next_display - now,
@@ -305,8 +280,7 @@ def run():
                     refresh_display()
                     points = []
                     for task in due:
-                        if modes.snapshot()[0] == "MAINTENANCE":
-                            break
+                        sample_mode = modes.snapshot()[0]
                         side, sensor = task.side, task.sensor
                         is_co2 = isinstance(sensor, SCD40)
                         fields = None
@@ -339,11 +313,12 @@ def run():
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)
                             started.remove(side)
                             error = True
-                        if side in ("left", "right") and (not is_co2 or fields is not None or error):
+                        if not is_co2 or fields is not None or error:
                             update_display_values(display_values, side, sensor.name, fields, finished)
                         # The SCD40 has no new value between its 5 s conversions.
                         # Do not publish a false unhealthy or repeat a stale sample.
-                        if not is_co2 or fields is not None or error:
+                        if (should_store_sample(sample_mode, modes.snapshot()[0])
+                                and (not is_co2 or fields is not None or error)):
                             timestamp = datetime.now(timezone.utc)
                             points.extend(sample_points(side, sensor.name, fields, timestamp))
                             if isinstance(sensor, MossHeight):
@@ -351,6 +326,8 @@ def run():
                                     side, fields.get("height_median_1m_cm") if fields else None, finished)
                                 points.extend(sample_points("moss", "aggregate", aggregate, timestamp))
                         refresh_display()
+                        if modes.snapshot()[0] != sample_mode:
+                            break
                     buffered.submit(points)
             finally:
                 STOP.set()

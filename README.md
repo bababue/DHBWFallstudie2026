@@ -134,10 +134,9 @@ Ein kurzer Druck auf den Taster an GPIO 26 schaltet zwischen beiden um. Während
 Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
 Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
-Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` pausieren alle
-Sensorabfragen mit Ausnahme der Deckelprüfung, und die periodischen CO₂-Messungen der SCD40 werden gestoppt.
-Eine laufende Einzelmessung wird noch beendet. Beim Verlassen des Modus laufen
-die Messungen wieder an; die SCD40 benötigen anschließend eine neue Messung.
+Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` laufen die
+Sensoren weiter und ihre aktuellen Werte werden angezeigt, aber nicht in
+InfluxDB gespeichert. Im Dashboard sind die Graphen währenddessen ausgeblendet.
 Die Modi steuern vorerst keine Aktoren.
 
 Die Sensorübersicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
@@ -245,6 +244,5 @@ Drei gültige Messungen eines Moossensors oberhalb der Grenze aktivieren
 MAINTENANCE und sperren den Taster für Moduswechsel. Erst drei gültige
 Messungen auf oder unter der Grenze von jedem zuvor geöffnet erkannten Sensor
 schalten zurück auf AUTO. Fehlende Echos bestätigen keinen Zustandswechsel.
-Während MAINTENANCE laufen ausschließlich diese Prüfungen weiter; sie werden
-nicht als Sensordaten gespeichert. Auch bei aktivem Demo-Modus erfolgt die
-Deckelprüfung anhand der echten Sensorwerte.
+Während MAINTENANCE laufen alle Messungen weiter, ohne in InfluxDB gespeichert
+zu werden. Die Deckelprüfung verwendet auch im Demo-Modus echte Sensorwerte.

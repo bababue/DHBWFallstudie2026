@@ -39,49 +39,33 @@ class DashboardTests(unittest.TestCase):
         result = subprocess.run(['node', '--check'], input=script, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_debug_returns_individual_sensor_values_without_aggregation(self):
-        record = SimpleNamespace(values={'side': 'left', 'sensor': 'scd40'},
-                                 get_field=lambda: 'temperature_c', get_value=lambda: 21.2345)
-        client = MagicMock()
-        client.__enter__.return_value = client
-        client.query_api.return_value.query.return_value = [SimpleNamespace(records=[record])]
-        with patch.object(main, 'InfluxDBClient', return_value=client):
-            result = main.debug_sensors()
-        self.assertEqual(result['readings'], [{'side': 'left', 'sensor': 'scd40',
-                                               'field': 'temperature_c', 'value': 21.2345}])
-        query = client.query_api.return_value.query.call_args.args[0]
-        self.assertIn('last()', query)
-        self.assertNotIn('aggregateWindow', query)
+    def test_live_readings_expire_and_debug_uses_them(self):
+        now = time.time()
+        readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21, sampled=now),
+                    dict(side='right', sensor='sht45', field='temperature_c', value=99, sampled=now - 13)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'readings.json'
+            path.write_text(json.dumps({'updated': now, 'readings': readings}))
+            with patch.object(main, 'READINGS_FILE', path):
+                self.assertEqual(main.debug_sensors()['readings'], readings[:1])
+                path.write_text(json.dumps({'updated': now - 6, 'readings': readings}))
+                self.assertEqual(main.live_readings(), [])
 
-    def test_maintenance_hides_current_values_but_keeps_history(self):
-        record = SimpleNamespace(values={'side': 'left', 'sensor': 'sht45'},
-                                 get_value=lambda: 20,
-                                 get_time=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
-        client = MagicMock()
-        client.__enter__.return_value = client
-        client.query_api.return_value.query.return_value = [SimpleNamespace(records=[record])]
+    def test_maintenance_shows_live_values_and_no_history(self):
+        readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21),
+                    dict(side='right', sensor='sht45', field='temperature_c', value=23),
+                    dict(side='moss1', sensor='ultrasonic', field='height_cm', value=2)]
         with patch.object(main, 'mode_state', return_value={'mode': 'MAINTENANCE'}), \
-                patch.object(main, 'InfluxDBClient', return_value=client):
-            self.assertEqual(main.debug_sensors(), {'readings': []})
-            result = main.temperature('24h')
-        self.assertIsNone(result['current']['value'])
-        self.assertEqual(result['points'][0]['value'], 20)
-        self.assertEqual(client.query_api.return_value.query.call_count, 1)
-
-    def test_current_queries_start_at_recent_mode_transition(self):
-        since = time.time() - 2
-        client = MagicMock()
-        client.__enter__.return_value = client
-        client.query_api.return_value.query.return_value = []
-        with patch.object(main, 'mode_state', return_value={'mode': 'AUTO', 'since': since}), \
-                patch.object(main, 'InfluxDBClient', return_value=client):
-            main.debug_sensors()
-            main.temperature('1h', current_only=True)
-            main.moss('1h', current_only=True)
-        for call in client.query_api.return_value.query.call_args_list:
-            self.assertIn('range(start: time(v:', call.args[0])
-        with patch.object(main, 'mode_state', return_value={'mode': 'AUTO', 'since': since - 20}):
-            self.assertEqual(main.current_range(), '-12s')
+                patch.object(main, 'live_readings', return_value=readings), \
+                patch.object(main, 'InfluxDBClient') as client:
+            self.assertEqual(main.debug_sensors()['readings'], readings)
+            self.assertEqual(main.temperature('24h')['current']['value'], 22)
+            self.assertEqual(main.temperature('24h')['points'], [])
+            self.assertEqual(main.moss('24h')['current'], {'moss1': 2})
+            client.assert_not_called()
+        body = main.index().body.decode()
+        self.assertIn('content:"Keine Messdaten"', body)
+        self.assertIn('.chart-container{position:relative;height:230px}', body)
 
     def test_temperature_combines_current_and_history_by_window(self):
         def record(side, sensor, value):
@@ -93,14 +77,18 @@ class DashboardTests(unittest.TestCase):
         client = MagicMock()
         client.__enter__.return_value = client
         client.query_api.return_value.query.return_value = [table]
-        with patch.object(main, 'InfluxDBClient', return_value=client):
+        readings = [dict(side='left', sensor='sht45', field='temperature_c', value=20),
+                    dict(side='right', sensor='scd40', field='temperature_c', value=22)]
+        with patch.object(main, 'InfluxDBClient', return_value=client), \
+                patch.object(main, 'live_readings', return_value=readings), \
+                patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
             result = main.temperature('24h')
         self.assertEqual(result['current']['value'], 21)
         self.assertEqual(result['points'][0]['value'], 21)
         self.assertIn('(fallback)', result['points'][0]['source'])
         self.assertEqual(result['window_seconds'], 60)
         calls = client.query_api.return_value.query.call_args_list
-        self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[1].args[0])
+        self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[0].args[0])
 
 
 if __name__ == '__main__':

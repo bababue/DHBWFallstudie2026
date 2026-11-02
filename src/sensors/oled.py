@@ -5,6 +5,8 @@ hat. Der I2C-Bus läuft in Software und braucht für ein ganzes Bild etwa 0,2 s.
 Auf dem Pi ist Pillow nicht installiert, deshalb steht die Schrift hier im Code.
 """
 
+from math import isfinite
+
 BREITE = 128
 HOEHE = 64
 OLED_ADRESSE = 0x3C
@@ -116,31 +118,50 @@ class Oled:
         self.alt = None
 
 
-def _value(readings, side, sensor, field, pattern):
-    value = readings.get((side, sensor, field))
-    if value is None and sensor == "sht45":
-        value = readings.get((side, "scd40", field))
-    return "--" if value is None else pattern.format(value)
+def overview_values(readings):
+    """Use the same side selection and averages as the dashboard."""
+    def valid(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
+
+    def average(values):
+        values = [value for value in values if valid(value)]
+        return sum(values) / len(values) if values else None
+
+    def sides(field, sensors):
+        selected = []
+        for side in ("left", "right"):
+            for sensor in sensors:
+                value = readings.get((side, sensor, field))
+                if valid(value):
+                    selected.append(value)
+                    break
+        return average(selected)
+
+    return {
+        "moos": average([readings.get((f"moss{index}", "ultrasonic", "height_cm"))
+                         for index in range(1, 5)]),
+        "temperatur": sides("temperature_c", ("sht45", "scd40")),
+        "luftfeuchtigkeit": sides("humidity_pct", ("sht45", "scd40")),
+        "co2": sides("co2_ppm", ("scd40",)),
+        "licht": sides("illuminance_lux", ("bh1750",)),
+    }
 
 
 def render(readings):
-    """Draw the sensor overview with SCD40 temperature/humidity backup."""
+    """Draw the current dashboard values on the sensor overview."""
+    values = overview_values(readings)
     image = Bild()
     image.text(0, 0, "Sensoren")
-    image.rechteck(0, 9, 128, 1)
-    image.text(37, 12, "Links")
-    image.text_rechts(127, 12, "Rechts")
-    rows = (
-        ("T", "sht45", "temperature_c", "{:.1f}°C"),
-        ("rF", "sht45", "humidity_pct", "{:.0f}%"),
-        ("CO2", "scd40", "co2_ppm", "{:.0f}"),
-        ("Lux", "bh1750", "illuminance_lux", "{:.0f}"),
-    )
-    for index, (label, sensor, field, pattern) in enumerate(rows):
-        y = 22 + index * 10
+    image.rechteck(0, 9, BREITE, 1)
+    rows = (("Moos", "moos", "cm"), ("Temp", "temperatur", "°C"),
+            ("Luft", "luftfeuchtigkeit", "%"), ("CO2", "co2", "ppm"),
+            ("Licht", "licht", "lx"))
+    for index, (label, key, unit) in enumerate(rows):
+        y = 14 + index * 10
         image.text(0, y, label)
-        image.text(37, y, _value(readings, "left", sensor, field, pattern))
-        image.text_rechts(127, y, _value(readings, "right", sensor, field, pattern))
+        value = values[key]
+        text = "--" if value is None else f"{value:.1f}".replace(".", ",") + " " + unit
+        image.text_rechts(127, y, text)
     return image.daten
 
 
