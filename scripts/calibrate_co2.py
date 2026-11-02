@@ -152,7 +152,7 @@ def main():
         try:
             if resume:
                 subprocess.run(command + ['stop', 'sensors'], cwd=root, check=True)
-            return subprocess.run(command + ['run', '--rm', '--no-deps', '-T', '--volume',
+            return subprocess.run(command + ['run', '--rm', '--no-deps', '-T', '--env', 'PYTHONPATH=/app', '--volume',
                                   f'{Path(__file__).resolve()}:/tmp/calibrate_co2.py:ro',
                                   'sensors', 'python', '-u', '/tmp/calibrate_co2.py',
                                   '--inside', '--reference', str(reference)], cwd=root).returncode

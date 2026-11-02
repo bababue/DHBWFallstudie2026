@@ -1,7 +1,7 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from calibrate_co2 import calibrate_sensor, stable_readings
+from calibrate_co2 import calibrate_sensor, main, stable_readings
 from sensors import crc8
 
 
@@ -11,6 +11,19 @@ def response(value):
 
 
 class CalibrationTests(unittest.TestCase):
+    def test_container_has_project_import_path_and_service_resumes_after_failure(self):
+        with patch('sys.argv', ['calibrate_co2.py']), \
+                patch('builtins.input', side_effect=['', 'j']), \
+                patch('calibrate_co2.subprocess.check_output', return_value='sensors\n'), \
+                patch('calibrate_co2.subprocess.run') as run:
+            run.side_effect = [MagicMock(), MagicMock(returncode=1), MagicMock()]
+            self.assertEqual(main(), 1)
+        stop, invocation, restart = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(stop[-2:], ['stop', 'sensors'])
+        self.assertIn('PYTHONPATH=/app', invocation)
+        self.assertIn('/tmp/calibrate_co2.py', invocation)
+        self.assertEqual(restart[-2:], ['start', 'sensors'])
+
     def test_stability_requires_enough_recent_values_without_large_jumps(self):
         self.assertIsNone(stable_readings([(0, 400)] * 7, 0))
         self.assertIsNone(stable_readings([(0, value) for value in [400] * 7 + [501]], 0))
