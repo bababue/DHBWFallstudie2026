@@ -93,6 +93,14 @@ gespeichert und tragen dort das Feld `demo_data=true`; echte Moosmessungen
 erhalten `false`. Der Sensorcontainer übernimmt Konfigurationsänderungen durch
 Neustart.
 
+Für die Kalibrierung beider SCD40 den Kasten geöffnet draußen aufstellen und
+`python3 scripts/calibrate_co2.py` auf dem Pi ausführen. Das Skript fragt nach
+dem Referenzwert (430 ppm als Schätzung), misst fünf Minuten und kalibriert nur
+bei stabilen Messwerten nach Bestätigung. Ein kalibriertes Referenzgerät liefert
+einen genaueren Wert. Die Kalibrierung wird im Sensor gespeichert; die automatische
+Selbstkalibrierung wird nicht verändert. Der Sensorcontainer wird währenddessen
+angehalten und danach wieder gestartet, sofern er zuvor lief.
+
 Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
 ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst
 das Skript jeden Sensor 200-mal mit 0,1 Sekunden Pause und fragt, ob stabile
