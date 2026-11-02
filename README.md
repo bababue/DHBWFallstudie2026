@@ -133,7 +133,8 @@ Messwerte, die älter als 12 Sekunden sind, erscheinen nicht mehr als aktuell.
 Die Temperaturkachel zeigt den Mittelwert der aktuellen SHT45-Messungen links
 und rechts. Fehlt ein SHT45, wird der SCD40 derselben Seite als gekennzeichnetes
 Backup verwendet; bei nur einer verfügbaren Seite wird diese gekennzeichnet.
-Die Kachel zeigt die Werte links und rechts sowie die Differenz rechts minus links;
+Die Kachel zeigt die Werte links und rechts sowie die relative Differenz
+`(rechts − links) / links × 100` in Prozent. Bei links = 0 erscheint „–“;
 ein SCD40-Ersatz ist mit „(fallback)“ gekennzeichnet. Der aktuelle Wert wird
 alle zwei Sekunden aktualisiert. Luftfeuchtigkeit steht als gleichartige Kachel
 neben Temperatur und verwendet ebenfalls SHT45 mit SCD40 als Backup.

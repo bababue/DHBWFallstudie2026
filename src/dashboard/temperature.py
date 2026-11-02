@@ -26,6 +26,10 @@ def combine(readings, unit="°"):
         else:
             lines.append(f'{label}: –')
     if len(selected) == 2:
-        difference = by_side['right'][1] - by_side['left'][1]
-        lines.append(f'{difference:+.1f}{unit}'.replace('.', ','))
+        left = by_side['left'][1]
+        if left == 0:
+            lines.append('–')
+        else:
+            difference = (by_side['right'][1] - left) / left * 100
+            lines.append(f'{difference:+.1f}%'.replace('.', ','))
     return {'value': value, 'source': '\n'.join(lines)}
