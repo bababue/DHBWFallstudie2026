@@ -3,9 +3,18 @@
 import unittest
 
 from oled import BREITE, HOEHE, Oled, render
+from main import display_readings, update_display_values
 
 
 class OledTests(unittest.TestCase):
+    def test_display_uses_recent_samples_and_clears_failed_reads(self):
+        values = {}
+        update_display_values(values, "left", "sht45", {"temperature_c": 21.5}, 10)
+        self.assertEqual(display_readings(values, 11)[("left", "sht45", "temperature_c")], 21.5)
+        self.assertEqual(display_readings(values, 23), {})
+        update_display_values(values, "left", "sht45", None, 24)
+        self.assertEqual(values, {})
+
     def test_overview_uses_scd40_as_temperature_backup(self):
         backup = {("left", "scd40", "temperature_c"): 21.5,
                   ("right", "scd40", "co2_ppm"): 530}

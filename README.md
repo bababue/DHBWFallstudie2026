@@ -1,8 +1,8 @@
 # Moos-Pi: Sensoren
 
 Der `sensors`-Container liest auf dem Raspberry Pi 5 die drei I2C-Sensoren links
-und rechts sowie den Ultraschallsensor für den Wasserstand. Er schreibt ihre
-Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
+und rechts sowie fünf Ultraschallsensoren für Wasserstand und Mooshöhe. Er schreibt
+ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
 
@@ -15,8 +15,8 @@ bereitliegt; der Sensor selbst erzeugt nur etwa alle 5 Sekunden einen neuen Wert
 Zwischen diesen Messungen wird kein alter CO₂-Wert erneut gespeichert.
 Datenbank-Schreibvorgänge laufen getrennt von den GPIO-Abfragen. Das Dashboard
 fragt InfluxDB alle 0,5 Sekunden ab und zeigt Werte nach 12 Sekunden ohne neues
-Sample nicht mehr als aktuell an. Das OLED aktualisiert seine Übersicht etwa
-einmal pro Sekunde.
+Sample nicht mehr als aktuell an. Der Sensorprozess aktualisiert das OLED etwa
+einmal pro Sekunde direkt aus den letzten Messwerten.
 
 ```sh
 cp .env.example .env
@@ -43,18 +43,35 @@ Beim Start nutzt der Minutenmedian die bereits verfügbaren Messungen. Ohne Echo
 erscheint kein aktueller Wert.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
+Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
+
+| Sensor | Trigger | Echo | Kalibrierwert in `.env` |
+| --- | ---: | ---: | --- |
+| Moos 1 | GPIO 0 | GPIO 5 | `MOSS_1_EMPTY_DISTANCE_CM` |
+| Moos 2 | GPIO 9 | GPIO 11 | `MOSS_2_EMPTY_DISTANCE_CM` |
+| Moos 3 | GPIO 22 | GPIO 10 | `MOSS_3_EMPTY_DISTANCE_CM` |
+| Moos 4 | GPIO 17 | GPIO 27 | `MOSS_4_EMPTY_DISTANCE_CM` |
+
+Jeder Kalibrierwert ist der Abstand vom Sensor zur moosfreien Bezugsfläche in cm.
+Ohne ihn wird nur der Rohabstand angezeigt. Mit ihm berechnet die Software die
+Mooshöhe je Messstelle. Je Sensor werden drei Echos pro Messzyklus gefiltert;
+die Sensoren starten um eine Sekunde versetzt und messen jeweils alle vier Sekunden.
+Für den gemeinsamen Wert nimmt die Software den Median der 60-Sekunden-Mediane
+von mindestens drei gültigen, kalibrierten Messstellen. So beeinflusst ein
+einzelner Ausreißer das Ergebnis wenig, und unterschiedliche Montagehöhen werden
+über die einzelnen Kalibrierwerte berücksichtigt.
+
 Die Busse sind Software-I2C. Der Code treibt eigene High-Bits aktiv, wie in der
 Übergabe für diesen Aufbau beschrieben; das ist nur bei geprüfter 3,3-V-Verdrahtung
 vertretbar. Der `sensors`-Container muss exklusiven Zugriff auf die vier I2C-Pins
-sowie GPIO 6 und 13 haben. Eine andere Steuerung, die dieselben GPIOs benutzt, darf nicht
+und alle zehn Ultraschall-Pins haben. Eine andere Steuerung, die dieselben GPIOs benutzt, darf nicht
 gleichzeitig laufen.
 
 ## OLED-Anzeige
 
 Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus und ist um
-180° gedreht. Der eigene `oled`-Container liest die aktuellen Werte aus InfluxDB
-und rendert die Anzeige. Er sendet fertige Bilder über einen gemeinsamen
-Unix-Socket an `sensors`. Nur `sensors` greift auf GPIO 14 und 15 zu.
+180° gedreht. `sensors` rendert die Anzeige direkt aus seinen Messwerten und
+greift als einziger Container auf GPIO 14 und 15 zu.
 
 Das Display zeigt ausschließlich eine Sensorübersicht: links und rechts
 Temperatur und Luftfeuchte vom SHT45,
@@ -72,7 +89,7 @@ Auf dem Pi mit Docker Compose:
 sudo systemctl disable --now kamera-live moos-steuerung
 
 ./start.sh
-docker compose logs -f sensors oled
+docker compose logs -f sensors dashboard
 ```
 
 `start.sh` holt zuerst die neuesten Git-Änderungen mit `git pull --ff-only`
@@ -85,7 +102,7 @@ Port 8000 weiterhin belegt ist, zeigt `sudo ss -ltnp '( sport = :8000 )'`
 den Prozess. Die Abschaltung der alten Dienste ist nur einmalig nötig.
 `--remove-orphans` entfernt beim Umstieg frühere Container.
 
-Die Container heißen `sensors`, `oled`, `influxdb`, `dashboard` und `camera`.
+Die Container heißen `sensors`, `influxdb`, `dashboard` und `camera`.
 Sensoren, OLED, Steuerung und Kamera laufen vollständig in Docker Compose.
 
 Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es ordnet
@@ -101,8 +118,9 @@ unterbrochenen Verbindung verbindet sich der Browser automatisch neu.
 Auf derselben Seite erscheint der MJPEG-Livestream der Pi-Kamera. Der
 `camera`-Container startet `rpicam-vid` erst, wenn ein Browser den Stream
 öffnet, und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream
-ist auch unter `http://moos.local:8000/stream.mjpg` erreichbar. `CAMERA_PORT`
-in `.env` kann den Port ändern. Für den Kamerazugriff erhält der Container
+ist über `http://moos.local:8080/camera/stream.mjpg` erreichbar. Der Kamera-Port
+ist nur im Compose-Netz erreichbar; `CAMERA_PORT` in `.env` legt ihn intern fest.
+Für den Kamerazugriff erhält der Container
 Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 16, 20 und 21.
 
 Die Regler für Licht, Lüfter und Pumpe senden ihre Werte über dieselbe
@@ -124,8 +142,8 @@ Prozessabbruch kann den letzten GPIO-Pegel bis zum Neustart stehen lassen.
 Die Steuerung ist für ein vertrauenswürdiges lokales Netzwerk gedacht, da die
 Webseite derzeit HTTP verwendet.
 
-Vor dem Start dürfen keine früheren Dienste die Kamera, Port 8000 oder die
-GPIO-Pins 16, 20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
+Vor dem Start dürfen keine früheren Dienste die Kamera oder die GPIO-Pins 16,
+20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
 
 InfluxDB ist unter `http://moos.local:8086` erreichbar.
 
@@ -138,8 +156,8 @@ verloren.
 
 ## InfluxDB-Schema
 
-Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`) und `sensor`
-(`sht45`/`bh1750`/`scd40`/`ultrasonic`):
+Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`/`moss1`–`moss4`/`moss`)
+und `sensor` (`sht45`/`bh1750`/`scd40`/`ultrasonic`/`aggregate`):
 
 | Sensor | Felder |
 | --- | --- |
@@ -147,9 +165,11 @@ Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`) und `sensor`
 | BH1750 | `illuminance_lux` |
 | SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
 | Ultraschall | `water_level_cm`, `water_level_median_1m_cm`, `distance_cm` |
+| Moos-Ultraschall 1–4 | `distance_cm`; nach Kalibrierung auch `height_cm`, `height_median_1m_cm` |
+| Moos-Aggregat | `height_median_cm` bei mindestens drei gültigen Messstellen |
 
-Das sind fünfzehn Zeitreihen: sechs Messgrößen pro Seite, Wasserstand,
-Minutenmedian und Abstand.
+Zusätzlich zu den beidseitigen I²C-Werten und Wasserstandswerten werden die
+Moos-Abstände und nach Kalibrierung die Höhen gespeichert.
 Für den SCD40 werden auch seine Temperatur und Luftfeuchtigkeit gespeichert,
 getrennt von den SHT45-Werten.
 

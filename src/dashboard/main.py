@@ -10,7 +10,8 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
+import httpx
 from influxdb_client import InfluxDBClient
 
 from actuators import Actuators
@@ -38,12 +39,19 @@ DISPLAY_ROWS = (
 WATER_READING = Reading("tank", "ultrasonic", "water_level_cm", "cm", 1)
 WATER_MEDIAN_READING = Reading("tank", "ultrasonic", "water_level_median_1m_cm", "cm", 1)
 WATER_DISTANCE_READING = Reading("tank", "ultrasonic", "distance_cm", "cm", 1)
+MOSS_READINGS = tuple(
+    Reading(f"moss{index}", "ultrasonic", field, "cm", 1)
+    for index in range(1, 5)
+    for field in ("distance_cm", "height_cm")
+)
+MOSS_AGGREGATE_READING = Reading("moss", "aggregate", "height_median_cm", "cm", 1)
 
 READINGS = tuple(
     Reading(side, sensor, field, unit, decimals)
     for _, sensor, field, unit, decimals in DISPLAY_ROWS
     for side in ("left", "right")
-) + (WATER_READING, WATER_MEDIAN_READING, WATER_DISTANCE_READING)
+) + (WATER_READING, WATER_MEDIAN_READING, WATER_DISTANCE_READING,
+     *MOSS_READINGS, MOSS_AGGREGATE_READING)
 
 
 @dataclass(frozen=True)
@@ -116,7 +124,7 @@ def make_payload(values: dict[tuple[str, str, str], float], error: bool = False,
             "controls": controls, "controls_enabled": controls is not None}
 
 
-def render_page(camera_port: int = 8000) -> str:
+def render_page() -> str:
     rows = "".join(
         f'<tr><td>{html.escape(label)}</td><td>{sensor.upper()}</td>'
         f'<td id="left-{sensor}-{field}">Verbinde…</td>'
@@ -129,6 +137,14 @@ def render_page(camera_port: int = 8000) -> str:
              '<td id="tank-ultrasonic-water_level_median_1m_cm" colspan="2">Verbinde…</td></tr>'
              '<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td>'
              '<td id="tank-ultrasonic-distance_cm" colspan="2">Verbinde…</td></tr>')
+    rows += "".join(
+        f'<tr><td>Moos {index}: {label}</td><td>Ultraschall</td>'
+        f'<td id="moss{index}-ultrasonic-{field}" colspan="2">Verbinde…</td></tr>'
+        for index in range(1, 5)
+        for field, label in (("distance_cm", "Rohabstand"), ("height_cm", "Höhe"))
+    )
+    rows += ('<tr><td>Mooshöhe: gemeinsamer Median</td><td>4 Messstellen</td>'
+             '<td id="moss-aggregate-height_median_cm" colspan="2">Verbinde…</td></tr>')
     script = """
 <script>
 const sliders = {
@@ -199,7 +215,7 @@ function connect() {
 connect();
 const camera = document.getElementById("camera");
 function connectCamera() {
-  camera.src = `http://${location.hostname}:__CAMERA_PORT__/stream.mjpg?${Date.now()}`;
+  camera.src = `/camera/stream.mjpg?${Date.now()}`;
 }
 camera.onload = () => { document.getElementById("camera-status").textContent = "Live"; };
 camera.onerror = () => {
@@ -208,7 +224,7 @@ camera.onerror = () => {
 };
 connectCamera();
 </script>
-""".replace("__CAMERA_PORT__", str(camera_port))
+"""
     return (
         '<!doctype html><html lang="de"><head><meta charset="utf-8">'
         "<title>Sensorwerte</title></head><body><h1>Sensorwerte</h1>"
@@ -310,7 +326,36 @@ app = FastAPI(title="Sensorwerte", lifespan=lifespan)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return HTMLResponse(render_page(Settings.from_env().camera_port))
+    return HTMLResponse(render_page())
+
+
+@app.get("/camera/stream.mjpg")
+async def camera_stream():
+    """Forward the camera stream through the dashboard's public port."""
+    port = Settings.from_env().camera_port
+    client = httpx.AsyncClient(timeout=httpx.Timeout(10, read=None))
+    try:
+        upstream = await client.send(
+            client.build_request("GET", f"http://camera:{port}/stream.mjpg"), stream=True
+        )
+        upstream.raise_for_status()
+    except httpx.HTTPError:
+        await client.aclose()
+        LOG.warning("Camera stream is unavailable")
+        return Response("Kamera nicht erreichbar", status_code=503)
+
+    async def frames():
+        try:
+            async for chunk in upstream.aiter_raw():
+                yield chunk
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        frames(), media_type=upstream.headers.get("content-type", "multipart/x-mixed-replace; boundary=FRAME"),
+        headers={"Cache-Control": "no-cache, private"},
+    )
 
 
 @app.websocket("/ws")

@@ -1,0 +1,37 @@
+import unittest
+from unittest.mock import MagicMock, patch
+
+from moss_height import MossAggregate, MossHeight
+
+
+class MossHeightTests(unittest.TestCase):
+    def test_raw_distance_is_available_before_calibration(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5)
+        with patch.object(sensor, "_distance_cm", side_effect=[8.0, None, 8.2]), \
+                patch("water_level.time.sleep"):
+            self.assertEqual(sensor.read(), {"distance_cm": 8.1})
+        sensor.close()
+
+    def test_height_uses_its_own_reference_and_minute_median(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=20.0)
+        with patch.object(sensor, "_distance_cm", side_effect=[18.0] * 3 + [17.0] * 3), \
+                patch("water_level.time.sleep"), \
+                patch("moss_height.time.monotonic", side_effect=[0, 5]):
+            first = sensor.read()
+            second = sensor.read()
+        self.assertEqual(first["height_cm"], 2.0)
+        self.assertEqual(second["height_cm"], 3.0)
+        self.assertEqual(second["height_median_1m_cm"], 2.5)
+        sensor.close()
+
+    def test_aggregate_needs_three_recent_calibrated_sensors(self):
+        aggregate = MossAggregate()
+        self.assertIsNone(aggregate.update("moss1", 2.0, now=0))
+        self.assertIsNone(aggregate.update("moss2", 2.0, now=1))
+        self.assertEqual(aggregate.update("moss3", 20.0, now=2), {"height_median_cm": 2.0})
+        self.assertEqual(aggregate.update("moss4", 3.0, now=3), {"height_median_cm": 2.5})
+        self.assertIsNone(aggregate.update("moss4", None, now=15))
+
+
+if __name__ == "__main__":
+    unittest.main()

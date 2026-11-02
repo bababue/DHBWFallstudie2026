@@ -5,16 +5,16 @@ import os
 import re
 import signal
 import time
-from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from threading import Event, Lock
+from threading import Event
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
-from oled_bridge import FrameServer
+from moss_height import MossAggregate, MossHeight
+from oled import Oled, render
 from schedule import ScheduledRead
 from storage import BufferedWriter
 from water_level import WaterLevel
@@ -38,6 +38,9 @@ class Config:
     water_trigger: int
     water_echo: int
     water_floor_distance_cm: float
+    moss_pins: tuple[tuple[int, int], ...]
+    moss_empty_distances_cm: tuple[float | None, ...]
+    moss_interval: float
     delay_us: int
     sht45_address: int
     bh1750_address: int
@@ -60,6 +63,14 @@ class Config:
             water_trigger=env_int("WATER_TRIGGER_GPIO", "6"),
             water_echo=env_int("WATER_ECHO_GPIO", "13"),
             water_floor_distance_cm=float(os.getenv("WATER_FLOOR_DISTANCE_CM", "8.62")),
+            moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
+                             env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
+                            for index, (trigger, echo) in enumerate(
+                                ((0, 5), (9, 11), (22, 10), (17, 27)), start=1)),
+            moss_empty_distances_cm=tuple(
+                float(value) if (value := os.getenv(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
+                for index in range(1, 5)),
+            moss_interval=float(os.getenv("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
             delay_us=env_int("I2C_DELAY_US", "12"),
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
             bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
@@ -72,11 +83,17 @@ class Config:
             influx_token=os.getenv("INFLUXDB_TOKEN", ""),
         )
         pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl,
-                config.water_trigger, config.water_echo)
+                config.water_trigger, config.water_echo,
+                *(pin for pair in config.moss_pins for pin in pair))
         if len(set(pins)) != len(pins) or not all(0 <= pin <= 27 for pin in pins):
             raise ValueError("Sensor GPIO pins must be distinct BCM numbers 0..27")
         if not 0 < config.water_floor_distance_cm <= WaterLevel.MAX_DISTANCE_CM:
             raise ValueError("WATER_FLOOR_DISTANCE_CM must be within the sensor range")
+        if not 4 <= config.moss_interval <= 60:
+            raise ValueError("MOSS_SAMPLE_INTERVAL_SECONDS must be 4..60")
+        if any(distance is not None and not 0 < distance <= MossHeight.MAX_DISTANCE_CM
+               for distance in config.moss_empty_distances_cm):
+            raise ValueError("MOSS_N_EMPTY_DISTANCE_CM must be within the sensor range")
         if not re.fullmatch(r"/dev/gpiochip\d+", config.chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
         if not 0.5 <= config.fast_interval <= 60:
@@ -103,6 +120,19 @@ def sample_points(side: str, sensor_name: str, fields: dict[str, float] | None, 
     return points
 
 
+def update_display_values(values, side, sensor, fields, now, max_age=12):
+    """Keep only recent fields; failed reads clear that sensor immediately."""
+    for key in tuple(values):
+        if key[:2] == (side, sensor) or now - values[key][1] > max_age:
+            del values[key]
+    if fields:
+        values.update({(side, sensor, field): (value, now) for field, value in fields.items()})
+
+
+def display_readings(values, now, max_age=12):
+    return {key: value for key, (value, sampled) in values.items() if now - sampled <= max_age}
+
+
 def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
@@ -112,8 +142,8 @@ def run():
     buses = []
     scd_sensors = []
     water_sensor = None
-    oled_bridge = None
-    bus_lock = Lock()
+    moss_sensors = []
+    oled = None
     try:
         for side, sda, scl in (
             ("left", config.left_sda, config.left_scl),
@@ -130,14 +160,27 @@ def run():
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
                                   config.water_floor_distance_cm)
         sensors.append(("tank", water_sensor))
-        oled_bridge = FrameServer(buses[0], bus_lock)
+        for index, ((trigger, echo), empty_distance) in enumerate(
+                zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
+            sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance)
+            moss_sensors.append(sensor)
+            sensors.append((f"moss{index}", sensor))
+        oled = Oled(buses[0])
         start_time = time.monotonic()
-        tasks = [ScheduledRead(side, sensor,
-                               config.co2_poll_interval if isinstance(sensor, SCD40)
-                               else config.fast_interval, start_time)
-                 for side, sensor in sensors]
+        tasks = []
+        for side, sensor in sensors:
+            if isinstance(sensor, MossHeight):
+                interval = config.moss_interval
+                first_due = start_time + (int(side[-1]) - 1) * interval / 4
+            else:
+                interval = config.co2_poll_interval if isinstance(sensor, SCD40) else config.fast_interval
+                first_due = start_time
+            tasks.append(ScheduledRead(side, sensor, interval, first_due))
+        moss_aggregate = MossAggregate()
         started = set()
         last_co2 = {}
+        display_values = {}
+        next_display = start_time
         with InfluxDBClient(url=config.influx_url, token=config.influx_token, org=config.influx_org, timeout=5000) as client:
             writer = client.write_api(write_options=SYNCHRONOUS)
             buffered = BufferedWriter(
@@ -147,8 +190,8 @@ def run():
                 while not STOP.is_set():
                     now = time.monotonic()
                     due = [task for task in tasks if task.ready(now)]
-                    if not due:
-                        STOP.wait(max(0, min(task.next_due for task in tasks) - now))
+                    if not due and now < next_display:
+                        STOP.wait(max(0, min(next_display, *(task.next_due for task in tasks)) - now))
                         continue
                     points = []
                     for task in due:
@@ -157,13 +200,12 @@ def run():
                         fields = None
                         error = False
                         try:
-                            with (bus_lock if side != "tank" else nullcontext()):
-                                if is_co2 and side not in started:
-                                    sensor.start()
-                                    started.add(side)
-                                    last_co2[side] = time.monotonic()
-                                else:
-                                    fields = sensor.read()
+                            if is_co2 and side not in started:
+                                sensor.start()
+                                started.add(side)
+                                last_co2[side] = time.monotonic()
+                            else:
+                                fields = sensor.read()
                             if fields is not None:
                                 LOG.info("%s/%s %s", side, sensor.name, fields)
                                 if is_co2:
@@ -177,23 +219,37 @@ def run():
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)
                             started.remove(side)
                             error = True
+                        if side in ("left", "right") and (not is_co2 or fields is not None or error):
+                            update_display_values(display_values, side, sensor.name, fields, finished)
                         # The SCD40 has no new value between its 5 s conversions.
                         # Do not publish a false unhealthy or repeat a stale sample.
                         if not is_co2 or fields is not None or error:
-                            points.extend(sample_points(side, sensor.name, fields,
-                                                        datetime.now(timezone.utc)))
+                            timestamp = datetime.now(timezone.utc)
+                            points.extend(sample_points(side, sensor.name, fields, timestamp))
+                            if isinstance(sensor, MossHeight):
+                                aggregate = moss_aggregate.update(
+                                    side, fields.get("height_median_1m_cm") if fields else None, finished)
+                                points.extend(sample_points("moss", "aggregate", aggregate, timestamp))
                     buffered.submit(points)
+                    if time.monotonic() >= next_display:
+                        next_display = time.monotonic() + 1
+                        try:
+                            oled.zeigen(render(display_readings(display_values, time.monotonic())))
+                        except Exception as exc:
+                            LOG.warning("OLED update failed: %s", exc)
             finally:
                 STOP.set()
                 buffered.close()
     finally:
         STOP.set()
-        if oled_bridge is not None:
-            oled_bridge.close()
+        if oled is not None:
+            try:
+                oled.ausschalten()
+            except Exception as exc:
+                LOG.warning("OLED shutdown failed: %s", exc)
         for sensor in scd_sensors:
             try:
-                with bus_lock:
-                    sensor.stop()
+                sensor.stop()
             except Exception:
                 pass
         for bus in reversed(buses):
@@ -206,6 +262,11 @@ def run():
                 water_sensor.close()
             except Exception:
                 LOG.exception("Could not release water level sensor pins")
+        for sensor in reversed(moss_sensors):
+            try:
+                sensor.close()
+            except Exception:
+                LOG.exception("Could not release moss height sensor pins")
         lgpio.gpiochip_close(handle)
 
 

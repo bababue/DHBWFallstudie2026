@@ -23,22 +23,7 @@ services:
     env_file: .env
     devices:
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
-    volumes:
-      - oled-socket:/run/moos-oled
     depends_on:
-      - influxdb
-
-  oled:
-    build:
-      context: ./src
-      dockerfile: oled/Dockerfile
-    container_name: oled
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - oled-socket:/run/moos-oled
-    depends_on:
-      - sensors
       - influxdb
 
   dashboard:
@@ -50,6 +35,7 @@ services:
       - "8080:8080"
     depends_on:
       - influxdb
+      - camera
     devices:
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
 
@@ -63,10 +49,7 @@ services:
     volumes:
       - /dev:/dev
       - /run/udev:/run/udev:ro
-    ports:
-      - "${CAMERA_PORT:-8000}:${CAMERA_PORT:-8000}"
 
 volumes:
   influxdb-data:
   influxdb-config:
-  oled-socket:

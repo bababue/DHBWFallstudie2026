@@ -1,27 +1,22 @@
-"""Ultrasonic water depth in the tank, measured from the sensor above its floor."""
+"""Ultrasonic distance measurement and water depth in the tank."""
 
 import statistics
 import time
 from collections import deque
 
 
-class WaterLevel:
-    name = "ultrasonic"
+class Ultrasonic:
     SOUND_CM_PER_S = 34300
     MAX_DISTANCE_CM = 400
     START_TIMEOUT_S = 0.01
     SAMPLE_PAUSE_S = 0.06
     SAMPLES = 5
-    MEDIAN_WINDOW_S = 60
 
-    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int,
-                 floor_distance_cm: float):
+    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int):
         self.gpio = gpio
         self.handle = handle
         self.trigger_pin = trigger_pin
         self.echo_pin = echo_pin
-        self.floor_distance_cm = floor_distance_cm
-        self.recent_distances = deque()
         gpio.gpio_claim_output(handle, trigger_pin, 0)
         try:
             gpio.gpio_claim_input(handle, echo_pin)
@@ -45,7 +40,7 @@ class WaterLevel:
                 return None
         return (time.perf_counter() - start) * self.SOUND_CM_PER_S / 2
 
-    def read(self):
+    def read_distances(self):
         distances = []
         for index in range(self.SAMPLES):
             distance = self._distance_cm()
@@ -53,6 +48,26 @@ class WaterLevel:
                 distances.append(distance)
             if index < self.SAMPLES - 1:
                 time.sleep(self.SAMPLE_PAUSE_S)
+        return distances
+
+    def close(self):
+        self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
+        self.gpio.gpio_free(self.handle, self.echo_pin)
+        self.gpio.gpio_free(self.handle, self.trigger_pin)
+
+
+class WaterLevel(Ultrasonic):
+    name = "ultrasonic"
+    MEDIAN_WINDOW_S = 60
+
+    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int,
+                 floor_distance_cm: float):
+        super().__init__(gpio, handle, trigger_pin, echo_pin)
+        self.floor_distance_cm = floor_distance_cm
+        self.recent_distances = deque()
+
+    def read(self):
+        distances = self.read_distances()
         if not distances:
             return None
         distance = statistics.median(distances)
@@ -66,8 +81,3 @@ class WaterLevel:
             "water_level_cm": max(0.0, self.floor_distance_cm - distance),
             "water_level_median_1m_cm": max(0.0, self.floor_distance_cm - minute_distance),
         }
-
-    def close(self):
-        self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
-        self.gpio.gpio_free(self.handle, self.echo_pin)
-        self.gpio.gpio_free(self.handle, self.trigger_pin)
