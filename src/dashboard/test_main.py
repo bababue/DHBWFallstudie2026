@@ -2,6 +2,7 @@ import json
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -41,6 +42,25 @@ class DashboardTests(unittest.TestCase):
         query = client.query_api.return_value.query.call_args.args[0]
         self.assertIn('last()', query)
         self.assertNotIn('aggregateWindow', query)
+
+    def test_temperature_combines_current_and_history_by_window(self):
+        def record(side, sensor, value):
+            return SimpleNamespace(values={'side': side, 'sensor': sensor},
+                                   get_value=lambda: value,
+                                   get_time=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+        table = SimpleNamespace(records=[record('left', 'sht45', 20),
+                                         record('right', 'scd40', 22)])
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.query_api.return_value.query.return_value = [table]
+        with patch.object(main, 'InfluxDBClient', return_value=client):
+            result = main.temperature('24h')
+        self.assertEqual(result['current']['value'], 21)
+        self.assertEqual(result['points'][0]['value'], 21)
+        self.assertIn('Backup', result['points'][0]['source'])
+        self.assertEqual(result['window_seconds'], 60)
+        calls = client.query_api.return_value.query.call_args_list
+        self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[1].args[0])
 
 
 if __name__ == '__main__':

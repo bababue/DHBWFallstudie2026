@@ -130,6 +130,16 @@ Luftfeuchtigkeitswerten von SHT45 und SCD40 links und rechts ein. Die bereits
 in °C und Prozent gespeicherten Einzelwerte werden unverändert angezeigt;
 Messwerte, die älter als 12 Sekunden sind, erscheinen nicht mehr als aktuell.
 
+Die Temperaturkachel zeigt den Mittelwert der aktuellen SHT45-Messungen links
+und rechts. Fehlt ein SHT45, wird der SCD40 derselben Seite als gekennzeichnetes
+Backup verwendet; bei nur einer verfügbaren Seite wird diese gekennzeichnet.
+Ab 2 °C Unterschied zeigt die Kachel die Abweichung an. Der aktuelle Wert wird
+alle zwei Sekunden aktualisiert. Der Verlauf bietet 1 Stunde, 24 Stunden, 7 Tage
+und 30 Tage; er wird alle 30 Sekunden aktualisiert. Für eine Stunde wird je
+10-Sekunden-Fenster der letzte Wert verwendet, für längere Zeiträume jeweils
+das Mittel pro Sensor und Zeitfenster (1, 5 oder 30 Minuten). Fehlende Fenster
+erscheinen als Lücke. Die ursprünglichen Messwerte bleiben in InfluxDB erhalten.
+
 Der `camera`-Container startet `rpicam-vid`, wenn ein Browser den Stream öffnet,
 und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream ist auch
 unter `http://moos.local:8080/camera/stream.mjpg` erreichbar.
