@@ -6,8 +6,8 @@ ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
 
-Hardwareparameter und Messintervalle stehen in `config/config.json`. Die Datei
-wird versioniert. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
+Hardwareparameter und Messintervalle stehen in `config/config.json`. Die lokale Datei ist von Git ausgeschlossen; `config/config.example.json`
+dient als versionierte Vorlage und wird beim ersten Start automatisch kopiert. Im Dashboard öffnet „Konfiguration“ einen JSON-Editor; Speichern
 prüft Struktur, Wertebereiche und doppelt vergebene GPIOs. Sensoränderungen
 starten den Sensorcontainer automatisch neu (der angezeigte Modus beginnt wieder
 in AUTO). `null` bei einem Moos-Bezugsabstand bedeutet „noch nicht kalibriert“.
@@ -18,9 +18,8 @@ Compose. Beim Start über `start.sh` oder Auto-Deployment werden bisherige
 Hardwarewerte einmalig aus `.env` übernommen und nicht mehr verwendete Werte
 entfernt. `config/.env-migrated` kennzeichnet die abgeschlossene Migration.
 
-Änderungen im Web-Editor ändern die versionierte JSON-Datei auf dem Pi. Diese
-müssen vor weiteren Git-Updates übernommen und committed werden; das Deployment
-überschreibt keine lokalen Änderungen. Der Editor ist wie das Dashboard für das
+Änderungen im Web-Editor bleiben lokal auf dem Pi und werden von Git-Updates
+nicht überschrieben. Der Editor ist wie das Dashboard für das
 vertrauenswürdige lokale Netz vorgesehen.
 
 `sensors` liest SHT45, BH1750 und den Wasserstandsensor unabhängig voneinander
@@ -113,8 +112,11 @@ schaltet zum nächsten Modus; nach `MEASURING` folgt wieder `AUTO`. Während der
 Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
 Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
-Neustart beginnt die Anzeige in `AUTO`. Die Modi steuern vorerst keine Geräte;
-Licht, Pumpe und Lüfter werden weiterhin über das Web-Dashboard eingestellt.
+Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` pausieren alle
+Sensorabfragen, und die periodischen CO₂-Messungen der SCD40 werden gestoppt.
+Eine laufende Einzelmessung wird noch beendet. Beim Verlassen des Modus laufen
+die Messungen wieder an; die SCD40 benötigen anschließend eine neue Messung.
+Die Modi steuern vorerst keine Aktoren.
 
 Die Sensorübersicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
 CO₂ vom SCD40 sowie Helligkeit vom BH1750. Falls ein SHT45-Wert fehlt, dient

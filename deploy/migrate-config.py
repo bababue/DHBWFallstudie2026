@@ -9,6 +9,9 @@ sys.path.insert(0, str(ROOT / 'src'))
 import configuration
 
 path = ROOT / 'config/config.json'
+if not path.exists():
+    import shutil
+    shutil.copyfile(ROOT / 'config/config.example.json', path)
 marker = ROOT / 'config/.env-migrated'
 if not marker.exists():
     env_path = ROOT / '.env'

@@ -194,6 +194,8 @@ def run():
         display_values = {}
         next_display = start_time
         displayed_version = None
+        maintenance_active = False
+        next_stop_attempt = 0.0
 
         def refresh_display():
             nonlocal next_display, displayed_version
@@ -227,8 +229,39 @@ def run():
                         LOG.info("Configuration changed; restarting sensor service")
                         break
                     now = time.monotonic()
-                    due = [task for task in tasks if task.ready(now)]
                     mode, show_info, version = modes.snapshot()
+                    if mode == "MAINTENANCE":
+                        if not maintenance_active:
+                            maintenance_active = True
+                            display_values.clear()
+                            water_sensor.recent.clear()
+                            water_sensor.last_sample = None
+                            for sensor in moss_sensors:
+                                sensor.recent_distances.clear()
+                            moss_aggregate.latest.clear()
+                            LOG.info("Maintenance: measurements paused")
+                        if started and now >= next_stop_attempt:
+                            next_stop_attempt = now + 2
+                            for side, sensor in zip(("left", "right"), scd_sensors):
+                                if side in started:
+                                    try:
+                                        sensor.stop()
+                                        started.remove(side)
+                                    except (OSError, ValueError, lgpio.error) as exc:
+                                        LOG.warning("%s/scd40 stop failed: %s", side, exc)
+                        refresh_display()
+                        STOP.wait(0.05)
+                        continue
+                    if maintenance_active:
+                        maintenance_active = False
+                        # Restart every SCD40, including a sensor whose stop failed.
+                        started.clear()
+                        last_co2.clear()
+                        for task in tasks:
+                            task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 2
+                                                   if isinstance(task.sensor, MossHeight) else 0)
+                        LOG.info("Maintenance ended: measurements resumed")
+                    due = [task for task in tasks if task.ready(now)]
                     if not due and now < next_display and version == displayed_version:
                         STOP.wait(max(0, min(0.05, next_display - now,
                                              *(task.next_due - now for task in tasks))))
@@ -236,6 +269,8 @@ def run():
                     refresh_display()
                     points = []
                     for task in due:
+                        if modes.snapshot()[0] == "MAINTENANCE":
+                            break
                         side, sensor = task.side, task.sensor
                         is_co2 = isinstance(sensor, SCD40)
                         fields = None
