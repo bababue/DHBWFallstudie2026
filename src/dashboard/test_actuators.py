@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from actuators import Actuators
 
@@ -37,7 +38,7 @@ class FakeGpio:
 class ActuatorTests(unittest.TestCase):
     def setUp(self):
         self.gpio = FakeGpio()
-        self.control = Actuators(self.gpio, "/dev/gpiochip0", 20, 21, 200, 5)
+        self.control = Actuators(self.gpio, "/dev/gpiochip0", 20, 21, 16, 200, 5, 5)
 
     def tearDown(self):
         self.control.close()
@@ -45,23 +46,62 @@ class ActuatorTests(unittest.TestCase):
     def test_claims_outputs_off_and_led_uses_fixed_endpoints(self):
         self.assertIn(("claim", 20, 0), self.gpio.calls)
         self.assertIn(("claim", 21, 0), self.gpio.calls)
-        self.control.set("led", 30)
-        self.assertIn(("pwm", 20, 200, 30), self.gpio.calls)
+        self.assertIn(("claim", 16, 0), self.gpio.calls)
+        self.control.set("led", 5)
+        self.assertIn(("pwm", 20, 200, 5), self.gpio.calls)
         self.control.set("led", 0)
         self.assertIn(("pwm", 20, 0, 0), self.gpio.calls)
         self.assertEqual(self.gpio.calls[-1], ("write", 20, 0))
 
     def test_fan_boost_and_low_end_scale(self):
-        self.control.set("fan", 5)
+        with patch("actuators.threading.Timer") as timer:
+            self.control.set("fan", 5)
+        self.assertEqual(timer.call_args.args[0], 0.5)
         self.assertIn(("write", 21, 1), self.gpio.calls)
-        self.control._finish_fan_boost(self.control.fan_generation)
+        self.control._finish_boost("fan", self.control.generations["fan"])
         self.assertIn(("pwm", 21, 5, 25.0), self.gpio.calls)
         self.control.set("fan", 0)
         self.assertEqual(self.control.status()["fan"], 0)
         self.assertEqual(self.gpio.calls[-1], ("write", 21, 0))
 
+    def test_pump_boost_and_low_end_scale(self):
+        with patch("actuators.threading.Timer") as timer:
+            self.control.set("pump", 5)
+        self.assertEqual(timer.call_args.args[0], 0.5)
+        self.assertIn(("pwm", 16, 5, 75), self.gpio.calls)
+        self.control._finish_boost("pump", self.control.generations["pump"])
+        self.assertIn(("pwm", 16, 5, 15.0), self.gpio.calls)
+        self.control.set("pump", 0)
+        self.assertEqual(self.gpio.calls[-1], ("write", 16, 0))
+
+    def test_stop_during_boost_keeps_both_motors_off(self):
+        with patch("actuators.threading.Timer"):
+            self.control.set("fan", 50)
+            self.control.set("pump", 30)
+        generations = dict(self.control.generations)
+        self.control.set("fan", 0)
+        self.control.set("pump", 0)
+        self.control._finish_boost("fan", generations["fan"])
+        self.control._finish_boost("pump", generations["pump"])
+        self.assertEqual(self.control.status(), {"led": 0, "fan": 0, "pump": 0})
+        self.assertEqual(self.gpio.calls[-1], ("write", 16, 0))
+
+    def test_scale_is_linear_and_boost_only_applies_in_start_range(self):
+        with patch("actuators.threading.Timer") as timer:
+            self.control.set("fan", 55)
+            self.control.set("pump", 35)
+        timer.assert_not_called()
+        self.assertAlmostEqual(self.control.duty("fan", 55), 25 + 50 * 75 / 95)
+        self.assertAlmostEqual(self.control.duty("pump", 35), 15 + 30 * 85 / 95)
+        self.control.set("led", 100)
+        self.assertIn(("write", 20, 1), self.gpio.calls)
+        self.control.set("fan", 100)
+        self.assertIn(("write", 21, 1), self.gpio.calls)
+        self.control.set("pump", 100)
+        self.assertIn(("write", 16, 1), self.gpio.calls)
+
     def test_rejects_invalid_commands(self):
-        for device, value in (("pump", 50), ("fan", -1), ("led", 101), ("led", True)):
+        for device, value in (("other", 50), ("fan", -1), ("led", 101), ("led", True), ("pump", 1)):
             with self.assertRaises(ValueError):
                 self.control.set(device, value)
 

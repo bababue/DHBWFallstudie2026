@@ -70,23 +70,30 @@ Auf derselben Seite erscheint der MJPEG-Livestream der Pi-Kamera. Der
 öffnet, und gibt die Kamera nach dem letzten Zuschauer wieder frei. Der Stream
 ist auch unter `http://moos.local:8000/stream.mjpg` erreichbar. `CAMERA_PORT`
 in `.env` kann den Port ändern. Für den Kamerazugriff erhält der Container
-Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 20 und 21.
+Zugriff auf die Pi-Geräte; der `dashboard`-Container nutzt GPIO 16, 20 und 21.
 
-Die Regler für Licht und Lüfter senden ihre Werte über dieselbe
+Die Regler für Licht, Lüfter und Pumpe senden ihre Werte über dieselbe
 WebSocket-Verbindung wie die Sensoranzeige. Die Steuerung ist zunächst mit
-`ACTUATORS_ENABLED=false` abgeschaltet. Vor dem Einschalten die Freilaufdiode
-am Lüfter und die Verdrahtung prüfen. Dann `ACTUATORS_ENABLED=true` und ein
+`ACTUATORS_ENABLED=false` abgeschaltet. Vor dem Einschalten die Freilaufdioden
+an Lüfter und Pumpe und die Verdrahtung prüfen. Dann `ACTUATORS_ENABLED=true` und ein
 langes `CONTROL_PASSWORD` in `.env` setzen und `docker compose up -d --build`
-ausführen. Das Passwort wird beim Verstellen im Dashboard eingegeben. LED und
-Lüfter beginnen bei jedem Start mit 0 %. Die LED nutzt GPIO 20 mit 200 Hz,
-der Lüfter GPIO 21 mit 5 Hz. Die Lüfterskala und der einsekündige Anlaufstoß
-folgen der Übergabe; alle Pins und Frequenzen stehen in `.env`. Ein harter
+ausführen. Das Passwort wird beim Verstellen im Dashboard eingegeben. Alle
+Ausgänge beginnen bei jedem Start mit 0 %. Die Regler gehen in 5-%-Schritten
+von 0 bis 100 %; zwischen 5 und 100 % steigt die reale Leistung linear:
+
+| Gerät | GPIO | PWM | Real bei angezeigten 5 % | Anlauf aus 0 % |
+| --- | ---: | ---: | ---: | --- |
+| LED | 20 | 200 Hz | 5 % | keiner |
+| Lüfter | 21 | 5 Hz | 25 % | bei 5–50 %: 0,5 s mit 100 % |
+| Pumpe | 16 | 5 Hz | 15 % | bei 5–30 %: 0,5 s mit 75 % |
+
+Pins und Frequenzen stehen in `.env`. Ein harter
 Prozessabbruch kann den letzten GPIO-Pegel bis zum Neustart stehen lassen.
 Die Steuerung ist für ein vertrauenswürdiges lokales Netzwerk gedacht, da die
 Webseite derzeit HTTP verwendet.
 
 Vor dem Start dürfen keine früheren Dienste die Kamera, Port 8000 oder die
-GPIO-Pins 20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
+GPIO-Pins 16, 20 und 21 belegen. Sie sind kein Teil dieser Docker-Architektur.
 
 InfluxDB ist unter `http://moos.local:8086` erreichbar.
 

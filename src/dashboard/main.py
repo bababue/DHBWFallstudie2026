@@ -129,7 +129,8 @@ def render_page(camera_port: int = 8000) -> str:
 <script>
 const sliders = {
   led: document.getElementById("led-slider"),
-  fan: document.getElementById("fan-slider")
+  fan: document.getElementById("fan-slider"),
+  pump: document.getElementById("pump-slider")
 };
 let socket;
 let lastControls = null;
@@ -228,7 +229,10 @@ connectCamera();
         '<output id="led-output">0 %</output></p>'
         '<p><label for="fan-slider">Lüfter</label> '
         '<input id="fan-slider" type="range" min="0" max="100" step="5" value="0" disabled> '
-        f'<output id="fan-output">0 %</output></p>{script}</body></html>'
+        '<output id="fan-output">0 %</output></p>'
+        '<p><label for="pump-slider">Pumpe</label> '
+        '<input id="pump-slider" type="range" min="0" max="100" step="5" value="0" disabled> '
+        f'<output id="pump-output">0 %</output></p>{script}</body></html>'
     )
 
 
@@ -285,10 +289,12 @@ async def lifespan(application: FastAPI):
             actuators = Actuators(
                 lgpio, os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
                 int(os.getenv("LED_GPIO", "20")), int(os.getenv("FAN_GPIO", "21")),
+                int(os.getenv("PUMP_GPIO", "16")),
                 int(os.getenv("LED_PWM_HZ", "200")), int(os.getenv("FAN_PWM_HZ", "5")),
+                int(os.getenv("PUMP_PWM_HZ", "5")),
             )
         except Exception:
-            LOG.exception("Could not claim LED and fan GPIO pins; controls stay disabled")
+            LOG.exception("Could not claim LED, fan and pump GPIO pins; controls stay disabled")
     hub = Hub(actuators)
     application.state.hub = hub
     application.state.settings = settings

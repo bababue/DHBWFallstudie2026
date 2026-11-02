@@ -26,6 +26,7 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('id="camera"', page)
         self.assertIn('id="led-slider"', page)
         self.assertIn('id="fan-slider"', page)
+        self.assertIn('id="pump-slider"', page)
         self.assertIn('stream.mjpg', page)
 
     def test_payload_formats_live_values_and_missing_values(self):
@@ -99,7 +100,7 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
     async def test_password_protects_slider_commands(self):
         class FakeActuators:
             def __init__(self):
-                self.values = {"led": 0, "fan": 0}
+                self.values = {"led": 0, "fan": 0, "pump": 0}
 
             def status(self):
                 return dict(self.values)
@@ -138,7 +139,7 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
         await sensor_stream(socket)
         self.assertEqual(actuators.status()["led"], 50)
         self.assertIn({"message": "Falsches Steuerpasswort"}, socket.messages)
-        self.assertEqual(socket.messages[-1]["controls"], {"led": 50, "fan": 0})
+        self.assertEqual(socket.messages[-1]["controls"], {"led": 50, "fan": 0, "pump": 0})
 
 
 if __name__ == "__main__":
