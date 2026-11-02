@@ -38,6 +38,32 @@ gleichzeitig laufen.
 Der B24_1 an GPIO 12 wird noch nicht gelesen: Seine Versorgungsspannung ist laut
 Übergabe ungeprüft. `B24_1_ENABLED=true` wird deshalb bewusst abgewiesen.
 
+## OLED und Taster
+
+Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus. Der
+`sensors`-Container bedient es zusammen mit den Sensoren, damit nur ein Prozess
+GPIO 14 und 15 nutzt. Der Taster ist an GPIO 26 mit internem Pull-up gegen GND
+vorgesehen. `OLED_ENABLED=true` und `OLED_BUTTON_GPIO=26` stehen in `.env.example`.
+
+Die Anzeige hat vier Ansichten: **Sensoren**, **Licht**, **Wasser** und **Luft**.
+Die Sensoransicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
+CO₂ vom SCD40 sowie Helligkeit vom BH1750. Falls ein SHT45-Wert fehlt, dient
+der entsprechende SCD40-Wert als Backup. Licht steuert den LED-Streifen,
+Wasser die Pumpe und Luft den Lüfter.
+
+| Tastendruck | Wirkung |
+| --- | --- |
+| Doppelklick (Abstand höchstens 0,4 s) | Nächste Ansicht; nach Luft wieder Sensoren |
+| Einfacher Klick in einer Einstellansicht | Wert um 5 Prozentpunkte erhöhen, maximal 100 % |
+| Mindestens 1 s halten in einer Einstellansicht | Zugehörigen Wert sofort auf 0 % setzen |
+
+Ein Einzelklick in der Sensoransicht verändert nichts. Die Anzeige liest die
+aktuellen Stellwerte vom Dashboard und sendet Änderungen dorthin. Dafür nutzt
+sie dasselbe `CONTROL_PASSWORD` wie die Websteuerung. Solange
+`ACTUATORS_ENABLED=false` ist, zeigt sie „Steuerung aus“; die Einstellungen
+lassen sich dann nicht verändern. Vor dem Aktivieren der Ausgänge die
+Freilaufdioden und Verdrahtung prüfen, wie im Abschnitt zur Steuerung beschrieben.
+
 ## Start
 
 Auf dem Pi mit Docker Compose:
@@ -93,7 +119,7 @@ von 0 bis 100 %; zwischen 5 und 100 % steigt die reale Leistung linear:
 
 | Gerät | GPIO | PWM | Real bei angezeigten 5 % | Anlauf aus 0 % |
 | --- | ---: | ---: | ---: | --- |
-| LED | 20 | 200 Hz | 5 % | keiner |
+| LED | 20 | 2000 Hz | 5 % | keiner |
 | Lüfter | 21 | 5 Hz | 25 % | bei 5–50 %: 0,5 s mit 100 % |
 | Pumpe | 16 | 5 Hz | 15 % | bei 5–30 %: 0,5 s mit 75 % |
 

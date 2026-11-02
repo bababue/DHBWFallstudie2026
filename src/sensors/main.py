@@ -7,12 +7,13 @@ import signal
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from threading import Event
+from threading import Event, Lock, Thread
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
+from display_runtime import run_display
 
 
 LOG = logging.getLogger("moos.sensors")
@@ -93,6 +94,10 @@ def run():
     handle = lgpio.gpiochip_open(chip_number)
     buses = []
     scd_sensors = []
+    bus_lock = Lock()
+    readings_lock = Lock()
+    readings = {}
+    display_thread = None
     try:
         for side, sda, scl in (
             ("left", config.left_sda, config.left_scl),
@@ -106,6 +111,18 @@ def run():
             for side, bus, scd in zip(("left", "right"), buses, scd_sensors)
             for sensor in (SHT45(bus, config.sht45_address), BH1750(bus, config.bh1750_address), scd)
         ]
+        if os.getenv("OLED_ENABLED", "true").lower() == "true":
+            button_pin = env_int("OLED_BUTTON_GPIO", "26")
+            used_pins = {config.left_sda, config.left_scl, config.right_sda, config.right_scl}
+            if button_pin in used_pins or not 0 <= button_pin <= 27:
+                raise ValueError("OLED button GPIO must be an unused BCM pin 0..27")
+            display_thread = Thread(
+                target=run_display,
+                args=(lgpio, handle, button_pin, buses[0], bus_lock, readings,
+                      readings_lock, os.getenv("CONTROL_PASSWORD", ""), STOP),
+                daemon=True,
+            )
+            display_thread.start()
         started = set()
         last_co2 = {}
         with InfluxDBClient(url=config.influx_url, token=config.influx_token, org=config.influx_org, timeout=10000) as client:
@@ -117,20 +134,28 @@ def run():
                 for side, sensor in sensors:
                     timestamp = datetime.now(timezone.utc)
                     try:
-                        if isinstance(sensor, SCD40) and side not in started:
-                            sensor.start()
-                            started.add(side)
-                            last_co2[side] = time.monotonic()
-                            fields = None  # First CO2 value takes about five seconds.
-                        else:
-                            fields = sensor.read()
-                            if isinstance(sensor, SCD40) and fields is not None:
+                        with bus_lock:
+                            if isinstance(sensor, SCD40) and side not in started:
+                                sensor.start()
+                                started.add(side)
                                 last_co2[side] = time.monotonic()
+                                fields = None  # First CO2 value takes about five seconds.
+                            else:
+                                fields = sensor.read()
+                                if isinstance(sensor, SCD40) and fields is not None:
+                                    last_co2[side] = time.monotonic()
                         if fields is not None:
                             LOG.info("%s/%s %s", side, sensor.name, fields)
                     except (OSError, ValueError, lgpio.error) as error:
                         LOG.warning("%s/%s read failed: %s", side, sensor.name, error)
                         fields = None
+                    with readings_lock:
+                        if fields is None:
+                            for key in [key for key in readings if key[:2] == (side, sensor.name)]:
+                                del readings[key]
+                        else:
+                            readings.update({(side, sensor.name, name): value
+                                             for name, value in fields.items()})
                     if isinstance(sensor, SCD40) and side in started:
                         if time.monotonic() - last_co2[side] > max(30, 2 * config.interval):
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next cycle", side)
@@ -147,9 +172,13 @@ def run():
                         LOG.error("InfluxDB backlog exceeded 2000 points; oldest samples dropped")
                 STOP.wait(max(0, config.interval - (time.monotonic() - cycle_start)))
     finally:
+        STOP.set()
+        if display_thread is not None:
+            display_thread.join(timeout=3)
         for sensor in scd_sensors:
             try:
-                sensor.stop()
+                with bus_lock:
+                    sensor.stop()
             except Exception:
                 pass
         for bus in reversed(buses):

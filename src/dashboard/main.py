@@ -10,7 +10,7 @@ import secrets
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from influxdb_client import InfluxDBClient
 
@@ -290,7 +290,7 @@ async def lifespan(application: FastAPI):
                 lgpio, os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
                 int(os.getenv("LED_GPIO", "20")), int(os.getenv("FAN_GPIO", "21")),
                 int(os.getenv("PUMP_GPIO", "16")),
-                int(os.getenv("LED_PWM_HZ", "200")), int(os.getenv("FAN_PWM_HZ", "5")),
+                int(os.getenv("LED_PWM_HZ", "2000")), int(os.getenv("FAN_PWM_HZ", "5")),
                 int(os.getenv("PUMP_PWM_HZ", "5")),
             )
         except Exception:
@@ -310,6 +310,38 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="Sensorwerte", lifespan=lifespan)
+
+
+def _check_control_access(request: Request):
+    settings: Settings = request.app.state.settings
+    supplied = request.headers.get("x-control-password", "")
+    if not settings.control_password or not secrets.compare_digest(supplied, settings.control_password):
+        raise HTTPException(status_code=401, detail="Falsches Steuerpasswort")
+
+
+@app.get("/api/controls")
+def control_status(request: Request):
+    _check_control_access(request)
+    actuators = request.app.state.hub.actuators
+    return {"enabled": actuators is not None,
+            "values": actuators.status() if actuators is not None else {}}
+
+
+@app.post("/api/controls")
+async def set_control(request: Request):
+    _check_control_access(request)
+    hub: Hub = request.app.state.hub
+    if hub.actuators is None:
+        raise HTTPException(status_code=503, detail="Steuerung deaktiviert")
+    try:
+        command = await request.json()
+        if not isinstance(command, dict):
+            raise ValueError("Ungültiger Steuerbefehl")
+        values = await asyncio.to_thread(hub.actuators.set, command.get("device"), command.get("value"))
+    except (ValueError, RuntimeError, TypeError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    await hub.publish_current()
+    return {"enabled": True, "values": values}
 
 
 @app.get("/", response_class=HTMLResponse)
