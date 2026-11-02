@@ -19,28 +19,40 @@ class MossHeightTests(unittest.TestCase):
 
     def test_raw_distance_is_available_before_calibration(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5)
-        with patch.object(sensor, "_distance_cm", return_value=8.2) as measure:
+        with patch("moss_height.TimestampUltrasonic._distance_cm", return_value=8.2) as measure:
             self.assertEqual(sensor.read(), {"distance_cm": 8.2, "demo_data": False})
             measure.assert_called_once_with()
         sensor.close()
 
-    def test_demo_uses_simulated_value_without_gpio_and_calculates_height(self):
+    def test_demo_uses_simulated_value_and_calculates_height(self):
         gpio = MagicMock()
         sensor = MossHeight(gpio, 1, 0, 5, empty_distance_cm=10,
                             demo_distance_cm=8, demo_sigma_cm=0.1)
-        with patch('moss_height.random.gauss', return_value=8.05) as draw:
+        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=7), \
+                patch('moss_height.random.gauss', return_value=8.05) as draw:
             fields = sensor.read()
         draw.assert_called_once_with(8, 0.1)
         self.assertAlmostEqual(fields['height_cm'], 1.95)
         self.assertTrue(fields['demo_data'])
+        self.assertEqual(sensor.last_real_distance_cm, 7)
         sensor.close()
-        gpio.gpio_claim_output.assert_not_called()
-        gpio.gpio_free.assert_not_called()
+        gpio.gpio_claim_output.assert_called_once()
+        gpio.gpio_free.assert_any_call(1, 5)
 
-    def test_demo_without_calibration_uses_demo_distance_as_reference(self):
-        sensor = MossHeight(MagicMock(), 1, 0, 5, demo_distance_cm=8, demo_sigma_cm=0.1)
-        with patch('moss_height.random.gauss', return_value=7.9):
-            self.assertAlmostEqual(sensor.read()['height_cm'], 0.1)
+    def test_real_open_distance_overrides_demo_even_without_water_noise(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=8,
+                            demo_distance_cm=9, lid_threshold_cm=12)
+        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=13):
+            self.assertEqual(sensor.read()['distance_cm'], 13)
+            self.assertFalse(sensor.read()['demo_data'])
+        sensor.close()
+
+    def test_demo_without_distance_still_reads_real_open_distance(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5, demo_enabled=True)
+        with patch('moss_height.TimestampUltrasonic._distance_cm', side_effect=[8, 13]):
+            self.assertIsNone(sensor.read())
+            self.assertEqual(sensor.read()['distance_cm'], 13)
+        sensor.close()
 
     def test_demo_waits_for_water_data_and_uses_measured_standard_deviation(self):
         noise = WaterNoise()
@@ -48,18 +60,20 @@ class MossHeightTests(unittest.TestCase):
             noise.add(index, value)
         self.assertIsNone(noise.sigma(4))
         sensor = MossHeight(MagicMock(), 1, 0, 5, demo_distance_cm=6)
-        self.assertIsNone(sensor.read())
+        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=None):
+            self.assertIsNone(sensor.read())
         noise.add(4, 8.2)
         sensor.demo_sigma_cm = noise.sigma(4)
         self.assertAlmostEqual(sensor.demo_sigma_cm, 0.158113883, places=6)
-        with patch('moss_height.random.gauss', return_value=6.05) as draw:
+        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=None), \
+                patch('moss_height.random.gauss', return_value=6.05) as draw:
             self.assertTrue(sensor.read()['demo_data'])
         draw.assert_called_once_with(6, sensor.demo_sigma_cm)
         self.assertIsNone(noise.sigma(65))
 
     def test_height_uses_its_own_reference_and_minute_median(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=20.0)
-        with patch.object(sensor, "_distance_cm", side_effect=[18.0, 17.0]), \
+        with patch("moss_height.TimestampUltrasonic._distance_cm", side_effect=[18.0, 17.0]), \
                 patch("moss_height.time.monotonic", side_effect=[0, 5]):
             first = sensor.read()
             second = sensor.read()

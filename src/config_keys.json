@@ -138,5 +138,21 @@
   "MOSS_4_DEMO": [
     "moos_4",
     "demo"
+  ],
+  "MOSS_1_DEMO_DISTANCE_CM": [
+    "moos_1",
+    "demo_abstand_cm"
+  ],
+  "MOSS_2_DEMO_DISTANCE_CM": [
+    "moos_2",
+    "demo_abstand_cm"
+  ],
+  "MOSS_3_DEMO_DISTANCE_CM": [
+    "moos_3",
+    "demo_abstand_cm"
+  ],
+  "MOSS_4_DEMO_DISTANCE_CM": [
+    "moos_4",
+    "demo_abstand_cm"
   ]
 }

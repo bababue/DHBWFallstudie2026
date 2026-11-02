@@ -33,35 +33,35 @@ class MossHeight(TimestampUltrasonic):
     WINDOW_S = 60
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None,
-                 demo_distance_cm=None, demo_sigma_cm=None):
+                 demo_distance_cm=None, demo_sigma_cm=None, lid_threshold_cm=12, demo_enabled=None):
+        self.demo_enabled = demo_distance_cm is not None if demo_enabled is None else demo_enabled
         self.demo_distance_cm = demo_distance_cm
         self.demo_sigma_cm = demo_sigma_cm
-        if demo_distance_cm is None:
-            super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
-        self.empty_distance_cm = (demo_distance_cm if empty_distance_cm is None and demo_distance_cm is not None
-                                  else empty_distance_cm)
+        self.lid_threshold_cm = lid_threshold_cm
+        self.last_real_distance_cm = None
+        super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
+        self.empty_distance_cm = empty_distance_cm
         self.recent_distances = deque()
 
-    def _distance_cm(self):
-        if self.demo_distance_cm is not None:
-            if self.demo_sigma_cm is None:
-                return None
-            return max(0.001, min(self.MAX_DISTANCE_CM, random.gauss(self.demo_distance_cm, self.demo_sigma_cm)))
-        return super()._distance_cm()
-
-    def close(self):
-        if self.demo_distance_cm is None:
-            super().close()
-
     def read(self):
-        distance = self._distance_cm()
-        if distance is None:
+        self.last_real_distance_cm = super()._distance_cm()
+        real = self.last_real_distance_cm
+        use_demo = (self.demo_enabled
+                    and not (real is not None and self.lid_threshold_cm < real <= self.MAX_DISTANCE_CM))
+        if use_demo:
+            if self.demo_distance_cm is None or self.demo_sigma_cm is None:
+                return None
+            distance = max(0.001, min(self.MAX_DISTANCE_CM,
+                                      random.gauss(self.demo_distance_cm, self.demo_sigma_cm)))
+        else:
+            distance = real
+        if distance is None or not 0 < distance <= self.MAX_DISTANCE_CM:
             return None
         now = time.monotonic()
         self.recent_distances.append((now, distance))
         while self.recent_distances and self.recent_distances[0][0] < now - self.WINDOW_S:
             self.recent_distances.popleft()
-        result = {"distance_cm": distance, "demo_data": self.demo_distance_cm is not None}
+        result = {"distance_cm": distance, "demo_data": use_demo}
         if self.empty_distance_cm is not None:
             result["height_cm"] = max(0.0, self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)

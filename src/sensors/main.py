@@ -180,11 +180,10 @@ def run():
         for index, ((trigger, echo), empty_distance) in enumerate(
                 zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
             demo = moss_config[f"moos_{index}"]["demo"]
-            if demo and empty_distance is None:
-                LOG.warning("Moos %s: Demo ohne Bezugsabstand deaktiviert", index)
-                continue
+            demo_distance = moss_config[f"moos_{index}"]["demo_abstand_cm"]
             sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance,
-                                demo_distance_cm=empty_distance if demo else None)
+                                demo_distance_cm=demo_distance if demo else None,
+                                lid_threshold_cm=moss_config["deckel"]["offen_abstand_cm"], demo_enabled=demo)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
@@ -287,7 +286,7 @@ def run():
                         started.clear()
                         last_co2.clear()
                         for sensor in moss_sensors:
-                            if sensor.demo_distance_cm is not None:
+                            if sensor.demo_enabled:
                                 sensor.demo_sigma_cm = None
                         for task in tasks:
                             task.next_due = now + ((int(task.side[-1]) - 1) * task.interval / 4
@@ -308,7 +307,7 @@ def run():
                         fields = None
                         error = False
                         try:
-                            if isinstance(sensor, MossHeight) and sensor.demo_distance_cm is not None:
+                            if isinstance(sensor, MossHeight) and sensor.demo_enabled:
                                 sigma = water_noise.sigma(time.monotonic())
                                 if sigma is not None:
                                     sensor.demo_sigma_cm = sigma
@@ -327,7 +326,7 @@ def run():
                             error = True
                         finished = time.monotonic()
                         if isinstance(sensor, MossHeight):
-                            modes.set_lid_open(lid.update(side, fields.get("distance_cm") if fields else None))
+                            modes.set_lid_open(lid.update(side, sensor.last_real_distance_cm))
                         if sensor is water_sensor and fields and 'distance_cm' in fields:
                             water_noise.add(finished, fields['distance_cm'])
                         task.advance(finished)

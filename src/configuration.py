@@ -22,6 +22,11 @@ def upgrade(data):
                 sensor = dict(data[key])
                 legacy_enabled = isinstance(legacy_demo, dict) and legacy_demo.get("demo_data") is True
                 sensor.setdefault("demo", legacy_enabled)
+                reference = sensor.get("bezugsabstand_cm")
+                default_distance = (round(reference + 1, 3)
+                                    if isinstance(reference, (int, float)) and not isinstance(reference, bool)
+                                    and math.isfinite(reference) and 0 < reference <= 399 else None)
+                sensor.setdefault("demo_abstand_cm", default_distance)
                 data[key] = sensor
     return data
 
@@ -40,7 +45,7 @@ def validate(data):
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
     for name, (group, key) in KEYS.items():
         value = data[group][key]
-        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
+        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name.endswith('DEMO_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
             continue
         if name.startswith('MOSS_') and name.endswith('_DEMO'):
             if type(value) is not bool:

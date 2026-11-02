@@ -81,8 +81,10 @@ erfasst. Das gilt auch für die Kalibrierung der Moossensoren.
 
 Für synthetische Moosdaten bei jedem gewünschten Sensor `moos_1.demo` bis
 `moos_4.demo` in `config/config.json` auf `true` setzen. Die Werte sind
-normalverteilt um den jeweiligen `bezugsabstand_cm`. Ist dieser `null`, liefert
-der Demo-Sensor keine Messwerte. Bei `demo: false` wird der echte Sensor genutzt.
+normalverteilt um den jeweiligen `demo_abstand_cm`. Ist dieser `null`, liefert
+der Demo-Sensor keine Messwerte. Für kalibrierte Sensoren liegt der anfängliche
+Demo-Abstand 1 cm über dem Bezugsabstand. Echte Messwerte oberhalb der
+Deckelgrenze ersetzen den Demowert und dienen der Deckelerkennung. Bei `demo: false` wird der echte Sensor genutzt.
 Die Standardabweichung wird laufend aus den gültigen Rohabständen des
 Wassersensors der letzten 60 Sekunden geschätzt. Mindestens fünf Messwerte sind
 nötig; ohne diese werden keine Demowerte erzeugt. Auch tatsächliche Änderungen
@@ -127,14 +129,13 @@ Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus und ist 
 180° gedreht. `sensors` rendert die Anzeige direkt aus seinen Messwerten und
 greift als einziger Container auf GPIO 14 und 15 zu.
 
-Das Display zeigt normalerweise den aktuellen Modus: `AUTO`, `MAINTENANCE`
-oder `MEASURING`. Ein kurzer Druck auf den Taster an GPIO 26
-schaltet zum nächsten Modus; nach `MEASURING` folgt wieder `AUTO`. Während der
+Das Display zeigt normalerweise den aktuellen Modus `AUTO` oder `MAINTENANCE`.
+Ein kurzer Druck auf den Taster an GPIO 26 schaltet zwischen beiden um. Während der
 Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
 Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` pausieren alle
-Sensorabfragen, und die periodischen CO₂-Messungen der SCD40 werden gestoppt.
+Sensorabfragen mit Ausnahme der Deckelprüfung, und die periodischen CO₂-Messungen der SCD40 werden gestoppt.
 Eine laufende Einzelmessung wird noch beendet. Beim Verlassen des Modus laufen
 die Messungen wieder an; die SCD40 benötigen anschließend eine neue Messung.
 Die Modi steuern vorerst keine Aktoren.
@@ -245,5 +246,5 @@ MAINTENANCE und sperren den Taster für Moduswechsel. Erst drei gültige
 Messungen auf oder unter der Grenze von jedem zuvor geöffnet erkannten Sensor
 schalten zurück auf AUTO. Fehlende Echos bestätigen keinen Zustandswechsel.
 Während MAINTENANCE laufen ausschließlich diese Prüfungen weiter; sie werden
-nicht als Sensordaten gespeichert. Bei deaktivierten Demo-Sensoren entfällt
-auch deren Deckelprüfung.
+nicht als Sensordaten gespeichert. Auch bei aktivem Demo-Modus erfolgt die
+Deckelprüfung anhand der echten Sensorwerte.

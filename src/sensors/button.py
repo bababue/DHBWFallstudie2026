@@ -1,4 +1,4 @@
-"""Debounced GPIO button state for the OLED's three display modes."""
+"""Debounced GPIO button state for the OLED's display modes."""
 
 import logging
 import time
@@ -6,7 +6,7 @@ from threading import Lock, Thread
 
 
 LOG = logging.getLogger("moos.button")
-MODES = ("AUTO", "MAINTENANCE", "MEASURING")
+MODES = ("AUTO", "MAINTENANCE")
 
 
 class ButtonModes:

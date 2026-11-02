@@ -48,3 +48,15 @@ class ConfigurationTests(unittest.TestCase):
         data = upgrade(data)
         data['deckel']['offen_abstand_cm'] = 0
         with self.assertRaises(ValueError): validate(data)
+
+    def test_demo_distance_defaults_to_calibrated_distance_plus_one(self):
+        data = copy.deepcopy(load())
+        data['moos_1']['bezugsabstand_cm'] = 6.94
+        del data['moos_1']['demo_abstand_cm']
+        data['moos_2']['bezugsabstand_cm'] = None
+        del data['moos_2']['demo_abstand_cm']
+        result = validate(upgrade(data))
+        self.assertEqual(result['moos_1']['demo_abstand_cm'], 7.94)
+        self.assertIsNone(result['moos_2']['demo_abstand_cm'])
+        result['moos_1']['demo_abstand_cm'] = -1
+        with self.assertRaises(ValueError): validate(result)

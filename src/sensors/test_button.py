@@ -6,6 +6,7 @@ from button import ButtonModes, MODES
 class ButtonModesTests(unittest.TestCase):
     def test_short_press_cycles_modes_only_after_release(self):
         modes = ButtonModes()
+        self.assertEqual(MODES, ("AUTO", "MAINTENANCE"))
         self.assertEqual(modes.snapshot()[:2], ("AUTO", False))
         for index in range(1, len(MODES) + 1):
             start = index * 2.0
