@@ -154,5 +154,29 @@
   "MOSS_4_DEMO_DISTANCE_CM": [
     "moos_4",
     "demo_abstand_cm"
+  ],
+  "LED_GPIO": [
+    "aktoren",
+    "licht_gpio"
+  ],
+  "FAN_GPIO": [
+    "aktoren",
+    "luefter_gpio"
+  ],
+  "PUMP_GPIO": [
+    "aktoren",
+    "pumpe_gpio"
+  ],
+  "LED_PWM_HZ": [
+    "aktoren",
+    "licht_pwm_hz"
+  ],
+  "FAN_PWM_HZ": [
+    "aktoren",
+    "luefter_pwm_hz"
+  ],
+  "PUMP_PWM_HZ": [
+    "aktoren",
+    "pumpe_pwm_hz"
   ]
 }

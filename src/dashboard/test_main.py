@@ -39,6 +39,21 @@ class DashboardTests(unittest.TestCase):
         result = subprocess.run(['node', '--check'], input=script, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_actuator_changes_require_maintenance_and_show_current_values(self):
+        controller = MagicMock()
+        controller.status.return_value = {'fan': 20, 'pump': 0, 'led': 40}
+        controller.set.return_value = {'fan': 30, 'pump': 0, 'led': 40}
+        with patch.object(main, 'actuators', controller):
+            self.assertEqual(main.actuator_status()['fan'], 20)
+            with patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
+                self.assertEqual(main.set_actuator('fan', {'value': 30}).status_code, 409)
+                controller.set.assert_not_called()
+            with patch.object(main, 'mode_state', return_value={'mode': 'MAINTENANCE'}):
+                self.assertEqual(main.set_actuator('fan', {'value': 30})['fan'], 30)
+                controller.set.assert_called_once_with('fan', 30)
+        with patch.object(main, 'actuators', None):
+            self.assertEqual(main.actuator_status().status_code, 503)
+
     def test_live_readings_expire_and_debug_uses_them(self):
         now = time.time()
         readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21, sampled=now),
@@ -64,7 +79,7 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(main.moss('24h')['current'], {'moss1': 2})
             client.assert_not_called()
         body = main.index().body.decode()
-        self.assertIn('content:"Keine Messdaten"', body)
+        self.assertIn('content:"Datenmessung pausiert"', body)
         self.assertIn('.chart-container{position:relative;height:230px}', body)
 
     def test_temperature_combines_current_and_history_by_window(self):

@@ -15,6 +15,8 @@ def upgrade(data):
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
         data.setdefault("deckel", {"offen_abstand_cm": 12.0})
+        data.setdefault("aktoren", {"licht_gpio": 20, "luefter_gpio": 21, "pumpe_gpio": 16,
+                                    "licht_pwm_hz": 2000, "luefter_pwm_hz": 5, "pumpe_pwm_hz": 5})
         legacy_demo = data.pop("moos_demo", None)
         for index in range(1, 5):
             key = f"moos_{index}"
@@ -57,6 +59,9 @@ def validate(data):
             if type(value) is not int or not 0 <= value <= 27:
                 raise ValueError(f'{group}.{key}: GPIO muss eine ganze Zahl von 0 bis 27 sein')
             pins.append(value)
+        elif name.endswith('_PWM_HZ'):
+            if type(value) is not int or not 1 <= value <= 20000:
+                raise ValueError(f'{group}.{key}: PWM-Frequenz muss eine ganze Zahl von 1 bis 20000 sein')
         elif name.endswith('ADDRESS'):
             if type(value) is not int or not 3 <= value <= 119:
                 raise ValueError(f'{group}.{key}: I²C-Adresse muss 3 bis 119 sein')

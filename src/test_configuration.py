@@ -60,3 +60,11 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIsNone(result['moos_2']['demo_abstand_cm'])
         result['moos_1']['demo_abstand_cm'] = -1
         with self.assertRaises(ValueError): validate(result)
+
+    def test_actuator_gpio_collisions_and_invalid_frequency_are_rejected(self):
+        data = copy.deepcopy(load())
+        data['aktoren']['licht_gpio'] = data['taster']['gpio']
+        with self.assertRaises(ValueError): validate(data)
+        data = copy.deepcopy(load())
+        data['aktoren']['licht_pwm_hz'] = 0
+        with self.assertRaises(ValueError): validate(data)

@@ -55,5 +55,13 @@
   },
   "deckel": {
     "offen_abstand_cm": 12.0
+  },
+  "aktoren": {
+    "licht_gpio": 20,
+    "luefter_gpio": 21,
+    "pumpe_gpio": 16,
+    "licht_pwm_hz": 2000,
+    "luefter_pwm_hz": 5,
+    "pumpe_pwm_hz": 5
   }
 }

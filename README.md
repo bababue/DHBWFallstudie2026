@@ -137,7 +137,10 @@ Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` laufen die
 Sensoren weiter und ihre aktuellen Werte werden angezeigt, aber nicht in
 InfluxDB gespeichert. Im Dashboard sind die Graphen währenddessen ausgeblendet.
-Die Modi steuern vorerst keine Aktoren.
+Im Maintenance-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
+Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
+werden die Ausgänge auf 0 gesetzt. Die GPIOs und PWM-Frequenzen stehen unter
+`aktoren` in der Konfiguration. Nach einer Änderung den Dashboard-Container neu starten.
 
 Die Sensorübersicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
 CO₂ vom SCD40 sowie Helligkeit vom BH1750. Falls ein SHT45-Wert fehlt, dient
