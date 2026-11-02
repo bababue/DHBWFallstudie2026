@@ -38,7 +38,7 @@ def validate(data):
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
     for name, (group, key) in KEYS.items():
         value = data[group][key]
-        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
+        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name.endswith('DEMO_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
             continue
         if name == 'MOSS_DEMO_DATA':
             if type(value) is not bool:

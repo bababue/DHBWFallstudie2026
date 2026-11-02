@@ -179,8 +179,11 @@ def run():
         water_noise = WaterNoise()
         for index, ((trigger, echo), empty_distance) in enumerate(
                 zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
+            demo_distance = demo[f"demo_distance_{index}_cm"]
+            if demo["demo_data"] and demo_distance is None:
+                continue
             sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance,
-                                demo_distance_cm=demo[f"demo_distance_{index}_cm"] if demo["demo_data"] else None)
+                                demo_distance_cm=demo_distance if demo["demo_data"] else None)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])

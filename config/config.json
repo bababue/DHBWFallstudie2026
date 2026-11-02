@@ -47,9 +47,9 @@
   },
   "moos_demo": {
     "demo_data": true,
-    "demo_distance_1_cm": 8.0,
-    "demo_distance_2_cm": 8.0,
-    "demo_distance_3_cm": 8.0,
-    "demo_distance_4_cm": 8.0
+    "demo_distance_1_cm": 6.940,
+    "demo_distance_2_cm": 6.059,
+    "demo_distance_3_cm": null,
+    "demo_distance_4_cm": null
   }
 }

@@ -83,7 +83,9 @@ Für synthetische Moosdaten `moos_demo.demo_data` in `config/config.json` auf
 `true` setzen und `moos_demo.demo_distance_1_cm` bis `demo_distance_4_cm`
 auf die gewünschten Abstände der jeweiligen Sensoren in cm setzen. Alle vier
 Sensoren erzeugen dann unabhängig normalverteilte Abstände um ihren jeweiligen
-Wert. Die Standardabweichung wird laufend aus den gültigen Rohabständen des
+Wert. Steht ein Demoabstand auf `null`, ist dieser Sensor im Demomodus
+ausgeschaltet und liefert keine Messwerte; außerhalb des Demomodus wird der
+echte Sensor weiterhin verwendet. Die Standardabweichung wird laufend aus den gültigen Rohabständen des
 Wassersensors der letzten 60 Sekunden geschätzt. Mindestens fünf Messwerte sind
 nötig; ohne diese werden keine Demowerte erzeugt. Auch tatsächliche Änderungen
 des Wasserstands beeinflussen diese Schätzung. Ein vorhandener Moos-Kalibrierwert bleibt die Referenz; fehlt er,

@@ -41,3 +41,10 @@ class ConfigurationTests(unittest.TestCase):
             data['moos_demo'][f'demo_distance_{i}_cm'] = float(i + 5)
         result = validate(upgrade(data))
         self.assertEqual([result['moos_demo'][f'demo_distance_{i}_cm'] for i in range(1, 5)], [6, 7, 8, 9])
+
+    def test_demo_distances_may_be_null(self):
+        data = copy.deepcopy(load())
+        data['moos_demo']['demo_data'] = True
+        for i in range(1, 5):
+            data['moos_demo'][f'demo_distance_{i}_cm'] = None
+        self.assertEqual(validate(upgrade(data))['moos_demo']['demo_distance_1_cm'], None)
