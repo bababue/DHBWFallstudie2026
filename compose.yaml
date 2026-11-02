@@ -23,7 +23,22 @@ services:
     env_file: .env
     devices:
       - ${GPIOCHIP_DEVICE:-/dev/gpiochip0}:/dev/gpiochip0
+    volumes:
+      - oled-socket:/run/moos-oled
     depends_on:
+      - influxdb
+
+  oled:
+    build:
+      context: ./src
+      dockerfile: oled/Dockerfile
+    container_name: oled
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - oled-socket:/run/moos-oled
+    depends_on:
+      - sensors
       - influxdb
 
   dashboard:
@@ -54,3 +69,4 @@ services:
 volumes:
   influxdb-data:
   influxdb-config:
+  oled-socket:

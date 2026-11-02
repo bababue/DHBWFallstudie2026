@@ -9,12 +9,17 @@ from main import DISPLAY_ROWS, Hub, READINGS, Settings, make_payload, read_lates
 
 
 class DashboardTests(unittest.TestCase):
+    def test_controls_need_no_website_password(self):
+        with patch.dict("os.environ", {"INFLUXDB_TOKEN": "test", "ACTUATORS_ENABLED": "true"}, clear=True):
+            self.assertTrue(Settings.from_env().actuators_enabled)
+
     def test_plain_page_contains_every_sensor_value(self):
         page = render_page()
-        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 2)
+        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 3)
         self.assertIn("<th>Messwert</th><th>Sensor</th><th>Links</th><th>Rechts</th>", page)
         self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td id="left-scd40-co2_ppm">', page)
         self.assertIn('<tr><td>Wasserstand</td><td>Ultraschall</td><td id="tank-ultrasonic-water_level_cm"', page)
+        self.assertIn('id="tank-ultrasonic-water_level_median_1m_cm"', page)
         self.assertIn('id="tank-ultrasonic-distance_cm"', page)
         self.assertLess(page.index("<td>Temperatur</td>"), page.index("<td>Luftfeuchte</td>"))
         self.assertLess(page.index("<td>Luftfeuchte</td>"), page.index("<td>Licht</td>"))
@@ -29,6 +34,7 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('id="led-slider"', page)
         self.assertIn('id="fan-slider"', page)
         self.assertIn('id="pump-slider"', page)
+        self.assertNotIn('control-password', page)
         self.assertIn('stream.mjpg', page)
 
     def test_payload_formats_live_values_and_missing_values(self):
@@ -37,6 +43,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(payload["readings"]["left-scd40-co2_ppm"], "512 ppm")
         self.assertEqual(payload["readings"]["right-bh1750-illuminance_lux"], "kein aktueller Wert")
         self.assertEqual(payload["readings"]["tank-ultrasonic-water_level_cm"], "kein aktueller Wert")
+        self.assertEqual(payload["readings"]["tank-ultrasonic-water_level_median_1m_cm"], "kein aktueller Wert")
         self.assertEqual(payload["readings"]["tank-ultrasonic-distance_cm"], "3.1 cm")
         self.assertEqual(len(payload["readings"]), len(READINGS))
         self.assertFalse(payload["controls_enabled"])
@@ -50,7 +57,7 @@ class DashboardTests(unittest.TestCase):
         client = unittest.mock.MagicMock()
         client.__enter__.return_value = client
         client.query_api.return_value.query.return_value = [SimpleNamespace(records=[record])]
-        settings = Settings("http://influxdb:8086", "moos", "moos_sensors", "test-token", 2, 180, 8000, False, "")
+        settings = Settings("http://influxdb:8086", "moos", "moos_sensors", "test-token", 2, 180, 8000, False)
         with patch("main.InfluxDBClient", return_value=client):
             values = read_latest(settings)
         self.assertEqual(values[("right", "sht45", "temperature_c")], 21.25)
@@ -66,8 +73,7 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
         hub.snapshot = make_payload({("left", "scd40", "co2_ppm"): 512.0})
 
         class FakeSocket:
-            app = SimpleNamespace(state=SimpleNamespace(
-                hub=hub, settings=Settings("", "", "", "token", 2, 180, 8000, False, "")))
+            app = SimpleNamespace(state=SimpleNamespace(hub=hub))
 
             def __init__(self):
                 self.accepted = False
@@ -102,7 +108,7 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
         await hub.publish(payload)
         self.assertEqual(messages, [payload])
 
-    async def test_password_protects_slider_commands(self):
+    async def test_slider_commands_work_without_password(self):
         class FakeActuators:
             def __init__(self):
                 self.values = {"led": 0, "fan": 0, "pump": 0}
@@ -116,16 +122,13 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
 
         actuators = FakeActuators()
         hub = Hub(actuators)
-        settings = Settings("", "", "", "token", 2, 180, 8000, True, "correct")
-
         class FakeSocket:
-            app = SimpleNamespace(state=SimpleNamespace(hub=hub, settings=settings))
+            app = SimpleNamespace(state=SimpleNamespace(hub=hub))
 
             def __init__(self):
                 self.messages = []
                 self.commands = iter([
-                    json.dumps({"type": "set", "device": "led", "value": 50, "password": "wrong"}),
-                    json.dumps({"type": "set", "device": "led", "value": 50, "password": "correct"}),
+                    json.dumps({"type": "set", "device": "led", "value": 50}),
                 ])
 
             async def accept(self):
@@ -143,7 +146,6 @@ class WebSocketTests(unittest.IsolatedAsyncioTestCase):
         socket = FakeSocket()
         await sensor_stream(socket)
         self.assertEqual(actuators.status()["led"], 50)
-        self.assertIn({"message": "Falsches Steuerpasswort"}, socket.messages)
         self.assertEqual(socket.messages[-1]["controls"], {"led": 50, "fan": 0, "pump": 0})
 
 

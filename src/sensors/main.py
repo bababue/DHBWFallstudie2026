@@ -5,15 +5,18 @@ import os
 import re
 import signal
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from threading import Event, Lock, Thread
+from threading import Event, Lock
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
-from display_runtime import run_display
+from oled_bridge import FrameServer
+from schedule import ScheduledRead
+from storage import BufferedWriter
 from water_level import WaterLevel
 
 
@@ -39,7 +42,8 @@ class Config:
     sht45_address: int
     bh1750_address: int
     scd40_address: int
-    interval: float
+    fast_interval: float
+    co2_poll_interval: float
     influx_url: str
     influx_org: str
     influx_bucket: str
@@ -47,8 +51,6 @@ class Config:
 
     @classmethod
     def from_env(cls):
-        if os.getenv("B24_1_ENABLED", "false").lower() == "true":
-            raise ValueError("B24_1 reading is not implemented; leave B24_1_ENABLED=false")
         config = cls(
             chip=os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
             left_sda=env_int("LEFT_I2C_SDA_GPIO", "15"),
@@ -62,7 +64,8 @@ class Config:
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
             bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
             scd40_address=env_int("SCD40_ADDRESS", "0x62"),
-            interval=float(os.getenv("SAMPLE_INTERVAL_SECONDS", "6")),
+            fast_interval=float(os.getenv("FAST_SAMPLE_INTERVAL_SECONDS", "1")),
+            co2_poll_interval=float(os.getenv("CO2_READY_POLL_SECONDS", "0.5")),
             influx_url=os.getenv("INFLUXDB_URL", "http://influxdb:8086"),
             influx_org=os.getenv("INFLUXDB_ORG", "moos"),
             influx_bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
@@ -76,8 +79,12 @@ class Config:
             raise ValueError("WATER_FLOOR_DISTANCE_CM must be within the sensor range")
         if not re.fullmatch(r"/dev/gpiochip\d+", config.chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
-        if config.interval < 6 or config.delay_us < 5:
-            raise ValueError("Sampling interval must be >=6 s and I2C_DELAY_US >=5")
+        if not 0.5 <= config.fast_interval <= 60:
+            raise ValueError("FAST_SAMPLE_INTERVAL_SECONDS must be 0.5..60")
+        if not 0.2 <= config.co2_poll_interval <= 5:
+            raise ValueError("CO2_READY_POLL_SECONDS must be 0.2..5")
+        if config.delay_us < 5:
+            raise ValueError("I2C_DELAY_US must be >=5")
         if not all(0x03 <= a <= 0x77 for a in (config.sht45_address, config.bh1750_address, config.scd40_address)):
             raise ValueError("I2C addresses must be 7-bit addresses")
         if not config.influx_token:
@@ -105,10 +112,8 @@ def run():
     buses = []
     scd_sensors = []
     water_sensor = None
+    oled_bridge = None
     bus_lock = Lock()
-    readings_lock = Lock()
-    readings = {}
-    display_thread = None
     try:
         for side, sda, scl in (
             ("left", config.left_sda, config.left_scl),
@@ -125,65 +130,66 @@ def run():
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
                                   config.water_floor_distance_cm)
         sensors.append(("tank", water_sensor))
-        if os.getenv("OLED_ENABLED", "true").lower() == "true":
-            display_thread = Thread(
-                target=run_display,
-                args=(buses[0], bus_lock, readings, readings_lock, STOP),
-                daemon=True,
-            )
-            display_thread.start()
+        oled_bridge = FrameServer(buses[0], bus_lock)
+        start_time = time.monotonic()
+        tasks = [ScheduledRead(side, sensor,
+                               config.co2_poll_interval if isinstance(sensor, SCD40)
+                               else config.fast_interval, start_time)
+                 for side, sensor in sensors]
         started = set()
         last_co2 = {}
-        with InfluxDBClient(url=config.influx_url, token=config.influx_token, org=config.influx_org, timeout=10000) as client:
+        with InfluxDBClient(url=config.influx_url, token=config.influx_token, org=config.influx_org, timeout=5000) as client:
             writer = client.write_api(write_options=SYNCHRONOUS)
-            pending = []
-            while not STOP.is_set():
-                cycle_start = time.monotonic()
-                points = []
-                for side, sensor in sensors:
-                    timestamp = datetime.now(timezone.utc)
-                    try:
-                        with bus_lock:
-                            if isinstance(sensor, SCD40) and side not in started:
-                                sensor.start()
-                                started.add(side)
-                                last_co2[side] = time.monotonic()
-                                fields = None  # First CO2 value takes about five seconds.
-                            else:
-                                fields = sensor.read()
-                                if isinstance(sensor, SCD40) and fields is not None:
-                                    last_co2[side] = time.monotonic()
-                        if fields is not None:
-                            LOG.info("%s/%s %s", side, sensor.name, fields)
-                    except (OSError, ValueError, lgpio.error) as error:
-                        LOG.warning("%s/%s read failed: %s", side, sensor.name, error)
+            buffered = BufferedWriter(
+                lambda points: writer.write(bucket=config.influx_bucket, org=config.influx_org,
+                                            record=points), STOP)
+            try:
+                while not STOP.is_set():
+                    now = time.monotonic()
+                    due = [task for task in tasks if task.ready(now)]
+                    if not due:
+                        STOP.wait(max(0, min(task.next_due for task in tasks) - now))
+                        continue
+                    points = []
+                    for task in due:
+                        side, sensor = task.side, task.sensor
+                        is_co2 = isinstance(sensor, SCD40)
                         fields = None
-                    with readings_lock:
-                        if fields is None:
-                            for key in [key for key in readings if key[:2] == (side, sensor.name)]:
-                                del readings[key]
-                        else:
-                            readings.update({(side, sensor.name, name): value
-                                             for name, value in fields.items()})
-                    if isinstance(sensor, SCD40) and side in started:
-                        if time.monotonic() - last_co2[side] > max(30, 2 * config.interval):
-                            LOG.warning("%s/scd40 has no fresh CO2; restarting next cycle", side)
+                        error = False
+                        try:
+                            with (bus_lock if side != "tank" else nullcontext()):
+                                if is_co2 and side not in started:
+                                    sensor.start()
+                                    started.add(side)
+                                    last_co2[side] = time.monotonic()
+                                else:
+                                    fields = sensor.read()
+                            if fields is not None:
+                                LOG.info("%s/%s %s", side, sensor.name, fields)
+                                if is_co2:
+                                    last_co2[side] = time.monotonic()
+                        except (OSError, ValueError, lgpio.error) as exc:
+                            LOG.warning("%s/%s read failed: %s", side, sensor.name, exc)
+                            error = True
+                        finished = time.monotonic()
+                        task.advance(finished)
+                        if is_co2 and side in started and finished - last_co2[side] > 30:
+                            LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)
                             started.remove(side)
-                    points.extend(sample_points(side, sensor.name, fields, timestamp))
-                pending.extend(points)
-                try:
-                    writer.write(bucket=config.influx_bucket, org=config.influx_org, record=pending)
-                    pending.clear()
-                except Exception as error:
-                    LOG.warning("InfluxDB write failed; retaining %d points: %s", len(pending), error)
-                    if len(pending) > 2000:
-                        pending = pending[-2000:]
-                        LOG.error("InfluxDB backlog exceeded 2000 points; oldest samples dropped")
-                STOP.wait(max(0, config.interval - (time.monotonic() - cycle_start)))
+                            error = True
+                        # The SCD40 has no new value between its 5 s conversions.
+                        # Do not publish a false unhealthy or repeat a stale sample.
+                        if not is_co2 or fields is not None or error:
+                            points.extend(sample_points(side, sensor.name, fields,
+                                                        datetime.now(timezone.utc)))
+                    buffered.submit(points)
+            finally:
+                STOP.set()
+                buffered.close()
     finally:
         STOP.set()
-        if display_thread is not None:
-            display_thread.join(timeout=3)
+        if oled_bridge is not None:
+            oled_bridge.close()
         for sensor in scd_sensors:
             try:
                 with bus_lock:

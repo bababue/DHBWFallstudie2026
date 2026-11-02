@@ -35,10 +35,15 @@ class SensorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Config.from_env()
 
-    def test_common_interval_keeps_margin_for_scd40(self):
+    def test_independent_fast_and_co2_poll_intervals(self):
         with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
-            self.assertEqual(Config.from_env().interval, 6)
-            os.environ["SAMPLE_INTERVAL_SECONDS"] = "5"
+            self.assertEqual(Config.from_env().fast_interval, 1)
+            self.assertEqual(Config.from_env().co2_poll_interval, 0.5)
+            os.environ["FAST_SAMPLE_INTERVAL_SECONDS"] = "0.1"
+            with self.assertRaises(ValueError):
+                Config.from_env()
+            os.environ["FAST_SAMPLE_INTERVAL_SECONDS"] = "1"
+            os.environ["CO2_READY_POLL_SECONDS"] = "0.1"
             with self.assertRaises(ValueError):
                 Config.from_env()
 

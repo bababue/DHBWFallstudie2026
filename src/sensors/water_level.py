@@ -2,6 +2,7 @@
 
 import statistics
 import time
+from collections import deque
 
 
 class WaterLevel:
@@ -11,6 +12,7 @@ class WaterLevel:
     START_TIMEOUT_S = 0.01
     SAMPLE_PAUSE_S = 0.06
     SAMPLES = 5
+    MEDIAN_WINDOW_S = 60
 
     def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int,
                  floor_distance_cm: float):
@@ -19,6 +21,7 @@ class WaterLevel:
         self.trigger_pin = trigger_pin
         self.echo_pin = echo_pin
         self.floor_distance_cm = floor_distance_cm
+        self.recent_distances = deque()
         gpio.gpio_claim_output(handle, trigger_pin, 0)
         try:
             gpio.gpio_claim_input(handle, echo_pin)
@@ -53,9 +56,15 @@ class WaterLevel:
         if not distances:
             return None
         distance = statistics.median(distances)
+        now = time.monotonic()
+        self.recent_distances.extend((now, value) for value in distances)
+        while self.recent_distances and self.recent_distances[0][0] < now - self.MEDIAN_WINDOW_S:
+            self.recent_distances.popleft()
+        minute_distance = statistics.median(value for _, value in self.recent_distances)
         return {
             "distance_cm": distance,
             "water_level_cm": max(0.0, self.floor_distance_cm - distance),
+            "water_level_median_1m_cm": max(0.0, self.floor_distance_cm - minute_distance),
         }
 
     def close(self):

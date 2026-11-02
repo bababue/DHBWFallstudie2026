@@ -6,7 +6,6 @@ import json
 import logging
 import math
 import os
-import secrets
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 
@@ -37,13 +36,14 @@ DISPLAY_ROWS = (
     ("CO₂", "scd40", "co2_ppm", "ppm", 0),
 )
 WATER_READING = Reading("tank", "ultrasonic", "water_level_cm", "cm", 1)
+WATER_MEDIAN_READING = Reading("tank", "ultrasonic", "water_level_median_1m_cm", "cm", 1)
 WATER_DISTANCE_READING = Reading("tank", "ultrasonic", "distance_cm", "cm", 1)
 
 READINGS = tuple(
     Reading(side, sensor, field, unit, decimals)
     for _, sensor, field, unit, decimals in DISPLAY_ROWS
     for side in ("left", "right")
-) + (WATER_READING, WATER_DISTANCE_READING)
+) + (WATER_READING, WATER_MEDIAN_READING, WATER_DISTANCE_READING)
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,6 @@ class Settings:
     max_age_seconds: int
     camera_port: int
     actuators_enabled: bool
-    control_password: str
 
     @classmethod
     def from_env(cls):
@@ -65,20 +64,17 @@ class Settings:
             org=os.getenv("INFLUXDB_ORG", "moos"),
             bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
             token=os.getenv("INFLUXDB_TOKEN", ""),
-            poll_seconds=float(os.getenv("DASHBOARD_POLL_SECONDS", "1")),
-            max_age_seconds=int(os.getenv("DASHBOARD_MAX_AGE_SECONDS", "30")),
+            poll_seconds=float(os.getenv("DASHBOARD_POLL_SECONDS", "0.5")),
+            max_age_seconds=int(os.getenv("DASHBOARD_MAX_AGE_SECONDS", "12")),
             camera_port=int(os.getenv("CAMERA_PORT", "8000")),
             actuators_enabled=os.getenv("ACTUATORS_ENABLED", "false").lower() == "true",
-            control_password=os.getenv("CONTROL_PASSWORD", ""),
         )
         if not settings.token:
             raise ValueError("INFLUXDB_TOKEN is required")
-        if settings.poll_seconds < 1 or settings.max_age_seconds < 5:
-            raise ValueError("Dashboard poll interval must be >=1 s and max age >=5 s")
+        if settings.poll_seconds < 0.25 or settings.max_age_seconds < 5:
+            raise ValueError("Dashboard poll interval must be >=0.25 s and max age >=5 s")
         if not 1 <= settings.camera_port <= 65535:
             raise ValueError("CAMERA_PORT must be 1..65535")
-        if settings.actuators_enabled and not settings.control_password:
-            raise ValueError("CONTROL_PASSWORD is required when actuators are enabled")
         return settings
 
 
@@ -129,6 +125,8 @@ def render_page(camera_port: int = 8000) -> str:
     )
     rows += ('<tr><td>Wasserstand</td><td>Ultraschall</td>'
              '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>'
+             '<tr><td>Wasserstand: Median (1 Minute)</td><td>Ultraschall</td>'
+             '<td id="tank-ultrasonic-water_level_median_1m_cm" colspan="2">Verbinde…</td></tr>'
              '<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td>'
              '<td id="tank-ultrasonic-distance_cm" colspan="2">Verbinde…</td></tr>')
     script = """
@@ -143,16 +141,7 @@ let lastControls = null;
 const editing = new Set();
 function sendControl(device) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
-  const password = document.getElementById("control-password").value;
-  if (!password) {
-    document.getElementById("control-status").textContent = "Steuerpasswort eingeben";
-    if (lastControls) {
-      sliders[device].value = lastControls[device];
-      document.getElementById(`${device}-output`).textContent = `${sliders[device].value} %`;
-    }
-    return;
-  }
-  socket.send(JSON.stringify({type: "set", device, value: Number(sliders[device].value), password}));
+  socket.send(JSON.stringify({type: "set", device, value: Number(sliders[device].value)}));
 }
 for (const [device, slider] of Object.entries(sliders)) {
   slider.addEventListener("input", () => {
@@ -227,8 +216,7 @@ connectCamera();
         f"<tbody>{rows}</tbody></table>"
         '<h2>Kamera</h2><img id="camera" alt="Live-Bild der Kamera" width="640" height="360">'
         '<p id="camera-status">Verbinde…</p>'
-        '<h2>Steuerung</h2><label for="control-password">Steuerpasswort</label> '
-        '<input id="control-password" type="password" autocomplete="off">'
+        '<h2>Steuerung</h2>'
         '<p id="control-status">Verbinde…</p>'
         '<p><label for="led-slider">Licht</label> '
         '<input id="led-slider" type="range" min="0" max="100" step="5" value="0" disabled> '
@@ -272,6 +260,7 @@ class Hub:
 
 async def poll_loop(settings: Settings, hub: Hub):
     while True:
+        started = asyncio.get_running_loop().time()
         try:
             values = await asyncio.to_thread(read_latest, settings)
             error = False
@@ -281,7 +270,9 @@ async def poll_loop(settings: Settings, hub: Hub):
             values = {}
             error = True
         await hub.update_sensors(values, error)
-        await asyncio.sleep(settings.poll_seconds)
+        elapsed = asyncio.get_running_loop().time() - started
+        await asyncio.sleep(max(1.0 if error else 0.05,
+                                settings.poll_seconds - elapsed))
 
 
 @asynccontextmanager
@@ -303,7 +294,6 @@ async def lifespan(application: FastAPI):
             LOG.exception("Could not claim LED, fan and pump GPIO pins; controls stay disabled")
     hub = Hub(actuators)
     application.state.hub = hub
-    application.state.settings = settings
     task = asyncio.create_task(poll_loop(settings, hub))
     try:
         yield
@@ -327,7 +317,6 @@ def index():
 async def sensor_stream(websocket: WebSocket):
     await websocket.accept()
     hub: Hub = websocket.app.state.hub
-    settings: Settings = websocket.app.state.settings
     hub.clients.add(websocket)
     try:
         if hub.snapshot is not None:
@@ -339,9 +328,6 @@ async def sensor_stream(websocket: WebSocket):
                     raise ValueError("Ungültiger Steuerbefehl")
                 if hub.actuators is None:
                     raise ValueError("Steuerung deaktiviert")
-                password = message.get("password")
-                if not isinstance(password, str) or not secrets.compare_digest(password, settings.control_password):
-                    raise ValueError("Falsches Steuerpasswort")
                 await asyncio.to_thread(hub.actuators.set, message.get("device"), message.get("value"))
                 await hub.publish_current()
             except (ValueError, RuntimeError) as error:
