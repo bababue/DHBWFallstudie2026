@@ -66,10 +66,10 @@ class Config:
             moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
                              env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
                             for index, (trigger, echo) in enumerate(
-                                ((0, 5), (9, 11), (22, 10), (17, 27)), start=1)),
+                                ((9, 11), (0, 5)), start=1)),
             moss_empty_distances_cm=tuple(
                 float(value) if (value := os.getenv(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
-                for index in range(1, 5)),
+                for index in range(1, 3)),
             moss_interval=float(os.getenv("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
             delay_us=env_int("I2C_DELAY_US", "12"),
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
@@ -171,7 +171,7 @@ def run():
         for side, sensor in sensors:
             if isinstance(sensor, MossHeight):
                 interval = config.moss_interval
-                first_due = start_time + (int(side[-1]) - 1) * interval / 4
+                first_due = start_time + (int(side[-1]) - 1) * interval / 2
             else:
                 interval = config.co2_poll_interval if isinstance(sensor, SCD40) else config.fast_interval
                 first_due = start_time

@@ -4,7 +4,7 @@ Stand der Quellen: Übergabe vom 1. November 2026 und aktueller Projektstand. Al
 
 ## Aufbau
 
-Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rechts), einem Ultraschallsensor für den Wasserstand, vier Ultraschallsensoren über dem Moos, Bewässerungspumpe, Lüfter, LED-Streifen, OLED-Anzeige, Taster und Pi-Kamera. Jede seitliche Messstelle besitzt einen SHT45, einen GY-302/BH1750 und einen SCD40.
+Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rechts), einem Ultraschallsensor für den Wasserstand, zwei Ultraschallsensoren über dem Moos, Bewässerungspumpe, Lüfter, LED-Streifen, OLED-Anzeige, Taster und Pi-Kamera. Jede seitliche Messstelle besitzt einen SHT45, einen GY-302/BH1750 und einen SCD40.
 
 | Bauteil | Anzahl | Aufgabe / Anschluss |
 | --- | ---: | --- |
@@ -13,7 +13,7 @@ Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rec
 | GY-302 mit BH1750 | 2 | Beleuchtungsstärke in Lux, je einer links und rechts |
 | SCD40 | 2 | **Primäre Messung von CO₂** in ppm; seine Temperatur- und Feuchtewerte dienen nur als Backup zum SHT45, je einer links und rechts |
 | Ultraschallsensor für Wasserstand | 1 | Trigger an GPIO 6, Echo an GPIO 13; Abstand vom Sensor zum Boden: **86,2 mm**; Sensormodell nicht angegeben |
-| Ultraschallsensoren für Mooshöhe | 4 | Je ein Trigger- und Echo-Pin gemäß Tabelle unten; Abstände zur moosfreien Bezugsfläche noch zu messen |
+| Ultraschallsensoren für Mooshöhe | 2 | Je ein Trigger- und Echo-Pin gemäß Tabelle unten; Abstände zur moosfreien Bezugsfläche noch zu messen |
 | OLED, SSD1306 | 1 | 0,96 Zoll, 128 × 64 Pixel, am linken I²C-Bus; Anzeige um 180° gedreht |
 | Taster | 1 | An GPIO 26 eingebaut; die aktuelle Docker-Steuerung verwendet ihn nicht |
 | Pi-Kamera, Sensor IMX708 | 1 | Anschluss CAM/DISP1; in der Übergabe als Kamera 0 erkannt |
@@ -33,15 +33,13 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 | GPIO / Anschluss | Hardwarefunktion | Dokumentierter Stand |
 | --- | --- | --- |
 | 6 | Trigger des Wasserstand-Ultraschallsensors | Ausgang für den Messimpuls |
-| 0 / 5 | Moos-Ultraschall 1: Trigger / Echo | Messstelle 1 |
-| 9 / 11 | Moos-Ultraschall 2: Trigger / Echo | Messstelle 2 |
+| 0 / 5 | Moos-Ultraschall 2: Trigger / Echo | Messstelle 2 |
+| 9 / 11 | Moos-Ultraschall 1: Trigger / Echo | Messstelle 1 |
 | 13 | Echo des Wasserstand-Ultraschallsensors | Eingang für das Echo-Signal |
 | 14 / 15 | I²C links: SCL / SDA | Sensorbus links |
 | 16 | Pumpe, MOSFET-Gate | 5-Hz-PWM vorgesehen |
-| 17 / 27 | Moos-Ultraschall 4: Trigger / Echo | Messstelle 4 |
 | 20 | LED-Streifen, MOSFET-Gate | Im aktuellen Projekt 2.000-Hz-PWM vorgesehen; die PDF nennt 200 Hz |
 | 21 | Lüfter, MOSFET-Gate | 5-Hz-PWM vorgesehen |
-| 22 / 10 | Moos-Ultraschall 3: Trigger / Echo | Messstelle 3 |
 | 23 / 24 | I²C rechts: SDA / SCL | Getrennter Sensorbus |
 | 26 | Eingebauter Taster | In der aktuellen Docker-Steuerung ungenutzt |
 | CAM/DISP1 | Pi-Kamera IMX708 | Kamerasensor in der Übergabe erkannt |
@@ -59,4 +57,4 @@ Der dokumentierte 5-Hz-Betrieb führt bei kleinen Stellwerten zu einzelnen Impul
 - **SCD40:** Beide Sensoren wurden laut Übergabe per Forced Recalibration auf 430 ppm eingestellt, unter der Annahme frischer Luft am offenen Fenster. Dabei waren teils ungewöhnlich große Korrekturen nötig. Die CO₂-Werte und mögliche Drift sollten weiter beobachtet werden; die automatische Selbstkalibrierung war zum Übergabezeitpunkt aktiv.
 - **Lastverhalten:** Wasserfluss und Lüfterlauf bei niedrigen Stellwerten sind offen.
 - **Wasserstand-Ultraschallsensor:** Die aktuelle Pinangabe ist Trigger GPIO 6 und Echo GPIO 13. Der Abstand vom Sensor zum Boden beträgt 86,2 mm. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; vor dem Anschluss sicherstellen, dass am Pi-Eingang höchstens 3,3 V anliegen.
-- **Mooshöhen-Ultraschallsensoren:** Für eine absolute Höhe fehlt noch je Messstelle der Abstand vom Sensor zur moosfreien Bezugsfläche. Bis diese vier Abstände eingetragen sind, liefert die Software Rohabstände, aber keine Höhe oder gemeinsame Höhe. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.
+- **Mooshöhen-Ultraschallsensoren:** Für eine absolute Höhe fehlt noch je Messstelle der Abstand vom Sensor zur moosfreien Bezugsfläche. Bis diese zwei Abstände eingetragen sind, liefert die Software Rohabstände, aber keine Höhe oder gemeinsame Höhe. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.

@@ -1,4 +1,4 @@
-"""Calibrated moss height from four staggered ultrasonic sensors."""
+"""Calibrated moss height from two staggered ultrasonic sensors."""
 
 import statistics
 import time
@@ -34,10 +34,10 @@ class MossHeight(Ultrasonic):
 
 
 class MossAggregate:
-    """Spatial median of recent, individually calibrated one-minute medians."""
+    """Median of both recent, individually calibrated one-minute medians."""
 
     MAX_AGE_S = 12
-    MIN_SENSORS = 3
+    MIN_SENSORS = 2
 
     def __init__(self):
         self.latest = {}

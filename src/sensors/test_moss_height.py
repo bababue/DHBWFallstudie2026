@@ -24,13 +24,13 @@ class MossHeightTests(unittest.TestCase):
         self.assertEqual(second["height_median_1m_cm"], 2.5)
         sensor.close()
 
-    def test_aggregate_needs_three_recent_calibrated_sensors(self):
+    def test_aggregate_needs_both_recent_calibrated_sensors(self):
         aggregate = MossAggregate()
         self.assertIsNone(aggregate.update("moss1", 2.0, now=0))
-        self.assertIsNone(aggregate.update("moss2", 2.0, now=1))
-        self.assertEqual(aggregate.update("moss3", 20.0, now=2), {"height_median_cm": 2.0})
-        self.assertEqual(aggregate.update("moss4", 3.0, now=3), {"height_median_cm": 2.5})
-        self.assertIsNone(aggregate.update("moss4", None, now=15))
+        self.assertEqual(aggregate.update("moss2", 3.0, now=1), {"height_median_cm": 2.5})
+        self.assertIsNone(aggregate.update("moss2", None, now=2))
+        self.assertEqual(aggregate.update("moss2", 3.0, now=3), {"height_median_cm": 2.5})
+        self.assertIsNone(aggregate.update("moss2", 3.0, now=15))
 
 
 if __name__ == "__main__":

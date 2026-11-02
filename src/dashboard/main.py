@@ -37,21 +37,17 @@ DISPLAY_ROWS = (
     ("CO₂", "scd40", "co2_ppm", "ppm", 0),
 )
 WATER_READING = Reading("tank", "ultrasonic", "water_level_cm", "cm", 1)
-WATER_MEDIAN_READING = Reading("tank", "ultrasonic", "water_level_median_1m_cm", "cm", 1)
 WATER_DISTANCE_READING = Reading("tank", "ultrasonic", "distance_cm", "cm", 1)
 MOSS_READINGS = tuple(
     Reading(f"moss{index}", "ultrasonic", field, "cm", 1)
-    for index in range(1, 5)
+    for index in range(1, 3)
     for field in ("distance_cm", "height_cm")
 )
-MOSS_AGGREGATE_READING = Reading("moss", "aggregate", "height_median_cm", "cm", 1)
-
 READINGS = tuple(
     Reading(side, sensor, field, unit, decimals)
     for _, sensor, field, unit, decimals in DISPLAY_ROWS
     for side in ("left", "right")
-) + (WATER_READING, WATER_MEDIAN_READING, WATER_DISTANCE_READING,
-     *MOSS_READINGS, MOSS_AGGREGATE_READING)
+) + (WATER_READING, WATER_DISTANCE_READING, *MOSS_READINGS)
 
 
 @dataclass(frozen=True)
@@ -115,10 +111,14 @@ def make_payload(values: dict[tuple[str, str, str], float], error: bool = False,
         value = values.get((reading.side, reading.sensor, reading.field))
         if error:
             formatted = "Datenbank nicht erreichbar"
-        elif value is None:
-            formatted = "kein aktueller Wert"
-        else:
+        elif value is not None:
             formatted = f"{value:.{reading.decimals}f} {reading.unit}"
+        elif reading.field == "height_cm" and not os.getenv(
+            f"MOSS_{reading.side.removeprefix('moss')}_EMPTY_DISTANCE_CM", ""
+        ).strip():
+            formatted = "Kalibrierung fehlt"
+        else:
+            formatted = "kein aktueller Wert"
         readings[reading_id(reading)] = formatted
     return {"readings": readings, "error": error,
             "controls": controls, "controls_enabled": controls is not None}
@@ -135,7 +135,7 @@ def render_page() -> str:
     moss_pins = tuple(
         f'Trigger {pin(f"MOSS_{index}_TRIGGER_GPIO", trigger)}, '
         f'Echo {pin(f"MOSS_{index}_ECHO_GPIO", echo)}'
-        for index, (trigger, echo) in enumerate(((0, 5), (9, 11), (22, 10), (17, 27)), 1)
+        for index, (trigger, echo) in enumerate(((9, 11), (0, 5)), 1)
     )
     rows = "".join(
         f'<tr><td>{html.escape(label)}</td><td>{sensor.upper()}</td><td>{i2c_pins}</td>'
@@ -147,19 +147,14 @@ def render_page() -> str:
                   f'Echo {pin("WATER_ECHO_GPIO", 13)}')
     rows += (f'<tr><td>Wasserstand</td><td>Ultraschall</td><td>{water_pins}</td>'
              '<td id="tank-ultrasonic-water_level_cm" colspan="2">Verbinde…</td></tr>'
-             f'<tr><td>Wasserstand: Median (1 Minute)</td><td>Ultraschall</td><td>{water_pins}</td>'
-             '<td id="tank-ultrasonic-water_level_median_1m_cm" colspan="2">Verbinde…</td></tr>'
-             f'<tr><td>Rohwert: Abstand zur Wasseroberfläche</td><td>Ultraschall</td><td>{water_pins}</td>'
+             f'<tr><td>Abstand zur Wasseroberfläche</td><td>Ultraschall</td><td>{water_pins}</td>'
              '<td id="tank-ultrasonic-distance_cm" colspan="2">Verbinde…</td></tr>')
     rows += "".join(
         f'<tr><td>Moos {index}: {label}</td><td>Ultraschall</td><td>{moss_pins[index - 1]}</td>'
         f'<td id="moss{index}-ultrasonic-{field}" colspan="2">Verbinde…</td></tr>'
-        for index in range(1, 5)
+        for index in range(1, 3)
         for field, label in (("distance_cm", "Rohabstand"), ("height_cm", "Höhe"))
     )
-    rows += ('<tr><td>Mooshöhe: gemeinsamer Median</td><td>4 Messstellen</td>'
-             '<td>Moos 1–4</td>'
-             '<td id="moss-aggregate-height_median_cm" colspan="2">Verbinde…</td></tr>')
     script = """
 <script>
 const sliders = {
@@ -247,9 +242,8 @@ connectCamera();
         "<th>Links</th><th>Rechts</th></tr></thead>"
         f"<tbody>{rows}</tbody></table>"
         '<p>Mooshöhen benötigen je Messstelle den Abstand vom Sensor zur moosfreien '
-        'Bezugsfläche als MOSS_1_EMPTY_DISTANCE_CM bis MOSS_4_EMPTY_DISTANCE_CM '
-        'in .env. Der gemeinsame Median '
-        'benötigt mindestens drei kalibrierte Messstellen.</p>'
+        'Bezugsfläche als MOSS_1_EMPTY_DISTANCE_CM und MOSS_2_EMPTY_DISTANCE_CM '
+        'in .env.</p>'
         '<h2>Kamera</h2><img id="camera" alt="Live-Bild der Kamera" width="640" height="360">'
         '<p id="camera-status">Verbinde…</p>'
         '<h2>Steuerung</h2>'

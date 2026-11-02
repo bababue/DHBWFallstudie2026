@@ -15,18 +15,20 @@ class DashboardTests(unittest.TestCase):
 
     def test_plain_page_contains_every_sensor_value(self):
         page = render_page()
-        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 12)
+        self.assertEqual(page.count("<tr><td>"), len(DISPLAY_ROWS) + 6)
         self.assertIn("<th>Messwert</th><th>Sensor</th><th>GPIO (BCM)</th><th>Links</th><th>Rechts</th>", page)
         self.assertIn('<tr><td>CO₂</td><td>SCD40</td><td>L: SDA 15/SCL 14; R: SDA 23/SCL 24</td><td id="left-scd40-co2_ppm">', page)
         self.assertIn('<tr><td>Wasserstand</td><td>Ultraschall</td><td>Trigger 6, Echo 13</td><td id="tank-ultrasonic-water_level_cm"', page)
-        for index, trigger, echo in ((1, 0, 5), (2, 9, 11), (3, 22, 10), (4, 17, 27)):
+        for index, trigger, echo in ((1, 9, 11), (2, 0, 5)):
             self.assertIn(f'<tr><td>Moos {index}: Rohabstand</td><td>Ultraschall</td><td>Trigger {trigger}, Echo {echo}</td>', page)
-        self.assertIn('MOSS_1_EMPTY_DISTANCE_CM bis MOSS_4_EMPTY_DISTANCE_CM', page)
-        self.assertIn('id="tank-ultrasonic-water_level_median_1m_cm"', page)
+        self.assertIn('MOSS_1_EMPTY_DISTANCE_CM und MOSS_2_EMPTY_DISTANCE_CM', page)
+        self.assertNotIn('water_level_median_1m_cm', page)
         self.assertIn('id="tank-ultrasonic-distance_cm"', page)
         self.assertIn('id="moss1-ultrasonic-distance_cm"', page)
-        self.assertIn('id="moss4-ultrasonic-height_cm"', page)
-        self.assertIn('id="moss-aggregate-height_median_cm"', page)
+        self.assertIn('id="moss2-ultrasonic-height_cm"', page)
+        self.assertNotIn('moss3-ultrasonic', page)
+        self.assertNotIn('moss4-ultrasonic', page)
+        self.assertNotIn('height_median_cm', page)
         self.assertLess(page.index("<td>Temperatur</td>"), page.index("<td>Luftfeuchte</td>"))
         self.assertLess(page.index("<td>Luftfeuchte</td>"), page.index("<td>Licht</td>"))
         self.assertLess(page.index("<td>Licht</td>"), page.index("<td>CO₂</td>"))
@@ -46,20 +48,28 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn('http://${location.hostname}', page)
 
     def test_payload_formats_live_values_and_missing_values(self):
-        payload = make_payload({("left", "scd40", "co2_ppm"): 512.0,
-                                ("tank", "ultrasonic", "distance_cm"): 3.1,
-                                ("moss1", "ultrasonic", "distance_cm"): 8.2,
-                                ("moss", "aggregate", "height_median_cm"): 2.5})
+        with patch.dict("os.environ", {f"MOSS_{index}_EMPTY_DISTANCE_CM": "" for index in range(1, 3)}):
+            payload = make_payload({("left", "scd40", "co2_ppm"): 512.0,
+                                    ("tank", "ultrasonic", "distance_cm"): 3.1,
+                                    ("moss1", "ultrasonic", "distance_cm"): 8.2})
         self.assertEqual(payload["readings"]["left-scd40-co2_ppm"], "512 ppm")
         self.assertEqual(payload["readings"]["right-bh1750-illuminance_lux"], "kein aktueller Wert")
         self.assertEqual(payload["readings"]["tank-ultrasonic-water_level_cm"], "kein aktueller Wert")
-        self.assertEqual(payload["readings"]["tank-ultrasonic-water_level_median_1m_cm"], "kein aktueller Wert")
+        self.assertNotIn("tank-ultrasonic-water_level_median_1m_cm", payload["readings"])
         self.assertEqual(payload["readings"]["tank-ultrasonic-distance_cm"], "3.1 cm")
         self.assertEqual(payload["readings"]["moss1-ultrasonic-distance_cm"], "8.2 cm")
-        self.assertEqual(payload["readings"]["moss1-ultrasonic-height_cm"], "kein aktueller Wert")
-        self.assertEqual(payload["readings"]["moss-aggregate-height_median_cm"], "2.5 cm")
+        self.assertEqual(payload["readings"]["moss1-ultrasonic-height_cm"], "Kalibrierung fehlt")
+        self.assertNotIn("moss-aggregate-height_median_cm", payload["readings"])
         self.assertEqual(len(payload["readings"]), len(READINGS))
         self.assertFalse(payload["controls_enabled"])
+
+    def test_missing_moss_calibration_is_distinct_from_missing_measurement(self):
+        with patch.dict("os.environ", {f"MOSS_{index}_EMPTY_DISTANCE_CM": "" for index in range(1, 3)}):
+            readings = make_payload({})["readings"]
+            self.assertEqual(readings["moss1-ultrasonic-height_cm"], "Kalibrierung fehlt")
+            self.assertNotIn("moss-aggregate-height_median_cm", readings)
+        with patch.dict("os.environ", {"MOSS_1_EMPTY_DISTANCE_CM": "15"}):
+            self.assertEqual(make_payload({})["readings"]["moss1-ultrasonic-height_cm"], "kein aktueller Wert")
 
     def test_queries_recent_raw_points_and_maps_tags(self):
         record = SimpleNamespace(

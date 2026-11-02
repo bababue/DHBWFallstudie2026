@@ -1,7 +1,7 @@
 # Moos-Pi: Sensoren
 
 Der `sensors`-Container liest auf dem Raspberry Pi 5 die drei I2C-Sensoren links
-und rechts sowie fünf Ultraschallsensoren für Wasserstand und Mooshöhe. Er schreibt
+und rechts sowie drei Ultraschallsensoren für Wasserstand und Mooshöhe. Er schreibt
 ihre Messwerte in InfluxDB 2; das Dashboard zeigt sie an.
 
 ## Konfiguration
@@ -43,28 +43,27 @@ Beim Start nutzt der Minutenmedian die bereits verfügbaren Messungen. Ohne Echo
 erscheint kein aktueller Wert.
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
-Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
+Zwei zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
 
 | Sensor | Trigger | Echo | Kalibrierwert in `.env` |
 | --- | ---: | ---: | --- |
-| Moos 1 | GPIO 0 | GPIO 5 | `MOSS_1_EMPTY_DISTANCE_CM` |
-| Moos 2 | GPIO 9 | GPIO 11 | `MOSS_2_EMPTY_DISTANCE_CM` |
-| Moos 3 | GPIO 22 | GPIO 10 | `MOSS_3_EMPTY_DISTANCE_CM` |
-| Moos 4 | GPIO 17 | GPIO 27 | `MOSS_4_EMPTY_DISTANCE_CM` |
+| Moos 1 | GPIO 9 | GPIO 11 | `MOSS_1_EMPTY_DISTANCE_CM` |
+| Moos 2 | GPIO 0 | GPIO 5 | `MOSS_2_EMPTY_DISTANCE_CM` |
 
 Jeder Kalibrierwert ist der Abstand vom Sensor zur moosfreien Bezugsfläche in cm.
 Ohne ihn wird nur der Rohabstand angezeigt. Mit ihm berechnet die Software die
 Mooshöhe je Messstelle. Je Sensor werden drei Echos pro Messzyklus gefiltert;
-die Sensoren starten um eine Sekunde versetzt und messen jeweils alle vier Sekunden.
+die Sensoren starten um zwei Sekunden versetzt und messen jeweils alle vier Sekunden.
 Für den gemeinsamen Wert nimmt die Software den Median der 60-Sekunden-Mediane
-von mindestens drei gültigen, kalibrierten Messstellen. So beeinflusst ein
-einzelner Ausreißer das Ergebnis wenig, und unterschiedliche Montagehöhen werden
-über die einzelnen Kalibrierwerte berücksichtigt.
+beider gültigen, kalibrierten Messstellen. Bei zwei Werten entspricht das ihrem
+Mittelwert; einzelne Ausreißer lassen sich damit nur zeitlich, nicht zwischen
+den Messstellen herausfiltern. Unterschiedliche Montagehöhen werden über die
+einzelnen Kalibrierwerte berücksichtigt.
 
 Die Busse sind Software-I2C. Der Code treibt eigene High-Bits aktiv, wie in der
 Übergabe für diesen Aufbau beschrieben; das ist nur bei geprüfter 3,3-V-Verdrahtung
 vertretbar. Der `sensors`-Container muss exklusiven Zugriff auf die vier I2C-Pins
-und alle zehn Ultraschall-Pins haben. Eine andere Steuerung, die dieselben GPIOs benutzt, darf nicht
+und alle sechs Ultraschall-Pins haben. Eine andere Steuerung, die dieselben GPIOs benutzt, darf nicht
 gleichzeitig laufen.
 
 ## OLED-Anzeige
@@ -107,7 +106,11 @@ Sensoren, OLED, Steuerung und Kamera laufen vollständig in Docker Compose.
 
 Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es ordnet
 die aktuellen Werte nach Temperatur, Luftfeuchte, Licht und CO₂ und zeigt
-links und rechts nebeneinander, weiterhin ohne CSS. Der Browser
+links und rechts nebeneinander, weiterhin ohne CSS. Es zeigt Wasserstand
+und Abstand zur Wasseroberfläche sowie die einzelnen
+Moos-Abstände und kalibrierten Höhen. Der Wasserabstand ist der Median der
+Echos des aktuellen Messzyklus; weitere Medianwerte erscheinen nicht im Dashboard.
+Der Browser
 lädt die Seite einmal und erhält neue Werte über eine WebSocket-Verbindung.
 Der Server prüft InfluxDB alle 0,5 Sekunden und sendet Änderungen sofort an alle
 verbundenen Browser. Messwerte, die älter als 12 Sekunden sind, erscheinen als
@@ -156,7 +159,7 @@ verloren.
 
 ## InfluxDB-Schema
 
-Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`/`moss1`–`moss4`/`moss`)
+Measurement `moos_sensor`, Tags `side` (`left`/`right`/`tank`/`moss1`/`moss2`/`moss`)
 und `sensor` (`sht45`/`bh1750`/`scd40`/`ultrasonic`/`aggregate`):
 
 | Sensor | Felder |
@@ -165,8 +168,8 @@ und `sensor` (`sht45`/`bh1750`/`scd40`/`ultrasonic`/`aggregate`):
 | BH1750 | `illuminance_lux` |
 | SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
 | Ultraschall | `water_level_cm`, `water_level_median_1m_cm`, `distance_cm` |
-| Moos-Ultraschall 1–4 | `distance_cm`; nach Kalibrierung auch `height_cm`, `height_median_1m_cm` |
-| Moos-Aggregat | `height_median_cm` bei mindestens drei gültigen Messstellen |
+| Moos-Ultraschall 1–2 | `distance_cm`; nach Kalibrierung auch `height_cm`, `height_median_1m_cm` |
+| Moos-Aggregat | `height_median_cm` bei zwei gültigen Messstellen |
 
 Zusätzlich zu den beidseitigen I²C-Werten und Wasserstandswerten werden die
 Moos-Abstände und nach Kalibrierung die Höhen gespeichert.
