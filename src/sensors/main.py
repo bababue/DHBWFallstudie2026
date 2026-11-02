@@ -54,7 +54,7 @@ class Config:
             sht45_address=env_int("SHT45_ADDRESS", "0x44"),
             bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
             scd40_address=env_int("SCD40_ADDRESS", "0x62"),
-            interval=float(os.getenv("SAMPLE_INTERVAL_SECONDS", "30")),
+            interval=float(os.getenv("SAMPLE_INTERVAL_SECONDS", "6")),
             influx_url=os.getenv("INFLUXDB_URL", "http://influxdb:8086"),
             influx_org=os.getenv("INFLUXDB_ORG", "moos"),
             influx_bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
@@ -65,8 +65,8 @@ class Config:
             raise ValueError("I2C GPIO pins must be distinct BCM numbers 0..27")
         if not re.fullmatch(r"/dev/gpiochip\d+", config.chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
-        if config.interval < 5 or config.delay_us < 5:
-            raise ValueError("Sampling interval must be >=5 s and I2C_DELAY_US >=5")
+        if config.interval < 6 or config.delay_us < 5:
+            raise ValueError("Sampling interval must be >=6 s and I2C_DELAY_US >=5")
         if not all(0x03 <= a <= 0x77 for a in (config.sht45_address, config.bh1750_address, config.scd40_address)):
             raise ValueError("I2C addresses must be 7-bit addresses")
         if not config.influx_token:

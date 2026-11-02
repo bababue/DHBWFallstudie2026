@@ -9,6 +9,12 @@ GPIO 12 wird nicht mehr mit PWM geschaltet.
 Alle Pins (BCM-Nummern), I2C-Adressen, das Abtastintervall und die InfluxDB-
 Zugangsdaten stehen in `.env`. Die Vorlage ist `.env.example`.
 
+`sensors` liest alle sechs Sensoren alle 6 Sekunden. Der SCD40 liefert im
+normalen periodischen Modus etwa alle 5 Sekunden neue CO₂-Werte; 6 Sekunden
+lassen dafür etwas Abstand und gelten auch als Mindestintervall dieser
+gemeinsamen Abfrageschleife. Das Dashboard fragt InfluxDB jede Sekunde ab
+und zeigt Werte nach 30 Sekunden ohne neues Sample nicht mehr als aktuell an.
+
 ```sh
 cp .env.example .env
 ```
@@ -59,8 +65,8 @@ Das einfache Dashboard ist unter `http://moos.local:8080` erreichbar. Es ordnet
 die aktuellen Werte nach Temperatur, Luftfeuchte, Licht und CO₂ und zeigt
 links und rechts nebeneinander, weiterhin ohne CSS. Der Browser
 lädt die Seite einmal und erhält neue Werte über eine WebSocket-Verbindung.
-Der Server prüft InfluxDB alle 2 Sekunden und sendet Änderungen sofort an alle
-verbundenen Browser. Messwerte, die älter als 180 Sekunden sind, erscheinen als
+Der Server prüft InfluxDB jede Sekunde und sendet Änderungen sofort an alle
+verbundenen Browser. Messwerte, die älter als 30 Sekunden sind, erscheinen als
 „kein aktueller Wert“. Die Zeiten lassen sich in `.env` über
 `DASHBOARD_POLL_SECONDS` und `DASHBOARD_MAX_AGE_SECONDS` ändern. Bei einer
 unterbrochenen Verbindung verbindet sich der Browser automatisch neu.

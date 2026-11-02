@@ -1,5 +1,8 @@
 import unittest
+import os
+from unittest.mock import patch
 
+from main import Config
 from sensors import BH1750, SCD40, SHT45, checked_word, crc8
 
 
@@ -23,6 +26,13 @@ class FakeBus:
 
 
 class SensorTests(unittest.TestCase):
+    def test_common_interval_keeps_margin_for_scd40(self):
+        with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
+            self.assertEqual(Config.from_env().interval, 6)
+            os.environ["SAMPLE_INTERVAL_SECONDS"] = "5"
+            with self.assertRaises(ValueError):
+                Config.from_env()
+
     def test_crc_rejects_corruption(self):
         self.assertEqual(crc8(b"\xbe\xef"), 0x92)
         with self.assertRaises(ValueError):
