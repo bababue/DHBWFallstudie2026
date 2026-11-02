@@ -72,8 +72,8 @@ Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus und ist 
 180° gedreht. `sensors` rendert die Anzeige direkt aus seinen Messwerten und
 greift als einziger Container auf GPIO 14 und 15 zu.
 
-Das Display zeigt normalerweise den aktuellen Modus: `AUTO`, `MANUAL`,
-`MAINTENANCE` oder `MEASURING`. Ein kurzer Druck auf den Taster an GPIO 26
+Das Display zeigt normalerweise den aktuellen Modus: `AUTO`, `MAINTENANCE`
+oder `MEASURING`. Ein kurzer Druck auf den Taster an GPIO 26
 schaltet zum nächsten Modus; nach `MEASURING` folgt wieder `AUTO`. Während der
 Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
 Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.

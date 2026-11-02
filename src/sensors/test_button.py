@@ -7,14 +7,14 @@ class ButtonModesTests(unittest.TestCase):
     def test_short_press_cycles_modes_only_after_release(self):
         modes = ButtonModes()
         self.assertEqual(modes.snapshot()[:2], ("AUTO", False))
-        for index in range(1, 5):
+        for index in range(1, len(MODES) + 1):
             start = index * 2.0
             modes.feed(True, start)
             modes.feed(True, start + 0.05)
             self.assertEqual(modes.snapshot()[0], MODES[index - 1])
             modes.feed(False, start + 0.15)
             modes.feed(False, start + 0.20)
-            self.assertEqual(modes.snapshot()[:2], (MODES[index % 4], False))
+            self.assertEqual(modes.snapshot()[:2], (MODES[index % len(MODES)], False))
 
     def test_hold_shows_info_without_changing_mode(self):
         modes = ButtonModes()

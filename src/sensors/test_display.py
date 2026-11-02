@@ -24,8 +24,8 @@ class OledTests(unittest.TestCase):
         self.assertEqual(len(render(backup)), BREITE * HOEHE // 8)
 
     def test_each_mode_has_its_own_screen(self):
-        frames = [render_mode(mode) for mode in ("AUTO", "MANUAL", "MAINTENANCE", "MEASURING")]
-        self.assertEqual(len(set(map(bytes, frames))), 4)
+        frames = [render_mode(mode) for mode in ("AUTO", "MAINTENANCE", "MEASURING")]
+        self.assertEqual(len(set(map(bytes, frames))), 3)
         self.assertTrue(all(len(frame) == BREITE * HOEHE // 8 for frame in frames))
 
     def test_oled_writes_the_overview_to_i2c(self):
