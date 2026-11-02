@@ -76,6 +76,8 @@ Die Kalibrierung ersetzt nicht die Prüfung des Mindestabstands laut Sensordaten
 Die Echo-Leitung muss am Pi-Eingang auf höchstens 3,3 V begrenzt sein.
 
 Vier zusätzliche Ultraschallsensoren messen den Abstand zur Moosoberfläche:
+Ihre Echozeiten werden wie beim Wassersensor über GPIO-Flanken mit Zeitstempeln
+erfasst. Das gilt auch für die Kalibrierung der Moossensoren.
 
 Zur Kalibrierung aller vier Sensoren `python3 scripts/calibrate_moss.py`
 ausführen und den Kalibrierungszettel auf die Halterung legen. Nach Enter misst

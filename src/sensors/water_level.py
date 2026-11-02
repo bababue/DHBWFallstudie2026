@@ -48,7 +48,7 @@ class Ultrasonic:
 class TimestampUltrasonic(Ultrasonic):
     """Measure echo width from kernel edge timestamps, not Python polling."""
 
-    def __init__(self, gpio, handle, trigger_pin, echo_pin):
+    def __init__(self, gpio, handle, trigger_pin, echo_pin, pull_down=False):
         self.gpio, self.handle = gpio, handle
         self.trigger_pin, self.echo_pin = trigger_pin, echo_pin
         self._lock = Lock()
@@ -57,10 +57,17 @@ class TimestampUltrasonic(Ultrasonic):
         self._rise = None
         self._distance = None
         gpio.gpio_claim_output(handle, trigger_pin, 0)
+        claimed_echo = False
         try:
-            gpio.gpio_claim_alert(handle, echo_pin, gpio.BOTH_EDGES)
+            if pull_down:
+                gpio.gpio_claim_alert(handle, echo_pin, gpio.BOTH_EDGES, gpio.SET_PULL_DOWN)
+            else:
+                gpio.gpio_claim_alert(handle, echo_pin, gpio.BOTH_EDGES)
+            claimed_echo = True
             self._callback = gpio.callback(handle, echo_pin, gpio.BOTH_EDGES, self._edge)
         except Exception:
+            if claimed_echo:
+                gpio.gpio_free(handle, echo_pin)
             gpio.gpio_free(handle, trigger_pin)
             raise
 

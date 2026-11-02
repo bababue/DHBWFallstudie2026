@@ -1,13 +1,13 @@
-"""Calibrated moss height from two staggered ultrasonic sensors."""
+"""Calibrated moss height from staggered ultrasonic sensors."""
 
 import statistics
 import time
 from collections import deque
 
-from water_level import Ultrasonic
+from water_level import TimestampUltrasonic
 
 
-class MossHeight(Ultrasonic):
+class MossHeight(TimestampUltrasonic):
     name = "ultrasonic"
     WINDOW_S = 60
 

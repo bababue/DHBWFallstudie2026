@@ -5,6 +5,18 @@ from moss_height import MossAggregate, MossHeight
 
 
 class MossHeightTests(unittest.TestCase):
+    def test_echo_uses_edge_timestamps_and_releases_gpio(self):
+        gpio = MagicMock()
+        sensor = MossHeight(gpio, 1, 0, 5)
+        gpio.gpio_claim_alert.assert_called_once_with(1, 5, gpio.BOTH_EDGES, gpio.SET_PULL_DOWN)
+        sensor._armed = True
+        sensor._edge(0, 5, 1, 1000000)
+        sensor._edge(0, 5, 0, 1400000)
+        self.assertAlmostEqual(sensor._distance, 6.86)
+        sensor.close()
+        gpio.callback.return_value.cancel.assert_called_once()
+        gpio.gpio_free.assert_any_call(1, 5)
+
     def test_raw_distance_is_available_before_calibration(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5)
         with patch.object(sensor, "_distance_cm", return_value=8.2) as measure:
