@@ -1,0 +1,11 @@
+[Unit]
+Description=Moos-Projekt aktualisieren
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=moos
+WorkingDirectory=/home/moos/DHBWFallstudie2026
+StateDirectory=moos-deploy
+ExecStart=/bin/bash /home/moos/DHBWFallstudie2026/deploy/auto-deploy.sh

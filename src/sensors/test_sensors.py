@@ -31,7 +31,12 @@ class SensorTests(unittest.TestCase):
             config = Config.from_env()
             self.assertEqual((config.water_trigger, config.water_echo), (6, 13))
             self.assertEqual(config.water_floor_distance_cm, 8.62)
+            self.assertEqual(config.button_pin, 26)
             os.environ["WATER_ECHO_GPIO"] = "14"
+            with self.assertRaises(ValueError):
+                Config.from_env()
+            os.environ["WATER_ECHO_GPIO"] = "13"
+            os.environ["BUTTON_GPIO"] = "13"
             with self.assertRaises(ValueError):
                 Config.from_env()
 

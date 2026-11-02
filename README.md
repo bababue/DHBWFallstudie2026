@@ -72,12 +72,18 @@ Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus und ist 
 180° gedreht. `sensors` rendert die Anzeige direkt aus seinen Messwerten und
 greift als einziger Container auf GPIO 14 und 15 zu.
 
-Das Display zeigt ausschließlich eine Sensorübersicht: links und rechts
-Temperatur und Luftfeuchte vom SHT45,
+Das Display zeigt normalerweise den aktuellen Modus: `AUTO`, `MANUAL`,
+`MAINTENANCE` oder `MEASURING`. Ein kurzer Druck auf den Taster an GPIO 26
+schaltet zum nächsten Modus; nach `MEASURING` folgt wieder `AUTO`. Während der
+Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
+Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.
+Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
+Neustart beginnt die Anzeige in `AUTO`. Die Modi steuern vorerst keine Geräte;
+Licht, Pumpe und Lüfter werden weiterhin über das Web-Dashboard eingestellt.
+
+Die Sensorübersicht zeigt links und rechts Temperatur und Luftfeuchte vom SHT45,
 CO₂ vom SCD40 sowie Helligkeit vom BH1750. Falls ein SHT45-Wert fehlt, dient
-der entsprechende SCD40-Wert als Backup. Der eingebaute Taster an GPIO 26 wird
-von der Docker-Software nicht verwendet. Licht, Pumpe und Lüfter werden ausschließlich
-über das Web-Dashboard eingestellt.
+der entsprechende SCD40-Wert als Backup.
 
 ## Start
 

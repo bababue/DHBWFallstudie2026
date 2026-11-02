@@ -124,7 +124,7 @@ def _value(readings, side, sensor, field, pattern):
 
 
 def render(readings):
-    """Draw the single sensor overview with SCD40 temperature/humidity backup."""
+    """Draw the sensor overview with SCD40 temperature/humidity backup."""
     image = Bild()
     image.text(0, 0, "Sensoren")
     image.rechteck(0, 9, 128, 1)
@@ -141,5 +141,17 @@ def render(readings):
         image.text(0, y, label)
         image.text(37, y, _value(readings, "left", sensor, field, pattern))
         image.text_rechts(127, y, _value(readings, "right", sensor, field, pattern))
+    return image.daten
+
+
+def render_mode(mode):
+    """Draw the selected mode without activating any control behavior."""
+    image = Bild()
+    image.text(0, 0, "Modus")
+    image.rechteck(0, 9, BREITE, 1)
+    scale = 1 if mode == "MAINTENANCE" else 2
+    width = (len(mode) * 6 - 1) * scale
+    image.text((BREITE - width) // 2, 26 if scale == 2 else 32, mode, scale)
+    image.text(0, 56, "Klick: weiter")
     return image.daten
 

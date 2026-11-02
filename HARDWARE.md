@@ -15,7 +15,7 @@ Der Raspberry Pi 5 betreut einen Moos-Kasten mit zwei Messstellen (links und rec
 | Ultraschallsensor für Wasserstand | 1 | Trigger an GPIO 6, Echo an GPIO 13; Abstand vom Sensor zum Boden: **86,2 mm**; Sensormodell nicht angegeben |
 | Ultraschallsensoren für Mooshöhe | 2 | Je ein Trigger- und Echo-Pin gemäß Tabelle unten; Abstände zur moosfreien Bezugsfläche noch zu messen |
 | OLED, SSD1306 | 1 | 0,96 Zoll, 128 × 64 Pixel, am linken I²C-Bus; Anzeige um 180° gedreht |
-| Taster | 1 | An GPIO 26 eingebaut; die aktuelle Docker-Steuerung verwendet ihn nicht |
+| Taster | 1 | An GPIO 26 eingebaut; kurzer Druck wechselt den angezeigten Modus, Halten zeigt die Sensorübersicht |
 | Pi-Kamera, Sensor IMX708 | 1 | Anschluss CAM/DISP1; in der Übergabe als Kamera 0 erkannt |
 | Pumpe | 1 | 5 V, über IRLB8721-MOSFET an GPIO 16 geschaltet |
 | Lüfter | 1 | 5 V, dreipolig, über IRLB8721-MOSFET an GPIO 21 geschaltet; Tacholeitung nicht angeschlossen |
@@ -41,7 +41,7 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 | 20 | LED-Streifen, MOSFET-Gate | Im aktuellen Projekt 2.000-Hz-PWM vorgesehen; die PDF nennt 200 Hz |
 | 21 | Lüfter, MOSFET-Gate | 5-Hz-PWM vorgesehen |
 | 23 / 24 | I²C rechts: SDA / SCL | Getrennter Sensorbus |
-| 26 | Eingebauter Taster | In der aktuellen Docker-Steuerung ungenutzt |
+| 26 | Eingebauter Taster | Eingang mit Pull-up, beim Drücken aktiv-low; Moduswahl und Sensorübersicht |
 | CAM/DISP1 | Pi-Kamera IMX708 | Kamerasensor in der Übergabe erkannt |
 
 Bei den Sensorbussen wurde ein elektrisches Problem am linken Bus beobachtet: Mit hohem Bildinhalt auf dem OLED fielen Sensorantworten aus. Die dokumentierte Ansteuerung treibt SCL und eigene SDA-High-Bits aktiv; damit liefen beide Busse in einem 22-Sekunden-Test mit OLED fehlerfrei. Die vermutete Ursache sind Pull-ups oder ein Spannungseinbruch am OLED-Modul, **elektrisch bestätigt ist sie nicht**. Die 3,3-V-Verdrahtung der Busse muss geprüft sein, bevor diese Ansteuerung verwendet wird.

@@ -13,8 +13,9 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
+from button import ButtonModes, start_button_reader
 from moss_height import MossAggregate, MossHeight
-from oled import Oled, render
+from oled import Oled, render, render_mode
 from schedule import ScheduledRead
 from storage import BufferedWriter
 from water_level import WaterLevel
@@ -37,6 +38,7 @@ class Config:
     right_scl: int
     water_trigger: int
     water_echo: int
+    button_pin: int
     water_floor_distance_cm: float
     moss_pins: tuple[tuple[int, int], ...]
     moss_empty_distances_cm: tuple[float | None, ...]
@@ -62,6 +64,7 @@ class Config:
             right_scl=env_int("RIGHT_I2C_SCL_GPIO", "24"),
             water_trigger=env_int("WATER_TRIGGER_GPIO", "6"),
             water_echo=env_int("WATER_ECHO_GPIO", "13"),
+            button_pin=env_int("BUTTON_GPIO", "26"),
             water_floor_distance_cm=float(os.getenv("WATER_FLOOR_DISTANCE_CM", "8.62")),
             moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
                              env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
@@ -83,7 +86,7 @@ class Config:
             influx_token=os.getenv("INFLUXDB_TOKEN", ""),
         )
         pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl,
-                config.water_trigger, config.water_echo,
+                config.water_trigger, config.water_echo, config.button_pin,
                 *(pin for pair in config.moss_pins for pin in pair))
         if len(set(pins)) != len(pins) or not all(0 <= pin <= 27 for pin in pins):
             raise ValueError("Sensor GPIO pins must be distinct BCM numbers 0..27")
@@ -144,6 +147,8 @@ def run():
     water_sensor = None
     moss_sensors = []
     oled = None
+    button_thread = None
+    button_claimed = False
     try:
         for side, sda, scl in (
             ("left", config.left_sda, config.left_scl),
@@ -166,6 +171,9 @@ def run():
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
+        modes = ButtonModes()
+        button_thread = start_button_reader(lgpio, handle, config.button_pin, STOP, modes)
+        button_claimed = True
         start_time = time.monotonic()
         tasks = []
         for side, sensor in sensors:
@@ -181,6 +189,23 @@ def run():
         last_co2 = {}
         display_values = {}
         next_display = start_time
+        displayed_version = None
+
+        def refresh_display():
+            nonlocal next_display, displayed_version
+            mode, show_info, version = modes.snapshot()
+            now = time.monotonic()
+            if version == displayed_version and now < next_display:
+                return
+            next_display = now + 1
+            try:
+                frame = (render(display_readings(display_values, now))
+                         if show_info else render_mode(mode))
+                oled.zeigen(frame)
+                displayed_version = version
+            except Exception as exc:
+                LOG.warning("OLED update failed: %s", exc)
+
         with InfluxDBClient(url=config.influx_url, token=config.influx_token, org=config.influx_org, timeout=5000) as client:
             writer = client.write_api(write_options=SYNCHRONOUS)
             buffered = BufferedWriter(
@@ -190,9 +215,12 @@ def run():
                 while not STOP.is_set():
                     now = time.monotonic()
                     due = [task for task in tasks if task.ready(now)]
-                    if not due and now < next_display:
-                        STOP.wait(max(0, min(next_display, *(task.next_due for task in tasks)) - now))
+                    mode, show_info, version = modes.snapshot()
+                    if not due and now < next_display and version == displayed_version:
+                        STOP.wait(max(0, min(0.05, next_display - now,
+                                             *(task.next_due - now for task in tasks))))
                         continue
+                    refresh_display()
                     points = []
                     for task in due:
                         side, sensor = task.side, task.sensor
@@ -230,18 +258,20 @@ def run():
                                 aggregate = moss_aggregate.update(
                                     side, fields.get("height_median_1m_cm") if fields else None, finished)
                                 points.extend(sample_points("moss", "aggregate", aggregate, timestamp))
+                        refresh_display()
                     buffered.submit(points)
-                    if time.monotonic() >= next_display:
-                        next_display = time.monotonic() + 1
-                        try:
-                            oled.zeigen(render(display_readings(display_values, time.monotonic())))
-                        except Exception as exc:
-                            LOG.warning("OLED update failed: %s", exc)
             finally:
                 STOP.set()
                 buffered.close()
     finally:
         STOP.set()
+        if button_thread is not None:
+            button_thread.join(timeout=1)
+        if button_claimed:
+            try:
+                lgpio.gpio_free(handle, config.button_pin)
+            except Exception:
+                LOG.exception("Could not release button pin")
         if oled is not None:
             try:
                 oled.ausschalten()

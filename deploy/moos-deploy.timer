@@ -1,0 +1,10 @@
+[Unit]
+Description=Moos-Projekt regelmäßig auf Änderungen prüfen
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=moos-deploy.service
+
+[Install]
+WantedBy=timers.target
