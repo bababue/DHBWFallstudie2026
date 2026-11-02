@@ -1,0 +1,35 @@
+{
+  "i2c": {
+    "links_sda_gpio": 15,
+    "links_scl_gpio": 14,
+    "rechts_sda_gpio": 23,
+    "rechts_scl_gpio": 24,
+    "taktpause_us": 12,
+    "sht45_adresse": 68,
+    "bh1750_adresse": 35,
+    "scd40_adresse": 98
+  },
+  "wasserstand": {
+    "trigger_gpio": 6,
+    "echo_gpio": 13,
+    "sensor_boden_abstand_cm": 8.62
+  },
+  "moos_1": {
+    "trigger_gpio": 9,
+    "echo_gpio": 11,
+    "bezugsabstand_cm": null
+  },
+  "moos_2": {
+    "trigger_gpio": 0,
+    "echo_gpio": 5,
+    "bezugsabstand_cm": null
+  },
+  "taster": {
+    "gpio": 26
+  },
+  "messintervalle": {
+    "schnelle_sensoren_s": 1.0,
+    "moos_s": 4.0,
+    "co2_bereitschaft_s": 0.5
+  }
+}
