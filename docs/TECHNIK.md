@@ -2,15 +2,13 @@
 
 ## Automatik
 
-- Ein Pumpvorgang ist für die konfigurierte Minute einmal täglich geplant
-  (`pumpe_start_stunde`, `pumpe_start_minute`, Europe/Berlin). Verpasste Termine
-  werden nicht nachgeholt; der Tagesstatus übersteht Containerneustarts.
+- Im AUTO-Modus prüft die Regelung laufend den Zielwasserstand und füllt bei Bedarf nach.
 - Die Zielhöhe ist der Mittelwert der aktuellen 60-Sekunden-Mediane aller
   kalibrierten Moosmessstellen, abzüglich `wasser_unter_moosspitzen_cm`. Sie ist
   auf mindestens 0 cm und höchstens `max_fuellhoehe_cm - sicherheitsabstand_cm -
   pumpe_hysterese_cm` begrenzt.
-- Ein Pumpvorgang endet am Ziel. Ein neuer Vorgang beginnt erst beim nächsten
-  Tagesplan oder über „Jetzt pumpen“. Fehlen sichere Wasser- oder Mooswerte,
+- Ein Pumpvorgang endet am Ziel. Bei erreichtem Ziel stoppt sie; bei erneutem Absinken unter die Hysterese
+  füllt sie wieder nach. Fehlen sichere Wasser- oder Mooswerte,
   endet ein laufender Vorgang. Die Wasserstands-Sperre gilt in AUTO und MANUAL.
 - In AUTO dimmt das Licht oberhalb des Temperaturziels. Die wärmere Seite zählt;
   SCD40 ersetzt dort einen fehlenden SHT45. Bei fehlender Seite gilt Licht aus

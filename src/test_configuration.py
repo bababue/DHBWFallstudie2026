@@ -7,16 +7,6 @@ class ConfigurationTests(unittest.TestCase):
     def test_current_configuration_valid(self):
         validate(load())
 
-    def test_pump_schedule_requires_both_times_and_rejects_invalid_time(self):
-        data = copy.deepcopy(load())
-        del data['automatik']['pumpe_start_stunde']
-        with self.assertRaises(ValueError): validate(data)
-        for key, value in [('pumpe_start_stunde', 24), ('pumpe_start_minute', 60), ('pumpe_start_minute', 1.5)]:
-            invalid = copy.deepcopy(load())
-            invalid['automatik'][key] = value
-            with self.assertRaises(ValueError):
-                validate(invalid)
-
     def test_rejects_gpio_collisions_and_unknown_fields(self):
         data = copy.deepcopy(load())
         data['taster']['gpio'] = data['wasserstand']['echo_gpio']

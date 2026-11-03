@@ -73,32 +73,6 @@ modeToggle.addEventListener("change", async () => {
 updateMode();
 setInterval(updateMode, 1000);
 
-const pumpNow = document.getElementById("pump-now");
-let pumpPending = false;
-
-pumpNow.addEventListener("change", async () => {
-  const enabled = pumpNow.checked;
-  pumpPending = true;
-  pumpNow.disabled = true;
-  try {
-    const response = await fetch("/api/automatic/pump", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled }),
-    });
-    if (!response.ok) throw Error(await response.text());
-    pumpNow.checked = (await response.json()).active;
-    document.getElementById("pump-error").textContent = "";
-  } catch (e) {
-    pumpNow.checked = !enabled;
-    document.getElementById("pump-error").textContent = e.message ||
-      "Pumpvorgang nicht möglich";
-  } finally {
-    pumpPending = false;
-    pumpNow.disabled = false;
-  }
-});
-
 const actuatorPanel = document.getElementById("actuator-panel"),
   actuatorError = document.getElementById("actuator-error");
 
@@ -150,10 +124,6 @@ function syncActuatorMode() {
   actuatorGeneration++;
   document.getElementById("water-pump").hidden = !actuatorVisible();
   document.getElementById("auto-pump-panel").hidden = !actuatorVisible();
-  document.querySelector(".pump-now").hidden =
-    document.documentElement.dataset.mode !== "AUTO";
-  document.getElementById("pump-error").hidden =
-    document.documentElement.dataset.mode !== "AUTO";
   actuatorPanel.hidden = !actuatorVisible();
   document.getElementById("auto-actuators").hidden =
     document.documentElement.dataset.mode !== "AUTO";
@@ -545,17 +515,6 @@ function initMetric(metric, unit) {
               minimumFractionDigits: 1,
               maximumFractionDigits: 1,
             }) + " cm";
-        if (!pumpPending) pumpNow.checked = state.pump_active;
-        document.getElementById("next-pump").textContent =
-          "Nächste Pumpzeit: " + (state.next_pump_at
-            ? new Date(state.next_pump_at).toLocaleString("de-DE", {
-              timeZone: "Europe/Berlin",
-              day: "2-digit",
-              month: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-            : "–");
         document.getElementById("water").textContent = fmt(
           state.water_level_cm,
         );
@@ -572,8 +531,6 @@ function initMetric(metric, unit) {
             ? state.reason
             : "";
       } catch (e) {
-        document.getElementById("next-pump").textContent =
-          "Nächste Pumpzeit: –";
         for (const id of ["water", "water-target", "water-moss"]) {
           setReading(id, "–");
         }

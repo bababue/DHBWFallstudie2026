@@ -210,13 +210,5 @@
   "WATER_BELOW_MOSS_CM": [
     "automatik",
     "wasser_unter_moosspitzen_cm"
-  ],
-  "PUMP_START_HOUR": [
-    "automatik",
-    "pumpe_start_stunde"
-  ],
-  "PUMP_START_MINUTE": [
-    "automatik",
-    "pumpe_start_minute"
   ]
 }

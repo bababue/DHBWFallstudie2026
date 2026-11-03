@@ -101,6 +101,19 @@ moosfreien Bezugsfläche. Ohne Bezugsabstand wird nur der Rohabstand angezeigt.
 
 ## Diagnose
 
+Prüfsummen der SHT45- und SCD40-Messwerte sowie je drei rohe Abstandsmessungen
+prüfen:
+
+```sh
+python3 scripts/check_sensors.py
+```
+
+Falls das Sensor-Image noch fehlt, zuerst `docker compose build sensors`
+ausführen. Die Diagnose stoppt Dashboard und Sensorprozess während des Zugriffs
+auf die GPIOs und startet nur zuvor laufende Dienste danach wieder. BH1750 und
+Ultraschallsensoren unterstützen keine CRC-Prüfung. Die Mittelwerte gelten nur
+für dieses Skript; Produktionsfilter und Kalibrierung bleiben unverändert.
+
 ```sh
 docker compose ps
 docker compose logs -f sensors

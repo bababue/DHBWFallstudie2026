@@ -82,25 +82,11 @@ def automatic_water():
         state, options = pump_state()
         is_automatic = automatic is not None and mode_state().get('mode') == 'AUTO'
         state['reason'] = automatic.pump.reason if is_automatic else ''
-        state['pump_active'] = bool(is_automatic and automatic.pump_schedule.active)
-        state['next_pump_at'] = automatic.pump_schedule.next_run(options) if is_automatic else None
+        state['pump_active'] = bool(is_automatic and actuators.status()['pump'])
         return state
     except (OSError, ValueError, TypeError, KeyError):
         LOG.exception('Wasserregelung nicht verfügbar')
         return Response('Wasserregelung nicht verfügbar', status_code=503)
-
-
-@app.post('/api/automatic/pump')
-def request_auto_pump(body: dict):
-    if automatic is None:
-        return Response('Steuerung nicht verfügbar', status_code=503)
-    enabled = body.get('enabled')
-    if type(enabled) is not bool:
-        return Response('Ungültige Anforderung', status_code=400)
-    try:
-        return automatic.request_pump(enabled)
-    except (PermissionError, ValueError) as exc:
-        return Response(str(exc), status_code=409)
 
 
 @app.on_event('startup')

@@ -133,6 +133,7 @@ header {
 .metric-readout .status {
   margin: 0;
   line-height: 1.4;
+  font-size: .95rem;
 }
 
 .metric-readout p {
