@@ -68,6 +68,8 @@
     "lichtstaerke_prozent": 100,
     "pumpe_hysterese_cm": 0.2,
     "pumpe_leistung_prozent": 25,
-    "wasser_ziel_cm": 1.3
+    "wasser_ziel_cm": 1.3,
+    "temperatur_ziel_c": 22,
+    "temperatur_max_c": 25
   }
 }

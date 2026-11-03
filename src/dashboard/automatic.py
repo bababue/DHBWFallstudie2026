@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from configuration import load
 from pump_control import PumpRegulator
+from thermal_control import ThermalRegulator
 from threading import Event, RLock, Thread
 
 LOG = logging.getLogger('moos.automatic')
@@ -29,11 +30,13 @@ def auto_setpoints(config=None, now=None):
 
 
 class AutomaticControl:
-    def __init__(self, actuators, get_mode, get_water_state=None):
+    def __init__(self, actuators, get_mode, get_water_state=None, get_readings=None):
         self.actuators = actuators
         self.get_mode = get_mode
         self.get_water_state = get_water_state
         self.pump = PumpRegulator()
+        self.thermal = ThermalRegulator()
+        self.get_readings = get_readings
         self.lock = RLock()
         self.stop_event = Event()
         self.thread = None
@@ -53,6 +56,10 @@ class AutomaticControl:
                     self.actuators.set('pump', 0)
                 return
             values = auto_setpoints()
+            if self.get_readings is not None:
+                options = load()["automatik"]
+                thermal = self.thermal.update(self.get_readings(), options, light_schedule(options), time.time())
+                values.update(fan=thermal["fan"], led=thermal["led"])
             if self.get_water_state is not None:
                 data, options = self.get_water_state()
                 values['pump'] = self.pump.value(data, options, time.monotonic())
@@ -77,6 +84,8 @@ class AutomaticControl:
                     LOG.exception('Automatische Aktorsteuerung fehlgeschlagen')
                     try:
                         self.actuators.set('pump', 0)
+                        self.actuators.set('led', 0)
+                        self.actuators.set('fan', 100)
                     except Exception:
                         LOG.exception('Pumpe konnte nach Steuerungsfehler nicht gestoppt werden')
                 self.stop_event.wait(0.1)

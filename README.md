@@ -264,3 +264,21 @@ bis zum Ziel und startet nach Erreichen erst wieder bei einem Absinken um
 höchstens drei Sekunden alt sein. Die Wasserstandssperre ist immer vorrangig.
 Die Moosspitzenhöhe dient derzeit nur zur Anzeige. Im Graphen zeigt die
 horizontale Ziellinie den aktuell eingestellten Sollwert über den gewählten Zeitraum.
+
+### Temperaturregelung in AUTO
+
+Während der Lichtphase regeln Licht und Lüfter auf 22 °C. Je Seite wird ein
+aktueller SHT45-Wert verwendet, ersatzweise SCD40; die wärmere Seite entscheidet.
+Ab 22,3 °C steigt die Lüfterleistung proportional, ab 23 °C wird zusätzlich das
+Licht gedimmt. Bei 25 °C: Licht aus, Lüfter 100 %. Dieser Schutz bleibt aktiv,
+bis beide Seiten unter 24 °C liegen, auch während der Dunkelphase. Sonst bleibt
+nachts das Licht aus und die Temperaturregelung pausiert. Fehlt auf einer Seite
+länger als 12 Sekunden ein gültiger Messwert, wird ebenfalls das Licht ausgeschaltet
+und der Lüfter auf 100 % gesetzt. Ein veralteter Sensorservice-Snapshot wird
+bereits nach 5 Sekunden verworfen. MANUAL bleibt manuell.
+
+`automatik.temperatur_ziel_c` (22) und `temperatur_max_c` (25) sind konfigurierbar;
+das Maximum muss mindestens 2 °C über dem Ziel liegen. Der Dimmbeginn liegt ein
+Drittel zwischen Ziel und Maximum. Die Skala unter dem Lichtplan zeigt die wärmere
+Seite, Ziel, Maximum und die aktuelle Regelaktion. Lüftung kann nicht unter die
+Umgebungstemperatur kühlen; 25 °C sind eine Abschaltgrenze, keine physikalische Garantie.
