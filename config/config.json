@@ -15,7 +15,7 @@
     "sensor_boden_abstand_cm": 8.265,
     "filter_messungen": 5,
     "max_streuung_cm": 0.2,
-    "max_fuellhoehe_cm": 1.0,
+    "max_fuellhoehe_cm": 8.0,
     "sicherheitsabstand_cm": 1.0
   },
   "moos_1": {
