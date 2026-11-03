@@ -17,19 +17,6 @@ class ButtonModesTests(unittest.TestCase):
             modes.feed(False, start + 0.20)
             self.assertEqual(modes.snapshot()[:2], (MODES[index % len(MODES)], False))
 
-    def test_open_lid_forces_maintenance_and_locks_button_until_closed(self):
-        modes = ButtonModes()
-        modes.set_lid_open(True)
-        self.assertEqual(modes.snapshot()[0], "MAINTENANCE")
-        for start in (1.0, 3.0, 5.0):
-            modes.feed(True, start)
-            modes.feed(True, start + 0.05)
-            modes.feed(False, start + 0.15)
-            modes.feed(False, start + 0.20)
-        self.assertEqual(modes.snapshot()[0], "MAINTENANCE")
-        modes.set_lid_open(False)
-        self.assertEqual(modes.snapshot()[0], "AUTO")
-
     def test_hold_shows_info_without_changing_mode(self):
         modes = ButtonModes()
         modes.feed(True, 1.0)

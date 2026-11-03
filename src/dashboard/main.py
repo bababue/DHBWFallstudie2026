@@ -2,6 +2,7 @@
 import json
 import html
 import logging
+import math
 import time
 from pathlib import Path
 
@@ -10,8 +11,8 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from influxdb_client import InfluxDBClient
 
-from configuration import setting
-from actuators import Actuators
+from configuration import load, setting
+from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl
 
 from temperature import PERIODS, combine
@@ -19,11 +20,31 @@ from temperature import PERIODS, combine
 app = FastAPI(title="Moosbox")
 MODE_FILE = Path('/run/moos/mode.json')
 READINGS_FILE = Path('/run/moos/readings.json')
+WATER_SAFETY_FILE = Path('/run/moos/water-safety.json')
 LOG = logging.getLogger('moos.dashboard')
 
 
 actuators = None
 automatic = None
+
+
+def water_pump_allowed():
+    """Fail closed on missing, stale, invalid or high raw water readings."""
+    try:
+        water = load()['wasserstand']
+        snapshot = json.loads(WATER_SAFETY_FILE.read_text())
+        sampled = snapshot['sampled']
+        distance = snapshot['distance_cm']
+        maximum = water['max_fuellhoehe_cm']
+        margin = water['sicherheitsabstand_cm']
+        if (maximum is None or isinstance(sampled, bool) or not isinstance(sampled, (int, float))
+                or not math.isfinite(sampled) or not 0 <= time.time() - sampled <= 3
+                or isinstance(distance, bool) or not isinstance(distance, (int, float))
+                or not math.isfinite(distance) or not 0 < distance <= 400):
+            return False
+        return water['sensor_boden_abstand_cm'] - distance < maximum - margin
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
 
 
 @app.on_event('startup')
@@ -33,7 +54,8 @@ def start_actuators():
         import lgpio
         actuators = Actuators(lgpio, setting('GPIOCHIP_DEVICE', '/dev/gpiochip0'),
                               int(setting('LED_GPIO')), int(setting('FAN_GPIO')), int(setting('PUMP_GPIO')),
-                              int(setting('LED_PWM_HZ')), int(setting('FAN_PWM_HZ')), int(setting('PUMP_PWM_HZ')))
+                              int(setting('LED_PWM_HZ')), int(setting('FAN_PWM_HZ')), int(setting('PUMP_PWM_HZ')),
+                              pump_allowed=water_pump_allowed)
         automatic = AutomaticControl(actuators, lambda: mode_state().get('mode'))
         automatic.start()
     except Exception:
@@ -67,6 +89,8 @@ def set_actuator(device: str, body: dict):
         return automatic.set_manual(device, body.get('value'))
     except PermissionError:
         return Response('Nur im Maintenance-Modus verfügbar', status_code=409)
+    except PumpLocked as exc:
+        return Response(str(exc), status_code=409)
     except ValueError:
         return Response('Ungültiger Stellwert', status_code=400)
     except Exception:
@@ -236,11 +260,11 @@ def index():
     function actuatorVisible(){return ['AUTO','MAINTENANCE'].includes(document.documentElement.dataset.mode)}
     function actuatorEditable(){return document.documentElement.dataset.mode==='MAINTENANCE'}
     function applyActuators(values){for(const device of ['fan','pump','led']){const input=document.getElementById(device+'-control');if(!input.matches(':active')){input.value=values[device];document.getElementById(device+'-value').textContent=values[device]+' %'}input.disabled=!actuatorEditable()}}
-    async function updateActuators(){if(!actuatorVisible()||actuatorBusy)return;const generation=actuatorGeneration;try{const response=await fetch('/api/actuators',{cache:'no-store'});if(!response.ok)throw Error();const values=await response.json();if(generation!==actuatorGeneration||!actuatorVisible()||actuatorBusy)return;applyActuators(values);actuatorError.textContent=''}catch(e){if(generation===actuatorGeneration&&actuatorVisible()){for(const device of ['fan','pump','led'])document.getElementById(device+'-control').disabled=true;actuatorError.textContent='Steuerung nicht erreichbar'}}}
+    async function updateActuators(){if(!actuatorVisible()||actuatorBusy)return;const generation=actuatorGeneration;try{const response=await fetch('/api/actuators',{cache:'no-store'});if(!response.ok)throw Error();const values=await response.json();if(generation!==actuatorGeneration||!actuatorVisible()||actuatorBusy)return;applyActuators(values);if(actuatorError.textContent==='Steuerung nicht erreichbar')actuatorError.textContent=''}catch(e){if(generation===actuatorGeneration&&actuatorVisible()){for(const device of ['fan','pump','led'])document.getElementById(device+'-control').disabled=true;actuatorError.textContent='Steuerung nicht erreichbar'}}}
     function syncActuatorMode(){actuatorGeneration++;actuatorPanel.hidden=!actuatorVisible();for(const device of ['fan','pump','led'])document.getElementById(device+'-control').disabled=true;if(!actuatorPanel.hidden)updateActuators()}
     window.addEventListener('modechange',syncActuatorMode);setInterval(()=>{syncActuatorVisibility();updateActuators()},1000);
     function syncActuatorVisibility(){if(actuatorPanel.hidden===actuatorVisible())syncActuatorMode()}
-    for(const device of ['fan','pump','led']){const input=document.getElementById(device+'-control');input.addEventListener('input',()=>document.getElementById(device+'-value').textContent=input.value+' %');input.addEventListener('change',async()=>{actuatorBusy=true;try{const response=await fetch('/api/actuators/'+device,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:Number(input.value)})});if(!response.ok)throw Error();if(actuatorVisible())applyActuators(await response.json());actuatorError.textContent=''}catch(e){actuatorError.textContent='Steuerung nicht erreichbar'}finally{actuatorBusy=false;updateActuators()}})}
+    for(const device of ['fan','pump','led']){const input=document.getElementById(device+'-control');input.addEventListener('input',()=>document.getElementById(device+'-value').textContent=input.value+' %');input.addEventListener('change',async()=>{actuatorBusy=true;try{const response=await fetch('/api/actuators/'+device,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:Number(input.value)})});if(!response.ok)throw Error(await response.text());if(actuatorVisible())applyActuators(await response.json());actuatorError.textContent=''}catch(e){actuatorError.textContent=e.message||'Steuerung nicht erreichbar'}finally{actuatorBusy=false;updateActuators()}})}
     const chartColors={temperature:'#d97706',humidity:'#0891b2',co2:'#7c3aed',light:'#ca8a04',water:'#2563eb',moss:'#16a34a'};
     function initMetric(metric, unit){
     const periodSelect=document.getElementById('global-period'), chart=document.getElementById(metric+'-chart');

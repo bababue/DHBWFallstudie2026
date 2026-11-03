@@ -14,9 +14,13 @@ def upgrade(data):
         data = dict(data)
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
-        data.setdefault("deckel", {"offen_abstand_cm": 12.0})
+        data.pop("deckel", None)
         data.setdefault("aktoren", {"licht_gpio": 20, "luefter_gpio": 21, "pumpe_gpio": 16,
                                     "licht_pwm_hz": 2000, "luefter_pwm_hz": 5, "pumpe_pwm_hz": 5})
+        if isinstance(data.get("wasserstand"), dict):
+            water = dict(data["wasserstand"])
+            water.setdefault("sicherheitsabstand_cm", 1.0)
+            data["wasserstand"] = water
         legacy_demo = data.pop("moos_demo", None)
         for index in range(1, 5):
             key = f"moos_{index}"
@@ -75,6 +79,8 @@ def validate(data):
     if type(count) is not int or count % 2 == 0:
         raise ValueError('wasserstand.filter_messungen: ungerade ganze Zahl erforderlich')
     maximum = data['wasserstand']['max_fuellhoehe_cm']
+    if maximum is not None and data['wasserstand']['sicherheitsabstand_cm'] >= maximum:
+        raise ValueError('Sicherheitsabstand muss kleiner als die maximale Füllhöhe sein')
     if maximum is not None and maximum >= data['wasserstand']['sensor_boden_abstand_cm']:
         raise ValueError('Maximale Füllhöhe muss kleiner als der Sensor-Boden-Abstand sein')
     if len(pins) != len(set(pins)):

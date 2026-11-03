@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from actuators import Actuators
+from actuators import Actuators, PumpLocked
 
 
 class FakeGpio:
@@ -38,7 +38,7 @@ class FakeGpio:
 class ActuatorTests(unittest.TestCase):
     def setUp(self):
         self.gpio = FakeGpio()
-        self.control = Actuators(self.gpio, "/dev/gpiochip0", 20, 21, 16, 200, 5, 5)
+        self.control = Actuators(self.gpio, "/dev/gpiochip0", 20, 21, 16, 200, 5, 5, pump_allowed=lambda: True)
 
     def tearDown(self):
         self.control.close()
@@ -99,6 +99,13 @@ class ActuatorTests(unittest.TestCase):
         self.assertIn(("write", 21, 1), self.gpio.calls)
         self.control.set("pump", 100)
         self.assertIn(("write", 16, 1), self.gpio.calls)
+
+    def test_pump_cannot_start_when_interlock_is_closed(self):
+        self.control.pump_allowed = lambda: False
+        with self.assertRaises(PumpLocked):
+            self.control.set('pump', 50)
+        self.assertEqual(self.control.status()['pump'], 0)
+        self.control.set('pump', 0)
 
     def test_rejects_invalid_commands(self):
         for device, value in (("other", 50), ("fan", -1), ("led", 101), ("led", True), ("pump", 1)):

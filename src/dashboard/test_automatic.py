@@ -11,6 +11,16 @@ class AutomaticControlTests(unittest.TestCase):
         self.controller.status.return_value = {'fan': 30, 'pump': 20, 'led': 80}
         self.automatic = AutomaticControl(self.controller, lambda: self.mode)
 
+    def test_water_lock_stops_running_pump_even_in_maintenance_or_unknown_mode(self):
+        self.controller.pump_allowed.return_value = False
+        self.automatic.apply()
+        self.controller.set.assert_called_once_with('pump', 0)
+        self.controller.set.reset_mock()
+        self.controller.status.return_value['pump'] = 20
+        self.mode = None
+        self.automatic.apply()
+        self.controller.set.assert_called_once_with('pump', 0)
+
     def test_auto_restores_all_setpoints_after_maintenance(self):
         self.automatic.apply()
         self.controller.set.assert_not_called()

@@ -33,35 +33,34 @@ class MossHeight(TimestampUltrasonic):
     WINDOW_S = 60
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None,
-                 demo_distance_cm=None, demo_sigma_cm=None, lid_threshold_cm=12, demo_enabled=None):
+                 demo_distance_cm=None, demo_sigma_cm=None, demo_enabled=None):
         self.demo_enabled = demo_distance_cm is not None if demo_enabled is None else demo_enabled
         self.demo_distance_cm = demo_distance_cm
         self.demo_sigma_cm = demo_sigma_cm
-        self.lid_threshold_cm = lid_threshold_cm
-        self.last_real_distance_cm = None
-        super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
+        if not self.demo_enabled:
+            super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
         self.empty_distance_cm = empty_distance_cm
         self.recent_distances = deque()
 
+    def close(self):
+        if not self.demo_enabled:
+            super().close()
+
     def read(self):
-        self.last_real_distance_cm = super()._distance_cm()
-        real = self.last_real_distance_cm
-        use_demo = (self.demo_enabled
-                    and not (real is not None and self.lid_threshold_cm < real <= self.MAX_DISTANCE_CM))
-        if use_demo:
+        if self.demo_enabled:
             if self.demo_distance_cm is None or self.demo_sigma_cm is None:
                 return None
             distance = max(0.001, min(self.MAX_DISTANCE_CM,
                                       random.gauss(self.demo_distance_cm, self.demo_sigma_cm)))
         else:
-            distance = real
+            distance = super()._distance_cm()
         if distance is None or not 0 < distance <= self.MAX_DISTANCE_CM:
             return None
         now = time.monotonic()
         self.recent_distances.append((now, distance))
         while self.recent_distances and self.recent_distances[0][0] < now - self.WINDOW_S:
             self.recent_distances.popleft()
-        result = {"distance_cm": distance, "demo_data": use_demo}
+        result = {"distance_cm": distance, "demo_data": self.demo_enabled}
         if self.empty_distance_cm is not None:
             result["height_cm"] = max(0.0, self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)
@@ -90,26 +89,3 @@ class MossAggregate:
         if len(values) < self.MIN_SENSORS:
             return None
         return {"height_median_cm": statistics.median(values)}
-
-
-class LidMonitor:
-    """Debounce each sensor independently; missing echoes never imply closure."""
-
-    REQUIRED_READINGS = 3
-
-    def __init__(self, threshold_cm):
-        self.threshold_cm = threshold_cm
-        self._state = {}
-        self._pending = {}
-
-    def update(self, side, distance):
-        if distance is None or not 0 < distance <= MossHeight.MAX_DISTANCE_CM:
-            self._pending.pop(side, None)
-            return any(self._state.values())
-        opened = distance > self.threshold_cm
-        previous, count = self._pending.get(side, (None, 0))
-        count = count + 1 if previous == opened else 1
-        self._pending[side] = (opened, count)
-        if count >= self.REQUIRED_READINGS:
-            self._state[side] = opened
-        return any(self._state.values())

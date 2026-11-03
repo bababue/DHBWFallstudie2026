@@ -22,7 +22,6 @@ class ButtonModes:
         self._show_info = False
         self._mode = 0
         self._version = 0
-        self._lid_open = False
 
     def feed(self, pressed, now):
         with self._lock:
@@ -34,7 +33,7 @@ class ButtonModes:
                 if self._pressed:
                     self._pressed_since = now
                 else:
-                    if not self._lid_open and self._pressed_since is not None and now - self._pressed_since < self.HOLD_SECONDS:
+                    if self._pressed_since is not None and now - self._pressed_since < self.HOLD_SECONDS:
                         self._mode = (self._mode + 1) % len(MODES)
                     self._show_info = False
                     self._pressed_since = None
@@ -43,14 +42,6 @@ class ButtonModes:
                     and now - self._pressed_since >= self.HOLD_SECONDS):
                 self._show_info = True
                 self._version += 1
-
-    def set_lid_open(self, is_open):
-        with self._lock:
-            if self._lid_open == is_open:
-                return
-            self._lid_open = is_open
-            self._mode = MODES.index("MAINTENANCE" if is_open else "AUTO")
-            self._version += 1
 
     def snapshot(self):
         with self._lock:

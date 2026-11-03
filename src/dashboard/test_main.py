@@ -55,6 +55,22 @@ class DashboardTests(unittest.TestCase):
         with patch.object(main, 'actuators', None):
             self.assertEqual(main.actuator_status().status_code, 503)
 
+    def test_water_lock_uses_fresh_raw_distance_and_margin(self):
+        water = {'sensor_boden_abstand_cm': 8.265, 'max_fuellhoehe_cm': 6.0,
+                 'sicherheitsabstand_cm': 1.0}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'water.json'
+            with patch.object(main, 'WATER_SAFETY_FILE', path), \
+                    patch.object(main, 'load', return_value={'wasserstand': water}):
+                self.assertFalse(main.water_pump_allowed())
+                for distance, age, allowed in [(4.0, 0, True), (3.265, 0, False),
+                                               (2.0, 0, False), (None, 0, False),
+                                               (float('nan'), 0, False), (4.0, 4, False)]:
+                    path.write_text(json.dumps({'sampled': time.time() - age, 'distance_cm': distance}))
+                    self.assertEqual(main.water_pump_allowed(), allowed, (distance, age))
+                water['max_fuellhoehe_cm'] = None
+                self.assertFalse(main.water_pump_allowed())
+
     def test_live_readings_expire_and_debug_uses_them(self):
         now = time.time()
         readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21, sampled=now),

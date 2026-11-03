@@ -20,9 +20,13 @@ class AutomaticControl:
 
     def apply(self):
         with self.lock:
+            current = self.actuators.status()
+            if current['pump'] and not self.actuators.pump_allowed():
+                LOG.warning('Wasserstandssperre: Pumpe wird abgeschaltet')
+                self.actuators.set('pump', 0)
+                current['pump'] = 0
             if self.get_mode() != 'AUTO':
                 return
-            current = self.actuators.status()
             for device, value in auto_setpoints().items():
                 if self.get_mode() != 'AUTO':
                     return

@@ -41,13 +41,10 @@ class ConfigurationTests(unittest.TestCase):
         self.assertNotIn('moos_demo', result)
         self.assertIn('moos_demo', data)
 
-    def test_lid_threshold_defaults_and_validation(self):
+    def test_legacy_lid_setting_is_ignored(self):
         data = copy.deepcopy(load())
-        del data['deckel']
-        self.assertEqual(validate(upgrade(data))['deckel']['offen_abstand_cm'], 12.0)
-        data = upgrade(data)
-        data['deckel']['offen_abstand_cm'] = 0
-        with self.assertRaises(ValueError): validate(data)
+        data['deckel'] = {'offen_abstand_cm': 12.0}
+        self.assertNotIn('deckel', validate(upgrade(data)))
 
     def test_demo_distance_defaults_to_calibrated_distance_plus_one(self):
         data = copy.deepcopy(load())
@@ -67,4 +64,10 @@ class ConfigurationTests(unittest.TestCase):
         with self.assertRaises(ValueError): validate(data)
         data = copy.deepcopy(load())
         data['aktoren']['licht_pwm_hz'] = 0
+        with self.assertRaises(ValueError): validate(data)
+
+    def test_water_margin_must_be_below_maximum(self):
+        data = copy.deepcopy(load())
+        data['wasserstand']['max_fuellhoehe_cm'] = 6
+        data['wasserstand']['sicherheitsabstand_cm'] = 6
         with self.assertRaises(ValueError): validate(data)

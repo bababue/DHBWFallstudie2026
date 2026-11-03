@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from moss_height import LidMonitor, MossAggregate, MossHeight, WaterNoise
+from moss_height import MossAggregate, MossHeight, WaterNoise
 
 
 class MossHeightTests(unittest.TestCase):
@@ -24,34 +24,21 @@ class MossHeightTests(unittest.TestCase):
             measure.assert_called_once_with()
         sensor.close()
 
-    def test_demo_uses_simulated_value_and_calculates_height(self):
+    def test_demo_uses_simulated_value_without_gpio(self):
         gpio = MagicMock()
         sensor = MossHeight(gpio, 1, 0, 5, empty_distance_cm=10,
                             demo_distance_cm=8, demo_sigma_cm=0.1)
-        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=7), \
-                patch('moss_height.random.gauss', return_value=8.05) as draw:
+        with patch('moss_height.random.gauss', return_value=8.05) as draw:
             fields = sensor.read()
         draw.assert_called_once_with(8, 0.1)
         self.assertAlmostEqual(fields['height_cm'], 1.95)
         self.assertTrue(fields['demo_data'])
-        self.assertEqual(sensor.last_real_distance_cm, 7)
         sensor.close()
-        gpio.gpio_claim_output.assert_called_once()
-        gpio.gpio_free.assert_any_call(1, 5)
+        gpio.gpio_claim_output.assert_not_called()
 
-    def test_real_open_distance_overrides_demo_even_without_water_noise(self):
-        sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=8,
-                            demo_distance_cm=9, lid_threshold_cm=12)
-        with patch('moss_height.TimestampUltrasonic._distance_cm', return_value=13):
-            self.assertEqual(sensor.read()['distance_cm'], 13)
-            self.assertFalse(sensor.read()['demo_data'])
-        sensor.close()
-
-    def test_demo_without_distance_still_reads_real_open_distance(self):
+    def test_demo_without_distance_has_no_reading(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5, demo_enabled=True)
-        with patch('moss_height.TimestampUltrasonic._distance_cm', side_effect=[8, 13]):
-            self.assertIsNone(sensor.read())
-            self.assertEqual(sensor.read()['distance_cm'], 13)
+        self.assertIsNone(sensor.read())
         sensor.close()
 
     def test_demo_waits_for_water_data_and_uses_measured_standard_deviation(self):
@@ -81,31 +68,6 @@ class MossHeightTests(unittest.TestCase):
         self.assertEqual(second["height_cm"], 3.0)
         self.assertEqual(second["height_median_1m_cm"], 2.5)
         sensor.close()
-
-    def test_lid_uses_three_valid_readings_per_sensor_and_keeps_state_on_failure(self):
-        lid = LidMonitor(12)
-        self.assertFalse(lid.update("moss1", 13))
-        self.assertFalse(lid.update("moss1", None))
-        self.assertFalse(lid.update("moss1", 13))
-        self.assertFalse(lid.update("moss1", 13))
-        self.assertTrue(lid.update("moss1", 13))
-        self.assertTrue(lid.update("moss1", None))
-        for _ in range(3):
-            self.assertTrue(lid.update("moss2", 8))
-        self.assertTrue(lid.update("moss1", 12))
-        self.assertTrue(lid.update("moss1", 12))
-        self.assertFalse(lid.update("moss1", 12))
-
-    def test_lid_requires_each_open_sensor_to_close(self):
-        lid = LidMonitor(12)
-        for side in ("moss1", "moss2"):
-            for _ in range(3):
-                lid.update(side, 13)
-        for _ in range(3):
-            self.assertTrue(lid.update("moss1", 7))
-        for _ in range(2):
-            self.assertTrue(lid.update("moss2", 7))
-        self.assertFalse(lid.update("moss2", 7))
 
     def test_aggregate_needs_both_recent_calibrated_sensors(self):
         aggregate = MossAggregate()

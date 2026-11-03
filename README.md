@@ -57,9 +57,12 @@ Ein fehlendes Echo oder eine Messpause über 12 Sekunden leert den Filter.
 `wasserstand.max_fuellhoehe_cm` ist die maximale erlaubte Füllhöhe. `null`
 bedeutet noch nicht festgelegt. `max_level_reached` meldet eine Überschreitung
 bereits beim einzelnen Rohwert und zusätzlich beim gefilterten Wert.
-Diese Meldung schaltet bislang keine Pumpe; eine unabhängige Hardwareabschaltung
-(z. B. Schwimmerschalter) muss separat eingebaut werden. Ein dauerhaftes Hindernis
-im Schallweg kann auch einen Medianfilter täuschen.
+Die Pumpensperre verwendet den ungefilterten Rohabstand und schaltet bei
+`max_fuellhoehe_cm` minus `sicherheitsabstand_cm` ab. Eine gültige Messung darf
+höchstens drei Sekunden alt sein; fehlende Messungen oder eine nicht konfigurierte
+Grenze sperren die Pumpe ebenfalls. Die Sperre gilt auch in MAINTENANCE. Ein
+unabhängiger Schwimmerschalter ist zusätzlich nötig, da Software, Messung oder
+Pumpenhardware ausfallen können.
 
 Kalibrierung im leeren Behälter, mit ruhiger Oberfläche und freiem Schallweg:
 
@@ -83,8 +86,7 @@ Für synthetische Moosdaten bei jedem gewünschten Sensor `moos_1.demo` bis
 `moos_4.demo` in `config/config.json` auf `true` setzen. Die Werte sind
 normalverteilt um den jeweiligen `demo_abstand_cm`. Ist dieser `null`, liefert
 der Demo-Sensor keine Messwerte. Für kalibrierte Sensoren liegt der anfängliche
-Demo-Abstand 1 cm über dem Bezugsabstand. Echte Messwerte oberhalb der
-Deckelgrenze ersetzen den Demowert und dienen der Deckelerkennung. Bei `demo: false` wird der echte Sensor genutzt.
+Demo-Abstand 1 cm über dem Bezugsabstand. Bei `demo: false` wird der echte Sensor genutzt.
 Die Standardabweichung wird laufend aus den gültigen Rohabständen des
 Wassersensors der letzten 60 Sekunden geschätzt. Mindestens fünf Messwerte sind
 nötig; ohne diese werden keine Demowerte erzeugt. Auch tatsächliche Änderungen
@@ -251,11 +253,3 @@ getrennt von den SHT45-Werten.
 Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/33FD6951/662A593A/HT_DS_Datasheet_SHT4x.pdf),
 [SCD4x-Datenblatt](https://sensirion.com/media/documents/E0F04247/631EF271/CD_DS_SCD40_SCD41_Datasheet_D1.pdf),
 [InfluxDB-Compose-Einrichtung](https://docs.influxdata.com/influxdb/v2/install/use-docker-compose/).
-
-Die Deckelerkennung verwendet `deckel.offen_abstand_cm` (Standard: 12 cm).
-Drei gültige Messungen eines Moossensors oberhalb der Grenze aktivieren
-MAINTENANCE und sperren den Taster für Moduswechsel. Erst drei gültige
-Messungen auf oder unter der Grenze von jedem zuvor geöffnet erkannten Sensor
-schalten zurück auf AUTO. Fehlende Echos bestätigen keinen Zustandswechsel.
-Während MAINTENANCE laufen alle Messungen weiter, ohne in InfluxDB gespeichert
-zu werden. Die Deckelprüfung verwendet auch im Demo-Modus echte Sensorwerte.

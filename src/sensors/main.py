@@ -16,7 +16,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from configuration import setting, load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, start_button_reader
-from moss_height import LidMonitor, MossAggregate, MossHeight, WaterNoise
+from moss_height import MossAggregate, MossHeight, WaterNoise
 from oled import Oled, render, render_mode
 from schedule import ScheduledRead
 from storage import BufferedWriter
@@ -146,7 +146,7 @@ def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
     # The shared volume survives restarts; do not show its previous mode.
-    for path in ('/run/moos/mode.json', '/run/moos/readings.json'):
+    for path in ('/run/moos/mode.json', '/run/moos/readings.json', '/run/moos/water-safety.json'):
         try:
             os.unlink(path)
         except FileNotFoundError:
@@ -188,11 +188,10 @@ def run():
             demo_distance = moss_config[f"moos_{index}"]["demo_abstand_cm"]
             sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance,
                                 demo_distance_cm=demo_distance if demo else None,
-                                lid_threshold_cm=moss_config["deckel"]["offen_abstand_cm"], demo_enabled=demo)
+                                demo_enabled=demo)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
-        lid = LidMonitor(load()["deckel"]["offen_abstand_cm"])
         modes = ButtonModes()
         button_thread = start_button_reader(lgpio, handle, config.button_pin, STOP, modes)
         button_claimed = True
@@ -304,10 +303,16 @@ def run():
                             LOG.warning("%s/%s read failed: %s", side, sensor.name, exc)
                             error = True
                         finished = time.monotonic()
-                        if isinstance(sensor, MossHeight):
-                            modes.set_lid_open(lid.update(side, sensor.last_real_distance_cm))
-                        if sensor is water_sensor and fields and 'distance_cm' in fields:
-                            water_noise.add(finished, fields['distance_cm'])
+                        if sensor is water_sensor:
+                            # Publish every attempt, including failures, independently of InfluxDB.
+                            try:
+                                with open('/run/moos/water-safety.tmp', 'w') as state:
+                                    json.dump({'sampled': time.time(), 'distance_cm': fields.get('distance_cm') if fields else None}, state, allow_nan=False)
+                                os.replace('/run/moos/water-safety.tmp', '/run/moos/water-safety.json')
+                            except (OSError, ValueError, TypeError) as exc:
+                                LOG.warning('Water safety publication failed: %s', exc)
+                            if fields and 'distance_cm' in fields:
+                                water_noise.add(finished, fields['distance_cm'])
                         task.advance(finished)
                         if is_co2 and side in started and finished - last_co2[side] > 30:
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)

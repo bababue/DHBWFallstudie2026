@@ -8,13 +8,17 @@ import threading
 LOG = logging.getLogger("moos.actuators")
 
 
+class PumpLocked(Exception):
+    """The pump cannot run without a valid safe water level."""
+
+
 class Actuators:
     BOOST_SECONDS = 0.5
     BOOSTS = {"fan": (50, 100), "pump": (30, 75)}
     MIN_DUTY = {"fan": 25, "pump": 15}
 
     def __init__(self, gpio, chip: str, led_pin: int, fan_pin: int, pump_pin: int,
-                 led_hz: int, fan_hz: int, pump_hz: int):
+                 led_hz: int, fan_hz: int, pump_hz: int, pump_allowed=None):
         if not re.fullmatch(r"/dev/gpiochip\d+", chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
         self.pins = {"led": led_pin, "fan": fan_pin, "pump": pump_pin}
@@ -23,6 +27,7 @@ class Actuators:
             raise ValueError("LED, fan and pump need distinct BCM GPIO pins")
         if not all(hz > 0 for hz in self.frequencies.values()):
             raise ValueError("PWM frequencies must be positive")
+        self.pump_allowed = pump_allowed or (lambda: False)
         self.gpio = gpio
         self.lock = threading.RLock()
         self.values = {device: 0 for device in self.pins}
@@ -64,6 +69,8 @@ class Actuators:
         with self.lock:
             if self.closed:
                 raise RuntimeError("GPIO controller is closed")
+            if device == 'pump' and value > 0 and not self.pump_allowed():
+                raise PumpLocked('Pumpe gesperrt: Wasserstand zu hoch oder Messung nicht verfügbar')
             pin, hz = self.pins[device], self.frequencies[device]
             old = self.values[device]
             if device in self.BOOSTS:

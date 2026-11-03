@@ -119,10 +119,6 @@
     "moos_4",
     "bezugsabstand_cm"
   ],
-  "LID_OPEN_DISTANCE_CM": [
-    "deckel",
-    "offen_abstand_cm"
-  ],
   "MOSS_1_DEMO": [
     "moos_1",
     "demo"
@@ -178,5 +174,9 @@
   "PUMP_PWM_HZ": [
     "aktoren",
     "pumpe_pwm_hz"
+  ],
+  "WATER_SAFETY_MARGIN_CM": [
+    "wasserstand",
+    "sicherheitsabstand_cm"
   ]
 }
