@@ -353,12 +353,15 @@ def index():
     const chartColors={temperature:'#d97706',humidity:'#0891b2',co2:'#7c3aed',light:'#ca8a04',water:'#2563eb',moss:'#16a34a'};
     function initMetric(metric, unit){
     const periodSelect=document.getElementById('global-period'), chart=document.getElementById(metric+'-chart');
-    let temperatureRequest=0;
+    let temperatureRequest=0, lastChartData=null;
+    if(metric==='water')new ResizeObserver(()=>{if(lastChartData)drawTemperature(lastChartData)}).observe(chart);
     function drawTemperature(data){
+      lastChartData=data;
       chart.replaceChildren();const waterPoints=data.points.filter(p=>p.value!==null&&Number.isFinite(p.value));const mossPoints=data.moss_points||[],targetPoints=data.target_points||[];const points=[...waterPoints,...mossPoints,...targetPoints];
       const status=document.getElementById(metric+'-chart-status');if(!points.length){status.textContent='Keine Messwerte im gewählten Zeitraum';return;}
       status.textContent='';
-      const ns='http://www.w3.org/2000/svg', width=800, height=230, left=55, right=20, top=15, bottom=35;
+      const ns='http://www.w3.org/2000/svg', width=metric==='water'?Math.max(240,chart.clientWidth):800, height=230, left=55, right=metric==='water'?8:20, top=15, bottom=35;
+      chart.setAttribute('viewBox',`0 0 ${width} ${height}`);
       const span={'10m':600,'1h':3600,'24h':86400,'7d':604800,'30d':2592000}[periodSelect.value], end=Date.now()/1000, start=end-span;
       let low=Math.min(...points.map(p=>p.value)), high=Math.max(...points.map(p=>p.value));const pad=Math.max((high-low)*.1,.5);low-=pad;high+=pad;
       function element(name,attributes){const el=document.createElementNS(ns,name);for(const [key,value] of Object.entries(attributes))el.setAttribute(key,value);chart.appendChild(el);return el}
