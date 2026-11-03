@@ -9,15 +9,21 @@ from threading import Event, RLock, Thread
 LOG = logging.getLogger('moos.automatic')
 
 
-def auto_setpoints(config=None, now=None):
-    """Set the LED by the local daily schedule; other outputs are currently off."""
+def light_schedule(config=None, now=None):
     config = load()['automatik'] if config is None else config
     now = datetime.now(ZoneInfo('Europe/Berlin')) if now is None else now.astimezone(ZoneInfo('Europe/Berlin'))
     minute = now.hour * 60 + now.minute
     start = config['licht_start_stunde'] * 60
     duration = config['lichtdauer_stunden'] * 60
-    light_on = (minute - start) % (24 * 60) < duration
-    return {'fan': 0, 'pump': 0, 'led': config['lichtstaerke_prozent'] if light_on else 0}
+    return {'start': start, 'duration': duration, 'current': minute,
+            'active': (minute - start) % 1440 < duration,
+            'level': config['lichtstaerke_prozent']}
+
+
+def auto_setpoints(config=None, now=None):
+    """Set the LED by the local daily schedule; other outputs are currently off."""
+    schedule = light_schedule(config, now)
+    return {'fan': 0, 'pump': 0, 'led': schedule['level'] if schedule['active'] else 0}
 
 
 class AutomaticControl:

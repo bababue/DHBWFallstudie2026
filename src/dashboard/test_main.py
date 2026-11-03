@@ -42,6 +42,9 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn('led-slider', body)
         self.assertIn('id="debug-toggle"', body)
         self.assertIn('id="debug-panel" hidden', body)
+        self.assertIn('id="auto-actuators"', body)
+        self.assertIn('id="manual-actuators"', body)
+        self.assertIn('id="light-timeline"', body)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js nicht installiert')
     def test_rendered_javascript_has_valid_syntax(self):

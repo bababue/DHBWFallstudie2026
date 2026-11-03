@@ -3,7 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from unittest.mock import MagicMock, patch
 
-from automatic import AutomaticControl, auto_setpoints
+from automatic import AutomaticControl, auto_setpoints, light_schedule
 
 
 class AutomaticControlTests(unittest.TestCase):
@@ -23,6 +23,9 @@ class AutomaticControlTests(unittest.TestCase):
         def value(hour, minute):
             return auto_setpoints(config, datetime(2026, 5, 3, hour, minute, tzinfo=berlin))['led']
         self.assertEqual([value(5, 59), value(6, 0), value(21, 59), value(22, 0)], [0, 80, 80, 0])
+        night = light_schedule(config, datetime(2026, 5, 3, 22, 0, tzinfo=berlin))
+        self.assertFalse(night['active'])
+        self.assertEqual((night['start'], night['duration'], night['current']), (360, 960, 1320))
         config['licht_start_stunde'] = 18
         self.assertEqual([value(17, 59), value(18, 0), value(9, 59), value(10, 0)], [0, 80, 80, 0])
 
