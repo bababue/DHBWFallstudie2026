@@ -70,6 +70,8 @@
     "pumpe_leistung_prozent": 25,
     "temperatur_ziel_c": 22,
     "temperatur_max_c": 25,
-    "wasser_unter_moosspitzen_cm": 2
+    "wasser_unter_moosspitzen_cm": 2,
+    "pumpe_start_stunde": 6,
+    "pumpe_start_minute": 0
   }
 }

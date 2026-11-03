@@ -258,6 +258,14 @@ Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/
 
 Die Moosspitzenhöhe wird ab dem Boden berechnet: `max(0; 6 cm + Bezugsabstand − Rohabstand)`. Die 6 cm entsprechen der Gitterhöhe; der Bezugsabstand stammt aus der Papierkalibrierung auf dem Gitter.
 
+Im AUTO-Modus startet ein Pumpvorgang täglich um 06:00 Uhr (Europe/Berlin).
+`automatik.pumpe_start_stunde` und `pumpe_start_minute` legen die Uhrzeit fest.
+Der Zeitpunkt wird nur in der eingestellten Minute berücksichtigt; verpasste
+Termine werden nicht nachgeholt. Die Checkbox „Jetzt pumpen“ startet oder stoppt
+im AUTO-Modus einen zusätzlichen Vorgang. Bei ungültigen Messwerten startet die
+Pumpe nicht bzw. ein laufender Vorgang wird beendet. Der Tagesstatus wird im
+`mode-state`-Volume gespeichert und übersteht Containerneustarts.
+
 Die Pumpenregelung verwendet die mittlere geglättete Moosspitzenhöhe minus
 `automatik.wasser_unter_moosspitzen_cm` (2 cm), mindestens 0 cm, und
 `pumpe_leistung_prozent` (25 %), ohne Startboost oder Pumpenpausen. Sie läuft

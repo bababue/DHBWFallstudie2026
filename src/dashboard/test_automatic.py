@@ -56,14 +56,15 @@ class AutomaticControlTests(unittest.TestCase):
         self.controller.set.assert_not_called()
         self.mode = 'AUTO'
         self.automatic.apply()
-        self.assertEqual(auto_setpoints(), {'fan': 0, 'pump': 0, 'led': 0})
+        self.assertEqual(self.automatic.get_mode(), 'AUTO')
         self.assertEqual(self.controller.set.call_count, 3)
         for device in ('fan', 'pump', 'led'):
             self.controller.set.assert_any_call(device, 0)
 
     def test_auto_drives_pump_from_regulator_and_manual_keeps_control(self):
         from test_pump_control import OPTIONS, state
-        self.automatic.get_water_state = lambda: (state(), OPTIONS)
+        self.automatic.get_water_state = lambda: (state(), dict(OPTIONS, pumpe_start_stunde=6, pumpe_start_minute=0))
+        self.automatic.pump_schedule.request(True, state())
         self.mode = 'AUTO'
         self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
         self.automatic.apply()
@@ -90,7 +91,7 @@ class AutomaticControlTests(unittest.TestCase):
 
     def test_auto_does_not_repeat_unchanged_outputs(self):
         self.mode = 'AUTO'
-        self.controller.status.return_value = auto_setpoints()
+        self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
         self.automatic.apply()
         self.controller.set.assert_not_called()
 

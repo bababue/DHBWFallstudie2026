@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from configuration import load
 from pump_control import PumpRegulator
+from pump_schedule import PumpSchedule
 from thermal_control import ThermalRegulator
 from threading import Event, RLock, Thread
 
@@ -36,6 +37,7 @@ class AutomaticControl:
         self.get_mode = get_mode
         self.get_water_state = get_water_state
         self.pump = PumpRegulator()
+        self.pump_schedule = PumpSchedule()
         self.thermal = ThermalRegulator()
         self.get_readings = get_readings
         self.lock = RLock()
@@ -54,6 +56,7 @@ class AutomaticControl:
             if mode != 'MANUAL':
                 self.manual_initialized = False
             if mode != 'AUTO':
+                self.pump_schedule.active = False
                 if mode == 'MANUAL':
                     self.initialize_manual()
                 elif current['pump']:
@@ -66,7 +69,7 @@ class AutomaticControl:
                 values.update(fan=thermal["fan"], led=thermal["led"])
             if self.get_water_state is not None:
                 data, options = self.get_water_state()
-                values['pump'] = self.pump.value(data, options, time.monotonic())
+                values['pump'] = self.pump_schedule.update(data, options, self.pump)
             for device, value in values.items():
                 if self.get_mode() != 'AUTO':
                     return
@@ -83,6 +86,19 @@ class AutomaticControl:
                 return
             self.actuators.set(device, value)
         self.manual_initialized = True
+
+    def request_pump(self, enabled):
+        with self.lock:
+            if self.get_mode() != 'AUTO':
+                raise PermissionError('Nur im Auto-Modus verfügbar')
+            if self.get_water_state is None:
+                raise ValueError('Wasserregelung nicht verfügbar')
+            data, _ = self.get_water_state()
+            self.pump_schedule.request(enabled, data)
+            self.pump.reset()
+            if not enabled:
+                self.actuators.set('pump', 0)
+            return {'active': self.pump_schedule.active}
 
     def set_manual(self, device, value):
         with self.lock:

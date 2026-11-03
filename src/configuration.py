@@ -26,6 +26,8 @@ def upgrade(data):
             options.setdefault('temperatur_max_c', 25)
             options.setdefault('wasser_unter_moosspitzen_cm', 2)
             options.setdefault('pumpe_hysterese_cm', 0.2)
+            options.setdefault('pumpe_start_stunde', 6)
+            options.setdefault('pumpe_start_minute', 0)
             # Replace the previous pulse default when upgrading to continuous operation.
             if legacy_pulse and options.get('pumpe_leistung_prozent') == 30:
                 options['pumpe_leistung_prozent'] = 25
@@ -85,6 +87,10 @@ def validate(data):
                          'AUTO_LIGHT_LEVEL_PERCENT': (0, 100)}[name]
             if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
                 raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
+        elif name in ('PUMP_START_HOUR', 'PUMP_START_MINUTE'):
+            high = 23 if name == 'PUMP_START_HOUR' else 59
+            if type(value) is not int or not 0 <= value <= high:
+                raise ValueError(f'{group}.{key}: ganze Zahl von 0 bis {high} erforderlich')
         elif name == 'PUMP_LEVEL_PERCENT':
             if type(value) is not int or not 5 <= value <= 100:
                 raise ValueError('automatik.pumpe_leistung_prozent: ganze Zahl 5 bis 100 erforderlich')
