@@ -66,6 +66,9 @@ class MossHeight(TimestampUltrasonic):
             result["height_cm"] = max(0.0, self.PLATFORM_HEIGHT_CM + self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)
             result["height_median_1m_cm"] = max(0.0, self.PLATFORM_HEIGHT_CM + self.empty_distance_cm - minute_distance)
+            inliers = sum(abs(value - minute_distance) <= 0.3 for _, value in self.recent_distances)
+            result['measurement_stable'] = int(len(self.recent_distances) >= 5
+                                               and inliers >= len(self.recent_distances) * 0.8)
         return result
 
 

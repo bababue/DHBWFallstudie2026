@@ -1,9 +1,11 @@
 """Automatic actuator setpoints and their application outside manual."""
 import logging
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from configuration import load
+from pump_control import PumpRegulator
 from threading import Event, RLock, Thread
 
 LOG = logging.getLogger('moos.automatic')
@@ -27,9 +29,11 @@ def auto_setpoints(config=None, now=None):
 
 
 class AutomaticControl:
-    def __init__(self, actuators, get_mode):
+    def __init__(self, actuators, get_mode, get_water_state=None):
         self.actuators = actuators
         self.get_mode = get_mode
+        self.get_water_state = get_water_state
+        self.pump = PumpRegulator()
         self.lock = RLock()
         self.stop_event = Event()
         self.thread = None
@@ -41,9 +45,18 @@ class AutomaticControl:
                 LOG.warning('Wasserstandssperre: Pumpe wird abgeschaltet')
                 self.actuators.set('pump', 0)
                 current['pump'] = 0
-            if self.get_mode() != 'AUTO':
+            mode = self.get_mode()
+            if mode != 'AUTO':
+                if mode == 'MANUAL':
+                    self.pump.reset()
+                elif current['pump']:
+                    self.actuators.set('pump', 0)
                 return
-            for device, value in auto_setpoints().items():
+            values = auto_setpoints()
+            if self.get_water_state is not None:
+                data, options = self.get_water_state()
+                values['pump'] = self.pump.value(data, options, time.monotonic())
+            for device, value in values.items():
                 if self.get_mode() != 'AUTO':
                     return
                 if current[device] != value:
@@ -62,7 +75,11 @@ class AutomaticControl:
                     self.apply()
                 except Exception:
                     LOG.exception('Automatische Aktorsteuerung fehlgeschlagen')
-                self.stop_event.wait(0.2)
+                    try:
+                        self.actuators.set('pump', 0)
+                    except Exception:
+                        LOG.exception('Pumpe konnte nach Steuerungsfehler nicht gestoppt werden')
+                self.stop_event.wait(0.1)
         self.thread = Thread(target=loop, name='moos-automatic', daemon=True)
         self.thread.start()
 

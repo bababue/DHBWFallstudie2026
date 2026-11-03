@@ -49,6 +49,19 @@ class AutomaticControlTests(unittest.TestCase):
         for device in ('fan', 'pump', 'led'):
             self.controller.set.assert_any_call(device, 0)
 
+    def test_auto_drives_pump_from_regulator_and_manual_keeps_control(self):
+        from test_pump_control import OPTIONS, state
+        self.automatic.get_water_state = lambda: (state(), OPTIONS)
+        self.mode = 'AUTO'
+        self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
+        self.automatic.apply()
+        self.controller.set.assert_called_once_with('pump', 30)
+        self.controller.set.reset_mock()
+        self.mode = 'MANUAL'
+        self.automatic.apply()
+        self.controller.set.assert_not_called()
+        self.assertIsNone(self.automatic.pump.pulse_started)
+
     def test_manual_values_are_only_set_in_manual(self):
         self.automatic.set_manual('fan', 30)
         self.controller.set.assert_called_once_with('fan', 30)
@@ -56,10 +69,10 @@ class AutomaticControlTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.automatic.set_manual('fan', 50)
 
-    def test_unknown_mode_does_not_apply_automatic_values(self):
+    def test_unknown_mode_stops_pump_without_applying_other_values(self):
         self.mode = None
         self.automatic.apply()
-        self.controller.set.assert_not_called()
+        self.controller.set.assert_called_once_with('pump', 0)
 
     def test_auto_does_not_repeat_unchanged_outputs(self):
         self.mode = 'AUTO'

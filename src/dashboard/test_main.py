@@ -85,6 +85,27 @@ class DashboardTests(unittest.TestCase):
                 water['max_fuellhoehe_cm'] = None
                 self.assertFalse(main.water_pump_allowed())
 
+    def test_automatic_water_combines_demo_moss_with_real_water(self):
+        from test_pump_control import CONFIG
+        config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265))
+        now = time.time()
+        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
+                    for side in ('moss1', 'moss2')
+                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1), ('demo_data', True)]]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'water.json'
+            path.write_text(json.dumps({'sampled': now, 'distance_cm': 4.0,
+                                        'water_level_cm': 4.265, 'measurement_stable': 1}))
+            with patch.object(main, 'WATER_SAFETY_FILE', path), \
+                    patch.object(main, 'load', return_value=config), \
+                    patch.object(main, 'live_readings', return_value=readings):
+                state, _ = main.pump_state()
+        self.assertEqual(state['target_cm'], 5.5)
+        self.assertTrue(state['moss_ready'])
+        self.assertTrue(state['water_ready'])
+        self.assertTrue(state['pump_allowed'])
+        self.assertEqual(state['moss_height_cm'], 7.5)
+
     def test_live_readings_expire_and_debug_uses_them(self):
         now = time.time()
         readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21, sampled=now),

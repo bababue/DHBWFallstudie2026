@@ -293,7 +293,9 @@ def run():
                             # Publish every attempt, including failures, independently of InfluxDB.
                             try:
                                 with open('/run/moos/water-safety.tmp', 'w') as state:
-                                    json.dump({'sampled': time.time(), 'distance_cm': fields.get('distance_cm') if fields else None}, state, allow_nan=False)
+                                    json.dump({'sampled': time.time(), 'distance_cm': fields.get('distance_cm') if fields else None,
+                                               'water_level_cm': fields.get('water_level_cm') if fields else None,
+                                               'measurement_stable': fields.get('measurement_stable', 0) if fields else 0}, state, allow_nan=False)
                                 os.replace('/run/moos/water-safety.tmp', '/run/moos/water-safety.json')
                             except (OSError, ValueError, TypeError) as exc:
                                 LOG.warning('Water safety publication failed: %s', exc)
