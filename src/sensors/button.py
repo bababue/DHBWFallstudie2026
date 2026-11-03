@@ -7,7 +7,7 @@ from threading import Lock, Thread
 
 
 LOG = logging.getLogger("moos.button")
-MODES = ("AUTO", "MAINTENANCE")
+MODES = ("AUTO", "MANUAL")
 
 
 class ButtonModes:

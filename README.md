@@ -60,7 +60,7 @@ bereits beim einzelnen Rohwert und zusätzlich beim gefilterten Wert.
 Die Pumpensperre verwendet den ungefilterten Rohabstand und schaltet bei
 `max_fuellhoehe_cm` minus `sicherheitsabstand_cm` ab. Eine gültige Messung darf
 höchstens drei Sekunden alt sein; fehlende Messungen oder eine nicht konfigurierte
-Grenze sperren die Pumpe ebenfalls. Die Sperre gilt auch in MAINTENANCE. Ein
+Grenze sperren die Pumpe ebenfalls. Die Sperre gilt auch in MANUAL. Ein
 unabhängiger Schwimmerschalter ist zusätzlich nötig, da Software, Messung oder
 Pumpenhardware ausfallen können.
 
@@ -139,17 +139,16 @@ Das SSD1306-OLED (128 × 64, Adresse `0x3C`) hängt am linken Sensorbus und ist 
 180° gedreht. `sensors` rendert die Anzeige direkt aus seinen Messwerten und
 greift als einziger Container auf GPIO 14 und 15 zu.
 
-Das Display zeigt normalerweise den aktuellen Modus `AUTO` oder `MAINTENANCE`.
+Das Display zeigt normalerweise den aktuellen Modus `AUTO` oder `MANUAL`.
 Ein kurzer Druck auf den Taster an GPIO 26 schaltet zwischen beiden um. Während der
 Taster mindestens 0,6 Sekunden gehalten wird, zeigt das Display die
 Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalten.
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
-Neustart beginnt die Anzeige in `AUTO`. Im Modus `MAINTENANCE` laufen die
-Sensoren weiter und ihre aktuellen Werte werden angezeigt, aber nicht in
-InfluxDB gespeichert. Im Dashboard sind die Graphen währenddessen ausgeblendet.
+Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
+Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
 Im AUTO-Modus setzt die automatische Steuerung Lüfter, Pumpe und Licht derzeit
-auf 0 %. Beim Verlassen von MAINTENANCE werden diese Sollwerte wieder übernommen.
-Im Maintenance-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
+auf 0 %. Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
+Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
 werden die Ausgänge auf 0 gesetzt. Die GPIOs und PWM-Frequenzen stehen unter
 `aktoren` in der Konfiguration. Nach einer Änderung den Dashboard-Container neu starten.

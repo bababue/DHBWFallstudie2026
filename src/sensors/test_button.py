@@ -9,7 +9,7 @@ from button import ButtonModes, MODES, apply_mode_command
 class ButtonModesTests(unittest.TestCase):
     def test_short_press_cycles_modes_only_after_release(self):
         modes = ButtonModes()
-        self.assertEqual(MODES, ("AUTO", "MAINTENANCE"))
+        self.assertEqual(MODES, ("AUTO", "MANUAL"))
         self.assertEqual(modes.snapshot()[:2], ("AUTO", False))
         for index in range(1, len(MODES) + 1):
             start = index * 2.0
@@ -24,13 +24,13 @@ class ButtonModesTests(unittest.TestCase):
         modes = ButtonModes()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'mode-command.json'
-            path.write_text(json.dumps({'id': 'one', 'mode': 'MAINTENANCE', 'requested': 10}))
+            path.write_text(json.dumps({'id': 'one', 'mode': 'MANUAL', 'requested': 10}))
             self.assertEqual(apply_mode_command(modes, path, None, 11), 'one')
-            self.assertEqual(modes.snapshot()[0], 'MAINTENANCE')
+            self.assertEqual(modes.snapshot()[0], 'MANUAL')
             modes.set_mode('AUTO')
             self.assertEqual(apply_mode_command(modes, path, 'one', 12), 'one')
             self.assertEqual(modes.snapshot()[0], 'AUTO')
-            path.write_text(json.dumps({'id': 'two', 'mode': 'MAINTENANCE', 'requested': 10}))
+            path.write_text(json.dumps({'id': 'two', 'mode': 'MANUAL', 'requested': 10}))
             self.assertEqual(apply_mode_command(modes, path, 'one', 16), 'one')
             self.assertEqual(modes.snapshot()[0], 'AUTO')
             path.write_text(json.dumps({'id': 'three', 'mode': 'AUTO', 'requested': 16}))

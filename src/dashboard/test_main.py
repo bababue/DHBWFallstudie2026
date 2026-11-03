@@ -28,8 +28,8 @@ class DashboardTests(unittest.TestCase):
             path = Path(directory) / 'mode-command.json'
             with patch.object(main, 'MODE_COMMAND_FILE', path), \
                     patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
-                self.assertEqual(main.request_mode({'mode': 'MAINTENANCE'}), {'requested': 'MAINTENANCE'})
-                self.assertEqual(json.loads(path.read_text())['mode'], 'MAINTENANCE')
+                self.assertEqual(main.request_mode({'mode': 'MANUAL'}), {'requested': 'MANUAL'})
+                self.assertEqual(json.loads(path.read_text())['mode'], 'MANUAL')
                 self.assertEqual(main.request_mode({'mode': 'INVALID'}).status_code, 400)
             with patch.object(main, 'mode_state', return_value={}):
                 self.assertEqual(main.request_mode({'mode': 'AUTO'}).status_code, 503)
@@ -50,7 +50,7 @@ class DashboardTests(unittest.TestCase):
         result = subprocess.run(['node', '--check'], input=script, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_actuator_changes_require_maintenance_and_show_current_values(self):
+    def test_actuator_changes_require_manual_and_show_current_values(self):
         controller = MagicMock()
         controller.status.return_value = {'fan': 20, 'pump': 0, 'led': 40}
         controller.set.return_value = {'fan': 30, 'pump': 0, 'led': 40}
@@ -60,7 +60,7 @@ class DashboardTests(unittest.TestCase):
             with patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
                 self.assertEqual(main.set_actuator('fan', {'value': 30}).status_code, 409)
                 controller.set.assert_not_called()
-            with patch.object(main, 'mode_state', return_value={'mode': 'MAINTENANCE'}):
+            with patch.object(main, 'mode_state', return_value={'mode': 'MANUAL'}):
                 self.assertEqual(main.set_actuator('fan', {'value': 30})['fan'], 30)
                 controller.set.assert_called_once_with('fan', 30)
         with patch.object(main, 'actuators', None):
@@ -94,21 +94,21 @@ class DashboardTests(unittest.TestCase):
                 path.write_text(json.dumps({'updated': now - 6, 'readings': readings}))
                 self.assertEqual(main.live_readings(), [])
 
-    def test_maintenance_shows_live_values_and_no_history(self):
-        readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21),
-                    dict(side='right', sensor='sht45', field='temperature_c', value=23),
-                    dict(side='moss1', sensor='ultrasonic', field='height_cm', value=2)]
-        with patch.object(main, 'mode_state', return_value={'mode': 'MAINTENANCE'}), \
+    def test_manual_shows_live_values_and_history(self):
+        readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21)]
+        record = SimpleNamespace(values={'side': 'left', 'sensor': 'sht45'},
+                                 get_value=lambda: 20,
+                                 get_time=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.query_api.return_value.query.return_value = [SimpleNamespace(records=[record])]
+        with patch.object(main, 'mode_state', return_value={'mode': 'MANUAL'}), \
                 patch.object(main, 'live_readings', return_value=readings), \
-                patch.object(main, 'InfluxDBClient') as client:
-            self.assertEqual(main.debug_sensors()['readings'], readings)
-            self.assertEqual(main.temperature('24h')['current']['value'], 22)
-            self.assertEqual(main.temperature('24h')['points'], [])
-            self.assertEqual(main.moss('24h')['current'], {'moss1': 2})
-            client.assert_not_called()
-        body = main.index().body.decode()
-        self.assertIn('content:"Datenmessung pausiert"', body)
-        self.assertIn('.chart-container{position:relative;height:230px}', body)
+                patch.object(main, 'InfluxDBClient', return_value=client):
+            result = main.temperature('24h')
+        self.assertEqual(result['current']['value'], 21)
+        self.assertEqual(result['points'][0]['value'], 20)
+        self.assertNotIn('Datenmessung pausiert', main.index().body.decode())
 
     def test_temperature_combines_current_and_history_by_window(self):
         def record(side, sensor, value):

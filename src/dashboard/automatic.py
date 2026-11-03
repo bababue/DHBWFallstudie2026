@@ -1,4 +1,4 @@
-"""Automatic actuator setpoints and their application outside maintenance."""
+"""Automatic actuator setpoints and their application outside manual."""
 import logging
 from threading import Event, RLock, Thread
 
@@ -35,8 +35,8 @@ class AutomaticControl:
 
     def set_manual(self, device, value):
         with self.lock:
-            if self.get_mode() != 'MAINTENANCE':
-                raise PermissionError('Nur im Maintenance-Modus verfügbar')
+            if self.get_mode() != 'MANUAL':
+                raise PermissionError('Nur im Manual-Modus verfügbar')
             return self.actuators.set(device, value)
 
     def start(self):

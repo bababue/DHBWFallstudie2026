@@ -3,7 +3,7 @@
 import unittest
 
 from oled import BREITE, HOEHE, Oled, overview_values, render, render_mode
-from main import display_readings, should_store_sample, update_display_values
+from main import display_readings, update_display_values
 
 
 class OledTests(unittest.TestCase):
@@ -14,12 +14,6 @@ class OledTests(unittest.TestCase):
         self.assertEqual(display_readings(values, 23), {})
         update_display_values(values, "left", "sht45", None, 24)
         self.assertEqual(values, {})
-
-    def test_samples_are_only_stored_outside_maintenance(self):
-        self.assertTrue(should_store_sample('AUTO', 'AUTO'))
-        self.assertFalse(should_store_sample('AUTO', 'MAINTENANCE'))
-        self.assertFalse(should_store_sample('MAINTENANCE', 'MAINTENANCE'))
-        self.assertFalse(should_store_sample('MAINTENANCE', 'AUTO'))
 
     def test_overview_uses_scd40_as_temperature_backup(self):
         backup = {("left", "scd40", "temperature_c"): 21.5,
@@ -57,7 +51,7 @@ class OledTests(unittest.TestCase):
         self.assertEqual(display_readings(values, 23), {})
 
     def test_each_mode_has_its_own_screen(self):
-        frames = [render_mode(mode) for mode in ("AUTO", "MAINTENANCE", "MEASURING")]
+        frames = [render_mode(mode) for mode in ("AUTO", "MANUAL", "MEASURING")]
         self.assertEqual(len(set(map(bytes, frames))), 3)
         self.assertTrue(all(len(frame) == BREITE * HOEHE // 8 for frame in frames))
 

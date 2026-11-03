@@ -170,7 +170,7 @@ def render_mode(mode):
     image = Bild()
     image.text(0, 0, "Modus")
     image.rechteck(0, 9, BREITE, 1)
-    scale = 1 if mode == "MAINTENANCE" else 2
+    scale = 1 if mode == "MANUAL" else 2
     width = (len(mode) * 6 - 1) * scale
     image.text((BREITE - width) // 2, 26 if scale == 2 else 32, mode, scale)
     image.text(0, 56, "Klick: weiter")

@@ -138,10 +138,6 @@ def display_readings(values, now, max_age=12):
     return {key: value for key, (value, sampled) in values.items() if now - sampled <= max_age}
 
 
-def should_store_sample(mode_before, mode_after):
-    return mode_before != "MAINTENANCE" and mode_after != "MAINTENANCE"
-
-
 def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
@@ -213,7 +209,6 @@ def run():
         displayed_version = None
         published_mode = None
         mode_since = time.time()
-        maintenance_active = False
         last_command_id = None
 
         def refresh_display():
@@ -262,18 +257,6 @@ def run():
                     last_command_id = apply_mode_command(modes, '/run/moos/mode-command.json',
                                                          last_command_id, time.time())
                     mode, show_info, version = modes.snapshot()
-                    if mode == "MAINTENANCE" and not maintenance_active:
-                        maintenance_active = True
-                        LOG.info("Maintenance: measurements continue without storage")
-                    elif mode != "MAINTENANCE" and maintenance_active:
-                        maintenance_active = False
-                        # Keep maintenance samples out of post-maintenance filters.
-                        water_sensor.recent.clear()
-                        water_sensor.last_sample = None
-                        for sensor in moss_sensors:
-                            sensor.recent_distances.clear()
-                        moss_aggregate.latest.clear()
-                        LOG.info("Maintenance ended: storage resumed")
                     due = [task for task in tasks if task.ready(now)]
                     if not due and now < next_display and version == displayed_version:
                         STOP.wait(max(0, min(0.05, next_display - now,
@@ -325,8 +308,7 @@ def run():
                             update_display_values(display_values, side, sensor.name, fields, finished)
                         # The SCD40 has no new value between its 5 s conversions.
                         # Do not publish a false unhealthy or repeat a stale sample.
-                        if (should_store_sample(sample_mode, modes.snapshot()[0])
-                                and (not is_co2 or fields is not None or error)):
+                        if not is_co2 or fields is not None or error:
                             timestamp = datetime.now(timezone.utc)
                             points.extend(sample_points(side, sensor.name, fields, timestamp))
                             if isinstance(sensor, MossHeight):
