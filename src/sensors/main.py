@@ -15,7 +15,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 
 from configuration import setting, load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
-from button import ButtonModes, start_button_reader
+from button import ButtonModes, apply_mode_command, start_button_reader
 from moss_height import MossAggregate, MossHeight, WaterNoise
 from oled import Oled, render, render_mode
 from schedule import ScheduledRead
@@ -146,7 +146,7 @@ def run():
     import lgpio  # Available inside the Raspberry Pi image only.
 
     # The shared volume survives restarts; do not show its previous mode.
-    for path in ('/run/moos/mode.json', '/run/moos/readings.json', '/run/moos/water-safety.json'):
+    for path in ('/run/moos/mode.json', '/run/moos/readings.json', '/run/moos/water-safety.json', '/run/moos/mode-command.json'):
         try:
             os.unlink(path)
         except FileNotFoundError:
@@ -214,6 +214,7 @@ def run():
         published_mode = None
         mode_since = time.time()
         maintenance_active = False
+        last_command_id = None
 
         def refresh_display():
             nonlocal next_display, displayed_version, published_mode, mode_since
@@ -258,6 +259,8 @@ def run():
                         LOG.info("Configuration changed; restarting sensor service")
                         break
                     now = time.monotonic()
+                    last_command_id = apply_mode_command(modes, '/run/moos/mode-command.json',
+                                                         last_command_id, time.time())
                     mode, show_info, version = modes.snapshot()
                     if mode == "MAINTENANCE" and not maintenance_active:
                         maintenance_active = True

@@ -1,6 +1,9 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
-from button import ButtonModes, MODES
+from button import ButtonModes, MODES, apply_mode_command
 
 
 class ButtonModesTests(unittest.TestCase):
@@ -16,6 +19,22 @@ class ButtonModesTests(unittest.TestCase):
             modes.feed(False, start + 0.15)
             modes.feed(False, start + 0.20)
             self.assertEqual(modes.snapshot()[:2], (MODES[index % len(MODES)], False))
+
+    def test_web_commands_are_fresh_and_applied_only_once(self):
+        modes = ButtonModes()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'mode-command.json'
+            path.write_text(json.dumps({'id': 'one', 'mode': 'MAINTENANCE', 'requested': 10}))
+            self.assertEqual(apply_mode_command(modes, path, None, 11), 'one')
+            self.assertEqual(modes.snapshot()[0], 'MAINTENANCE')
+            modes.set_mode('AUTO')
+            self.assertEqual(apply_mode_command(modes, path, 'one', 12), 'one')
+            self.assertEqual(modes.snapshot()[0], 'AUTO')
+            path.write_text(json.dumps({'id': 'two', 'mode': 'MAINTENANCE', 'requested': 10}))
+            self.assertEqual(apply_mode_command(modes, path, 'one', 16), 'one')
+            self.assertEqual(modes.snapshot()[0], 'AUTO')
+            path.write_text(json.dumps({'id': 'three', 'mode': 'AUTO', 'requested': 16}))
+            self.assertEqual(apply_mode_command(modes, path, 'one', 16), 'three')
 
     def test_hold_shows_info_without_changing_mode(self):
         modes = ButtonModes()

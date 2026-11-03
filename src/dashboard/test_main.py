@@ -23,6 +23,17 @@ class DashboardTests(unittest.TestCase):
                 state.write_text(json.dumps({'mode': 'AUTO', 'updated': time.time() - 10}))
                 self.assertIsNone(main.mode()['mode'])
 
+    def test_mode_request_writes_command_and_checks_sensor_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'mode-command.json'
+            with patch.object(main, 'MODE_COMMAND_FILE', path), \
+                    patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
+                self.assertEqual(main.request_mode({'mode': 'MAINTENANCE'}), {'requested': 'MAINTENANCE'})
+                self.assertEqual(json.loads(path.read_text())['mode'], 'MAINTENANCE')
+                self.assertEqual(main.request_mode({'mode': 'INVALID'}).status_code, 400)
+            with patch.object(main, 'mode_state', return_value={}):
+                self.assertEqual(main.request_mode({'mode': 'AUTO'}).status_code, 503)
+
     def test_page_has_mode_and_camera(self):
         body = main.index().body.decode()
         self.assertIn('class="topbar"', body)

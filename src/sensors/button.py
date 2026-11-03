@@ -1,5 +1,6 @@
 """Debounced GPIO button state for the OLED's display modes."""
 
+import json
 import logging
 import time
 from threading import Lock, Thread
@@ -43,9 +44,34 @@ class ButtonModes:
                 self._show_info = True
                 self._version += 1
 
+    def set_mode(self, mode):
+        if mode not in MODES:
+            raise ValueError('Unbekannter Modus')
+        with self._lock:
+            index = MODES.index(mode)
+            if self._mode != index:
+                self._mode = index
+                self._version += 1
+
     def snapshot(self):
         with self._lock:
             return MODES[self._mode], self._show_info, self._version
+
+
+def apply_mode_command(modes, path, previous_id, now):
+    """Apply a fresh command once; ignore malformed or stale requests."""
+    try:
+        with open(path) as request:
+            command = json.load(request)
+        command_id, target, requested = command['id'], command['mode'], command['requested']
+        if (isinstance(command_id, str) and command_id != previous_id
+                and target in MODES and isinstance(requested, (int, float))
+                and not isinstance(requested, bool) and 0 <= now - requested <= 5):
+            modes.set_mode(target)
+            return command_id
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return previous_id
 
 
 def start_button_reader(gpio, handle, pin, stop, modes):

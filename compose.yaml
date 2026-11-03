@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - mode-state:/run/moos:ro
+      - mode-state:/run/moos
       - ./config:/config:ro
     ports:
       - "8080:8080"
