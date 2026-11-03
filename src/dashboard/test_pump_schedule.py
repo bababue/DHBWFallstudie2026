@@ -34,6 +34,14 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(self.update(state()), 0)
         self.assertEqual(self.update(state(), day=4), 25)
 
+    def test_next_run_before_after_and_completed_slot(self):
+        self.assertEqual(self.schedule.next_run(OPTIONS, at(3, 5, 0)), at(3, 6, 0).isoformat())
+        self.assertEqual(self.schedule.next_run(OPTIONS, at(3, 6, 1)), at(4, 6, 0).isoformat())
+        self.schedule.mark_today('2026-05-03')
+        self.assertEqual(self.schedule.next_run(OPTIONS, at(3, 6, 0)), at(4, 6, 0).isoformat())
+        self.schedule.last_day = 'unknown'
+        self.assertIsNone(self.schedule.next_run(OPTIONS, at(3, 6, 0)))
+
     def test_missed_time_does_not_run_late(self):
         self.assertEqual(self.update(state(), hour=6, minute=1), 0)
         self.assertFalse(self.path.exists())

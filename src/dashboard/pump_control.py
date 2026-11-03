@@ -25,7 +25,7 @@ def water_overview(readings, config, now):
                 and valid_number(reading.get('value')) and reading['value'] >= 0):
             heights.append(reading['value'])
     height = sum(heights) / len(heights) if heights else None
-    return {'moss_height_cm': height, 'target_cm': target_level(config, height)}
+    return {'moss_height_cm': height, 'moss_averaged': len(heights) > 1, 'target_cm': target_level(config, height)}
 
 
 class PumpRegulator:
