@@ -98,6 +98,7 @@
                   <th>Sensor</th>
                   <th>Rohabstand¹ (cm)</th>
                   <th>Geglätteter Abstand² (cm)</th>
+                  <th>Innerhalb Streuung (%)</th>
                   <th>Berechnete Höhe³ (cm)</th>
                 </tr>
               </thead>
@@ -106,30 +107,35 @@
                   <th scope="row">Wasser</th>
                   <td id="ultrasonic-tank-raw">–</td>
                   <td id="ultrasonic-tank-filtered">–</td>
+                  <td id="ultrasonic-tank-inliers">–</td>
                   <td id="ultrasonic-tank-calculated">–</td>
                 </tr>
                 <tr>
                   <th scope="row">Moos 1</th>
                   <td id="ultrasonic-moss1-raw">–</td>
                   <td id="ultrasonic-moss1-filtered">–</td>
+                  <td id="ultrasonic-moss1-inliers">–</td>
                   <td id="ultrasonic-moss1-calculated">–</td>
                 </tr>
                 <tr>
                   <th scope="row">Moos 2</th>
                   <td id="ultrasonic-moss2-raw">–</td>
                   <td id="ultrasonic-moss2-filtered">–</td>
+                  <td id="ultrasonic-moss2-inliers">–</td>
                   <td id="ultrasonic-moss2-calculated">–</td>
                 </tr>
                 <tr>
                   <th scope="row">Moos 3</th>
                   <td id="ultrasonic-moss3-raw">–</td>
                   <td id="ultrasonic-moss3-filtered">–</td>
+                  <td id="ultrasonic-moss3-inliers">–</td>
                   <td id="ultrasonic-moss3-calculated">–</td>
                 </tr>
                 <tr>
                   <th scope="row">Moos 4</th>
                   <td id="ultrasonic-moss4-raw">–</td>
                   <td id="ultrasonic-moss4-filtered">–</td>
+                  <td id="ultrasonic-moss4-inliers">–</td>
                   <td id="ultrasonic-moss4-calculated">–</td>
                 </tr>
               </tbody>
@@ -138,7 +144,7 @@
           <ol class="debug-notes">
             <li>Abstand von der Sensorfläche zur Wasser- bzw. Moosoberfläche.</li>
             <li
-              id="ultrasonic-filter-note">Geglätteter Abstand: Median gültiger Messwerte.</li>
+              id="ultrasonic-filter-note">Geglätteter Abstand: Median der Werte innerhalb der Streuung.</li>
             <li
               id="ultrasonic-height-note">Wassertiefe bzw. Mooshöhe ab Tankboden: Montagehöhe minus geglätteter Abstand.</li>
           </ol>
@@ -213,7 +219,7 @@
           </section>
         </div>
         <section class="card ultrasonic-panel">
-          <p class="label">Ultraschall-Rohabstände</p>
+          <p class="label">Berechnete Höhen</p>
           <div class="ultrasonic-legend" aria-label="Messstellen">
             <span style="color:#2563eb">Wasser</span><span style="color:#15803d">Moos 1</span>
             <span style="color:#d97706">Moos 2</span><span style="color:#7c3aed">Moos 3</span>
@@ -221,7 +227,7 @@
           </div>
           <div class="chart-container">
             <svg class="chart" id="ultrasonic-chart" viewBox="0 0 800 230"
-              role="img" aria-label="Verlauf der Ultraschall-Rohabstände"></svg>
+              role="img" aria-label="Verlauf der berechneten Wasser- und Mooshöhen"></svg>
           </div>
           <p class="status chart-status"
             id="ultrasonic-status">Lade Verlauf …</p>

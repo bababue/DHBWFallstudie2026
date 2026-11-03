@@ -509,7 +509,7 @@ function initUltrasonicChart() {
       );
       const points = Object.values(series).flat();
       if (!points.length) {
-        status.textContent = "Keine Rohabstände im gewählten Zeitraum";
+        status.textContent = "Keine berechneten Höhen im gewählten Zeitraum";
         return;
       }
       status.textContent = "";
@@ -616,10 +616,15 @@ async function updateDebug() {
         const column = {
           raw_cm: "raw",
           filtered_cm: "filtered",
+          inlier_percent: "inliers",
           calculated_cm: "calculated",
         }[field];
         const cell = document.getElementById(`ultrasonic-${side}-${column}`);
-        if (cell) cell.textContent = fmt(value);
+        if (cell) cell.textContent = column === "inliers"
+          ? Number.isFinite(value)
+            ? value.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " %"
+            : "–"
+          : fmt(value);
       }
       if (values.raw_cm === null) {
         const cell = document.getElementById(`ultrasonic-${side}-raw`);
@@ -633,11 +638,11 @@ async function updateDebug() {
     }
     const filter = data.filter;
     document.getElementById("ultrasonic-filter-note").textContent =
-      `${filter.samples} Messungen; mindestens ${filter.minimum_samples} müssen innerhalb ±${
+      `${filter.samples} Messungen; nur Werte innerhalb ±${
         fmt(filter.water_spread_cm)
       } cm (Wasser) bzw. ±${
         fmt(filter.moss_spread_cm)
-      } cm (Moos) um den Median liegen. Der Median dieser Werte ist der geglättete Abstand. Bei fehlendem Echo oder mehr als ${filter.max_gap_seconds} s Messpause beginnt der Filter neu; bei instabiler Messung „–“.`;
+      } cm (Moos) um den Median fließen in den geglätteten Abstand ein. Die Prozentzahl zeigt ihren Anteil an den ${filter.samples} Messungen. Bei fehlendem Echo oder mehr als ${filter.max_gap_seconds} s Messpause beginnt der Filter neu.`;
     document.getElementById("ultrasonic-height-note").textContent =
       `Höhe ab Tankboden = Montagehöhe − geglätteter Abstand; Wassertiefe mindestens 0. Montagehöhen (cm): Wasser ${
         fmt(data.water_floor_distance_cm)

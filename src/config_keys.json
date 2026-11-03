@@ -171,10 +171,6 @@
     "ultraschall_glaettung",
     "messungen"
   ],
-  "ULTRASONIC_MIN_PERCENT": [
-    "ultraschall_glaettung",
-    "mindestanteil_prozent"
-  ],
   "ULTRASONIC_WATER_SPREAD_CM": [
     "ultraschall_glaettung",
     "wasser_streuung_cm"

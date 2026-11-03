@@ -51,11 +51,8 @@ def validate(data):
             if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
                 raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
         elif name == 'ULTRASONIC_FILTER_SAMPLES':
-            if type(value) is not int or not 3 <= value <= 101 or value % 2 == 0:
-                raise ValueError('ultraschall_glaettung.messungen: ungerade ganze Zahl von 3 bis 101 erforderlich')
-        elif name == 'ULTRASONIC_MIN_PERCENT':
-            if type(value) is not int or not 51 <= value <= 100:
-                raise ValueError('ultraschall_glaettung.mindestanteil_prozent: ganze Zahl von 51 bis 100 erforderlich')
+            if type(value) is not int or not 3 <= value <= 101:
+                raise ValueError('ultraschall_glaettung.messungen: ganze Zahl von 3 bis 101 erforderlich')
         elif name == 'PUMP_LEVEL_PERCENT':
             if type(value) is not int or not 5 <= value <= 100:
                 raise ValueError('automatik.pumpe_leistung_prozent: ganze Zahl 5 bis 100 erforderlich')

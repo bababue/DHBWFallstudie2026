@@ -63,8 +63,7 @@
     "wasser_unter_moosspitzen_cm": 2.5
   },
   "ultraschall_glaettung": {
-    "messungen": 15,
-    "mindestanteil_prozent": 80,
+    "messungen": 60,
     "wasser_streuung_cm": 0.2,
     "moos_streuung_cm": 0.3,
     "max_messpause_s": 12

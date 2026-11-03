@@ -12,7 +12,8 @@ class MossDistanceTests(unittest.TestCase):
         with patch.object(sensor, '_distance_cm', return_value=6.8):
             for _ in range(FILTER_SAMPLES):
                 result = sensor.read()
-        self.assertEqual(result, {'distance_cm': 6.8, 'distance_filtered_cm': 6.8, 'measurement_stable': 1})
+        self.assertEqual(result, {'distance_cm': 6.8, 'distance_filtered_cm': 6.8,
+                                  'distance_inlier_percent': 100, 'measurement_stable': 1})
         sensor.close()
         gpio.callback.return_value.cancel.assert_called_once()
 

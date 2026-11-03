@@ -18,7 +18,7 @@ from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl, light_schedule
 from pump_control import water_overview
 from measurements import (valid_number, fresh, MAX_DISTANCE_CM, WATER_MAX_AGE_SECONDS,
-                          MAX_SAMPLE_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS, required_inliers)
+                          MAX_SAMPLE_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS)
 
 from temperature import PERIODS, combine
 
@@ -201,6 +201,7 @@ def debug_sensors():
         raw = values.get((side, 'distance_cm'), {})
         filtered = values.get((side, 'distance_filtered_cm'), {})
         stable = values.get((side, 'measurement_stable'), {})
+        inliers = values.get((side, 'distance_inlier_percent'), {})
         raw_value = raw.get('value') if valid_number(raw.get('value')) else None
         echo = values.get((side, 'echo_received'), {})
         ultrasonic_status[side] = ('ok' if raw_value is not None else
@@ -209,6 +210,10 @@ def debug_sensors():
         if (not valid_number(value) or stable.get('value') != 1
                 or stable.get('sampled') != filtered.get('sampled')):
             value = None
+        inlier_percent = inliers.get('value')
+        if (not valid_number(inlier_percent) or raw_value is None
+                or inliers.get('sampled') != raw.get('sampled')):
+            inlier_percent = None
         calculated = None
         if value is not None:
             if side == 'tank':
@@ -219,12 +224,11 @@ def debug_sensors():
                 mount = config['moos']['montagehoehe_cm']
                 if mount is not None:
                     calculated = mount - value
-        ultrasonic[side] = {'raw_cm': raw_value, 'filtered_cm': value, 'calculated_cm': calculated}
+        ultrasonic[side] = {'raw_cm': raw_value, 'filtered_cm': value,
+                            'inlier_percent': inlier_percent, 'calculated_cm': calculated}
     settings = config['ultraschall_glaettung']
     return {'readings': readings, 'ultrasonic': ultrasonic, 'ultrasonic_status': ultrasonic_status,
-            'filter': {'samples': settings['messungen'], 'fraction': settings['mindestanteil_prozent'] / 100,
-                       'minimum_samples': required_inliers(settings['messungen'], settings['mindestanteil_prozent']),
-                       'max_gap_seconds': settings['max_messpause_s'],
+            'filter': {'samples': settings['messungen'], 'max_gap_seconds': settings['max_messpause_s'],
                        'water_spread_cm': settings['wasser_streuung_cm'], 'moss_spread_cm': settings['moos_streuung_cm']},
             'moss_mounting_height_cm': config['moos']['montagehoehe_cm'],
             'water_floor_distance_cm': config['wasserstand']['sensor_boden_abstand_cm']}
@@ -307,22 +311,29 @@ def ultrasonic_history(period: str = '1h'):
     org = setting('INFLUXDB_ORG', 'moos')
     bucket = setting('INFLUXDB_BUCKET', 'moos_sensors')
     sides = ('tank', 'moss1', 'moss2', 'moss3', 'moss4')
-    side_filter = ' or '.join(f'r.side == {json.dumps(side)}' for side in sides)
+    moss_filter = ' or '.join(f'r.side == {json.dumps(side)}' for side in sides[1:])
     query = (f'from(bucket: {json.dumps(bucket)})\n'
              f'  |> range(start: -{duration})\n'
              '  |> filter(fn: (r) => r._measurement == "moos_sensor" '
-             'and r.sensor == "ultrasonic" and r._field == "distance_cm" '
-             f'and ({side_filter}))\n'
+             'and r.sensor == "ultrasonic" '
+             'and ((r.side == "tank" and r._field == "water_level_cm") '
+             f'or (({moss_filter}) and r._field == "distance_filtered_cm")))\n'
              f'  |> aggregateWindow(every: {window}, fn: last, createEmpty: false, timeSrc: "_start")')
     series = {side: [] for side in sides}
     try:
+        moss_mount = load()['moos']['montagehoehe_cm']
         with InfluxDBClient(url=setting('INFLUXDB_URL', 'http://influxdb:8086'),
                             token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
             for table in client.query_api().query(query, org=org):
                 for record in table.records:
                     side, value = record.values.get('side'), record.get_value()
-                    if side in series and valid_number(value):
-                        series[side].append({'time': int(record.get_time().timestamp()), 'value': value})
+                    if side not in series or not valid_number(value):
+                        continue
+                    if side != 'tank':
+                        if moss_mount is None:
+                            continue
+                        value = moss_mount - value
+                    series[side].append({'time': int(record.get_time().timestamp()), 'value': value})
         for points in series.values():
             points.sort(key=lambda point: point['time'])
         return {'series': series, 'window_seconds': int(window[:-1]) * (60 if window.endswith('m') else 1)}

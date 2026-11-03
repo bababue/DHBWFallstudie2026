@@ -61,12 +61,16 @@ in [HARDWARE.md](HARDWARE.md).
 Die Moossensoren messen direkt den Abstand ab Decke. Unter `moos` stehen eine
 gemeinsame `montagehoehe_cm` (Abstand Sensorfläche–Tankboden) und die Pins der
 vier Sensoren unter `sensoren`.
-Das Dashboard zeigt den Verlauf der Rohabstände von Wasser und Moos 1 bis 4.
-Für längere Zeiträume wird pro Zeitfenster jeweils der letzte Rohwert dargestellt.
+Das Dashboard zeigt die berechnete Wassertiefe und die vier Mooshöhen.
+Die Werte beruhen auf geglätteten Abständen; für längere Zeiträume wird pro
+Zeitfenster jeweils der letzte berechnete Wert dargestellt.
 Die Ultraschallglättung steht in `config/config.json` unter `ultraschall_glaettung`:
-`messungen` (15), `mindestanteil_prozent` (80), `wasser_streuung_cm` (0,2),
+`messungen` (60), `wasser_streuung_cm` (0,2),
 `moos_streuung_cm` (0,3) und `max_messpause_s` (12). Nach einer Änderung startet der Sensorprozess neu.
-Mehr Messungen verlängern die Zeit, bis ein geglätteter Wert verfügbar ist.
+Nur Werte innerhalb der erlaubten Streuung um den Median der 60 Messungen
+fließen in den geglätteten Abstand ein. Das Debug-Panel zeigt ihren Anteil in
+Prozent. Der erste geglättete Wert erscheint nach etwa einer Minute für Wasser
+und nach etwa vier Minuten für Moos, sofern kein Echo ausfällt.
 Die maximale Messpause muss größer als die Messintervalle für Wasser und Moos
 und darf höchstens 12 Sekunden sein.
 Weitere Zeitgrenzen stehen in `src/measurements.py`.

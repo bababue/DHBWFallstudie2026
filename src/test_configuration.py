@@ -21,9 +21,8 @@ class ConfigurationTests(unittest.TestCase):
         with self.assertRaises(ValueError): validate(data)
 
     def test_ultrasonic_filter_requires_safe_valid_parameters(self):
-        for key, value in [('messungen', 2), ('messungen', 4), ('messungen', 102),
-                           ('messungen', 15.0), ('mindestanteil_prozent', 50),
-                           ('mindestanteil_prozent', 101), ('mindestanteil_prozent', 80.5),
+        for key, value in [('messungen', 2), ('messungen', 102),
+                           ('messungen', 15.0),
                            ('wasser_streuung_cm', 0), ('moos_streuung_cm', 5.1),
                            ('wasser_streuung_cm', True), ('max_messpause_s', 0),
                            ('max_messpause_s', 13), ('max_messpause_s', True)]:
@@ -32,7 +31,7 @@ class ConfigurationTests(unittest.TestCase):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 validate(data)
         data = copy.deepcopy(load())
-        data['ultraschall_glaettung'].update(messungen=3, mindestanteil_prozent=51,
+        data['ultraschall_glaettung'].update(messungen=60,
                                              wasser_streuung_cm=.01, moos_streuung_cm=5)
         validate(data)
 
