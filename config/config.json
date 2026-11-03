@@ -12,7 +12,7 @@
   "wasserstand": {
     "trigger_gpio": 6,
     "echo_gpio": 13,
-    "sensor_boden_abstand_cm": 8.265,
+    "sensor_boden_abstand_cm": 8.5,
     "max_fuellhoehe_cm": 7.0
   },
   "moos_1": {
