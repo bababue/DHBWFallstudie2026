@@ -22,14 +22,14 @@
     "trigger_gpio": 9,
     "echo_gpio": 11,
     "bezugsabstand_cm": 6.94,
-    "demo": false,
+    "demo": true,
     "demo_abstand_cm": 5.44
   },
   "moos_2": {
     "trigger_gpio": 0,
     "echo_gpio": 5,
     "bezugsabstand_cm": 6.059,
-    "demo": false,
+    "demo": true,
     "demo_abstand_cm": 4.559
   },
   "moos_3": {
