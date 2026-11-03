@@ -18,22 +18,22 @@
   "moos_1": {
     "trigger_gpio": 9,
     "echo_gpio": 11,
-    "montagehoehe_cm": 12.94
+    "montagehoehe_cm": 13.1
   },
   "moos_2": {
     "trigger_gpio": 0,
     "echo_gpio": 5,
-    "montagehoehe_cm": 12.059
+    "montagehoehe_cm": 13.1
   },
   "moos_3": {
     "trigger_gpio": 22,
     "echo_gpio": 10,
-    "montagehoehe_cm": null
+    "montagehoehe_cm": 13.1
   },
   "moos_4": {
     "trigger_gpio": 17,
     "echo_gpio": 27,
-    "montagehoehe_cm": null
+    "montagehoehe_cm": 13.1
   },
   "taster": {
     "gpio": 26
