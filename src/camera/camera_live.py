@@ -13,8 +13,8 @@ from http import server
 PORT = int(os.environ.get("KAMERA_PORT", "8000"))
 BREITE = 1280
 HOEHE = 720
-FPS = 30
-QUALITAET = 80
+FPS = 10
+QUALITAET = 60
 # Nach dem letzten Zuschauer noch kurz weiterlaufen, damit ein Neuladen der Seite
 # nicht jedes Mal einen Kamera-Neustart auslöst.
 NACHLAUF_S = 10
