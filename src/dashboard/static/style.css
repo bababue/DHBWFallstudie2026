@@ -134,6 +134,8 @@ header {
   margin: 0;
   line-height: 1.4;
   font-size: .95rem;
+  font-weight: 400;
+  white-space: pre-line;
 }
 
 .metric-readout p {
@@ -341,11 +343,6 @@ h1 {
   font-size: .9rem;
 }
 
-#temperature-source,
-#humidity-source,
-#co2-source,
-#light-source,
-#water-source,
 .temperature-head,
 .humidity-head,
 .co2-head,
