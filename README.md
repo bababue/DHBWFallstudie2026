@@ -146,10 +146,11 @@ Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalt
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
 Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
-Im AUTO-Modus ist der Lüfter derzeit auf 0 % gesetzt. Die Pumpe hält einen festen Wasserstand
-von 1,3 cm und läuft dafür durchgehend mit 25 %, bis dieser erreicht ist. Das Licht folgt
-`automatik` in der Konfiguration: standardmäßig 06:00 bis 22:00 Uhr mit 100 %,
-die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin). Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
+Im AUTO-Modus hält die Pumpe den Zielwasserstand unterhalb der Moosspitzen.
+Das Licht folgt `automatik` in der Konfiguration: standardmäßig 06:00 bis
+22:00 Uhr mit 50 %, die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin).
+Temperaturregelung und Übertemperaturschutz können Licht und Lüfter anpassen.
+Beim Verlassen von MANUAL werden die automatischen Sollwerte wieder übernommen.
 Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
 werden die Ausgänge auf 0 gesetzt. Die GPIOs und PWM-Frequenzen stehen unter
@@ -270,8 +271,9 @@ horizontale Ziellinie den aktuell eingestellten Sollwert über den gewählten Ze
 
 Während der Lichtphase regeln Licht und Lüfter auf 22 °C. Je Seite wird ein
 aktueller SHT45-Wert verwendet, ersatzweise SCD40; die wärmere Seite entscheidet.
-Ab 22,3 °C steigt die Lüfterleistung proportional, ab 23 °C wird zusätzlich das
-Licht gedimmt. Bei 25 °C: Licht aus, Lüfter 100 %. Dieser Schutz bleibt aktiv,
+Über 22 °C wird das Licht zunehmend gedimmt. Ab 24 °C schaltet der Lüfter
+zu und steigt bis 25 °C auf 100 %; unter 23,5 °C schaltet er wieder aus.
+Bei 25 °C: Licht aus, Lüfter 100 %. Dieser Schutz bleibt aktiv,
 bis beide Seiten unter 24 °C liegen, auch während der Dunkelphase. Sonst bleibt
 nachts das Licht aus und die Temperaturregelung pausiert. Fehlt auf einer Seite
 länger als 12 Sekunden ein gültiger Messwert, wird ebenfalls das Licht ausgeschaltet
@@ -279,7 +281,10 @@ und der Lüfter auf 100 % gesetzt. Ein veralteter Sensorservice-Snapshot wird
 bereits nach 5 Sekunden verworfen. MANUAL bleibt manuell.
 
 `automatik.temperatur_ziel_c` (22) und `temperatur_max_c` (25) sind konfigurierbar;
-das Maximum muss mindestens 2 °C über dem Ziel liegen. Der Dimmbeginn liegt ein
-Drittel zwischen Ziel und Maximum. Die Skala unter dem Lichtplan zeigt die wärmere
-Seite, Ziel, Maximum und die aktuelle Regelaktion. Lüftung kann nicht unter die
+das Maximum muss mindestens 2 °C über dem Ziel liegen. Die Dimmung beginnt
+am Ziel; der Lüfter startet 1 °C unter dem Maximum und stoppt 1,5 °C darunter.
+Die Skala unter dem Lichtplan zeigt die wärmere Seite, Ziel und Maximum. Lüftung kann nicht unter die
 Umgebungstemperatur kühlen; 25 °C sind eine Abschaltgrenze, keine physikalische Garantie.
+
+Beim Eintritt in MANUAL gelten einmalig: Pumpe 0 %, Licht 20 %, Lüfter 20 %.
+Danach bleiben Änderungen über die Regler bis zum nächsten Moduswechsel erhalten.

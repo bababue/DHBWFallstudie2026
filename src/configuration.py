@@ -16,7 +16,7 @@ def upgrade(data):
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
         data.pop("deckel", None)
         data.setdefault("automatik", {"licht_start_stunde": 6, "lichtdauer_stunden": 16,
-                                      "lichtstaerke_prozent": 100})
+                                      "lichtstaerke_prozent": 50})
         if isinstance(data.get("automatik"), dict):
             options = dict(data["automatik"])
             legacy_pulse = 'pumpe_impuls_s' in options

@@ -12,9 +12,21 @@ class AutomaticControlTests(unittest.TestCase):
         self.controller = MagicMock()
         self.controller.status.return_value = {'fan': 30, 'pump': 20, 'led': 80}
         self.automatic = AutomaticControl(self.controller, lambda: self.mode)
+        self.automatic.manual_initialized = True
         self.schedule = patch('automatic.auto_setpoints', return_value={'fan': 0, 'pump': 0, 'led': 0})
         self.schedule.start()
         self.addCleanup(self.schedule.stop)
+
+    def test_manual_defaults_once_and_slider_preserved(self):
+        self.automatic.manual_initialized = False
+        self.automatic.apply()
+        self.controller.set.assert_any_call('pump', 0)
+        self.controller.set.assert_any_call('led', 20)
+        self.controller.set.assert_any_call('fan', 20)
+        self.controller.set.reset_mock()
+        self.automatic.set_manual('led', 35)
+        self.automatic.apply()
+        self.controller.set.assert_called_once_with('led', 35)
 
     def test_light_schedule_boundaries_and_midnight(self):
         self.schedule.stop()
@@ -59,7 +71,9 @@ class AutomaticControlTests(unittest.TestCase):
         self.controller.set.reset_mock()
         self.mode = 'MANUAL'
         self.automatic.apply()
-        self.controller.set.assert_not_called()
+        self.controller.set.assert_any_call('pump', 0)
+        self.controller.set.assert_any_call('led', 20)
+        self.controller.set.assert_any_call('fan', 20)
         self.assertFalse(self.automatic.pump.reached)
 
     def test_manual_values_are_only_set_in_manual(self):

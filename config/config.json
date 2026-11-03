@@ -65,7 +65,7 @@
   "automatik": {
     "licht_start_stunde": 6,
     "lichtdauer_stunden": 16,
-    "lichtstaerke_prozent": 100,
+    "lichtstaerke_prozent": 50,
     "pumpe_hysterese_cm": 0.2,
     "pumpe_leistung_prozent": 25,
     "temperatur_ziel_c": 22,

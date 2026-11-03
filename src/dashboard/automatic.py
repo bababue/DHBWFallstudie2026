@@ -10,6 +10,7 @@ from thermal_control import ThermalRegulator
 from threading import Event, RLock, Thread
 
 LOG = logging.getLogger('moos.automatic')
+MANUAL_DEFAULTS = {'pump': 0, 'led': 20, 'fan': 20}
 
 
 def light_schedule(config=None, now=None):
@@ -40,6 +41,7 @@ class AutomaticControl:
         self.lock = RLock()
         self.stop_event = Event()
         self.thread = None
+        self.manual_initialized = False
 
     def apply(self):
         with self.lock:
@@ -49,9 +51,11 @@ class AutomaticControl:
                 self.actuators.set('pump', 0)
                 current['pump'] = 0
             mode = self.get_mode()
+            if mode != 'MANUAL':
+                self.manual_initialized = False
             if mode != 'AUTO':
                 if mode == 'MANUAL':
-                    self.pump.reset()
+                    self.initialize_manual()
                 elif current['pump']:
                     self.actuators.set('pump', 0)
                 return
@@ -69,10 +73,22 @@ class AutomaticControl:
                 if current[device] != value:
                     self.actuators.set(device, value)
 
+    def initialize_manual(self):
+        """Apply entry values once, preserving subsequent slider adjustments."""
+        if self.manual_initialized:
+            return
+        self.pump.reset()
+        for device, value in MANUAL_DEFAULTS.items():
+            if self.get_mode() != 'MANUAL':
+                return
+            self.actuators.set(device, value)
+        self.manual_initialized = True
+
     def set_manual(self, device, value):
         with self.lock:
             if self.get_mode() != 'MANUAL':
                 raise PermissionError('Nur im Manual-Modus verfügbar')
+            self.initialize_manual()
             return self.actuators.set(device, value)
 
     def start(self):

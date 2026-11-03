@@ -12,14 +12,14 @@ class ThermalTests(unittest.TestCase):
         self.reg = ThermalRegulator()
 
     def value(self, temp, active=True, now=100):
-        return self.reg.update(readings(temp), OPTIONS, dict(active=active, level=100), now)
+        return self.reg.update(readings(temp), OPTIONS, dict(active=active, level=50), now)
 
     def test_daytime_cooling_and_dimming(self):
-        self.assertEqual((self.value(21)['fan'], self.value(21)['led']), (0, 100))
-        self.assertGreater(self.value(22.5)['fan'], 0)
-        self.assertEqual(self.value(22.5)['led'], 100)
-        self.assertEqual(self.value(24)['led'], 50)
-        self.assertGreater(self.value(24)['fan'], self.value(23)['fan'])
+        self.assertEqual((self.value(21)['fan'], self.value(21)['led']), (0, 50))
+        self.assertEqual((self.value(22)['fan'], self.value(22)['led']), (0, 50))
+        self.assertEqual((self.value(23)['fan'], self.value(23)['led']), (0, 35))
+        self.assertEqual((self.value(24)['fan'], self.value(24)['led']), (5, 15))
+        self.assertEqual(self.value(24.5)['fan'], 50)
 
     def test_cutoff_and_recovery_hysteresis(self):
         self.assertEqual(self.value(25)['led'], 0)
@@ -46,10 +46,10 @@ class ThermalTests(unittest.TestCase):
         self.assertEqual(self.reg.update(data, OPTIONS, dict(active=True, level=100), 100)['led'], 0)
 
     def test_fan_deadband(self):
-        self.assertEqual(self.value(22.2)['fan'], 0)
-        self.assertGreater(self.value(22.4)['fan'], 0)
-        self.assertGreater(self.value(22.1)['fan'], 0)
-        self.assertEqual(self.value(22)['fan'], 0)
+        self.assertEqual(self.value(23.9)['fan'], 0)
+        self.assertGreater(self.value(24)['fan'], 0)
+        self.assertGreater(self.value(23.5)['fan'], 0)
+        self.assertEqual(self.value(23.4)['fan'], 0)
 
 class IntegrationTests(unittest.TestCase):
     def test_auto_controls_actual_outputs_and_manual_is_untouched(self):
@@ -65,4 +65,6 @@ class IntegrationTests(unittest.TestCase):
             actuator.set.reset_mock()
             control.get_mode = lambda: 'MANUAL'
             control.apply()
-            actuator.set.assert_not_called()
+            actuator.set.assert_any_call('pump', 0)
+            actuator.set.assert_any_call('led', 20)
+            actuator.set.assert_any_call('fan', 20)

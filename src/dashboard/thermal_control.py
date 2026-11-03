@@ -39,16 +39,16 @@ class ThermalRegulator:
             self.cooling = False
             fan, led, reason = 0, 0, 'Dunkelphase'
         else:
-            if temp >= target + .3:
+            # Start cooling one degree below the limit; retain it until 1.5 °C below.
+            fan_start = limit - 1
+            if temp >= fan_start:
                 self.cooling = True
-            elif temp <= target:
+            elif temp < limit - 1.5:
                 self.cooling = False
-            # Quantized outputs and a dead band avoid rapid fan start/stop cycles.
-            fan = max(5, min(100, round((temp-target)/(limit-target)*20)*5)) if self.cooling else 0
-            dim_start = target + (limit-target)/3
-            factor = max(0, min(1, (limit-temp)/(limit-dim_start)))
-            led = round(schedule['level'] * factor / 5) * 5
-            led = min(schedule['level'], led)
-            reason = 'Licht gedimmt · Kühlung' if factor < 1 else ('Kühlung' if fan else 'Zielbereich' if temp >= target-.3 else 'Aufwärmen')
+            fan = max(5, min(100, round((temp-fan_start)*100/5)*5)) if self.cooling else 0
+            # Prefer reducing heat input over ventilation during the day.
+            factor = max(0, min(1, (limit-temp)/(limit-target)))
+            led = min(schedule['level'], round(schedule['level'] * factor / 5) * 5)
+            reason = ('Licht gedimmt · Kühlung' if self.cooling else 'Licht gedimmt') if factor < 1 else ('Zielbereich' if temp >= target-.3 else 'Aufwärmen')
         self.state = dict(temperature=temp, target=target, maximum=limit, fan=fan, led=led, reason=reason)
         return self.state
