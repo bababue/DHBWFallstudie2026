@@ -31,6 +31,7 @@ class WaterNoise:
 class MossHeight(TimestampUltrasonic):
     name = "ultrasonic"
     WINDOW_S = 60
+    PLATFORM_HEIGHT_CM = 6.0
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None,
                  demo_distance_cm=None, demo_sigma_cm=None, demo_enabled=None):
@@ -62,9 +63,9 @@ class MossHeight(TimestampUltrasonic):
             self.recent_distances.popleft()
         result = {"distance_cm": distance, "demo_data": self.demo_enabled}
         if self.empty_distance_cm is not None:
-            result["height_cm"] = max(0.0, self.empty_distance_cm - result["distance_cm"])
+            result["height_cm"] = max(0.0, self.PLATFORM_HEIGHT_CM + self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)
-            result["height_median_1m_cm"] = max(0.0, self.empty_distance_cm - minute_distance)
+            result["height_median_1m_cm"] = max(0.0, self.PLATFORM_HEIGHT_CM + self.empty_distance_cm - minute_distance)
         return result
 
 

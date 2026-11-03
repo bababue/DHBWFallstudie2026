@@ -31,7 +31,7 @@ class MossHeightTests(unittest.TestCase):
         with patch('moss_height.random.gauss', return_value=8.05) as draw:
             fields = sensor.read()
         draw.assert_called_once_with(8, 0.1)
-        self.assertAlmostEqual(fields['height_cm'], 1.95)
+        self.assertAlmostEqual(fields['height_cm'], 7.95)
         self.assertTrue(fields['demo_data'])
         sensor.close()
         gpio.gpio_claim_output.assert_not_called()
@@ -64,9 +64,17 @@ class MossHeightTests(unittest.TestCase):
                 patch("moss_height.time.monotonic", side_effect=[0, 5]):
             first = sensor.read()
             second = sensor.read()
-        self.assertEqual(first["height_cm"], 2.0)
-        self.assertEqual(second["height_cm"], 3.0)
-        self.assertEqual(second["height_median_1m_cm"], 2.5)
+        self.assertEqual(first["height_cm"], 8.0)
+        self.assertEqual(second["height_cm"], 9.0)
+        self.assertEqual(second["height_median_1m_cm"], 8.5)
+        sensor.close()
+
+    def test_height_is_measured_from_floor_and_clamped_at_floor(self):
+        sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=6.94)
+        with patch('moss_height.TimestampUltrasonic._distance_cm', side_effect=[5.44, 10.68812, 20]):
+            self.assertAlmostEqual(sensor.read()['height_cm'], 7.5)
+            self.assertAlmostEqual(sensor.read()['height_cm'], 2.25188)
+            self.assertEqual(sensor.read()['height_cm'], 0)
         sensor.close()
 
     def test_aggregate_needs_both_recent_calibrated_sensors(self):

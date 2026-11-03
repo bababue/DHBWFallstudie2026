@@ -253,3 +253,5 @@ getrennt von den SHT45-Werten.
 Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/33FD6951/662A593A/HT_DS_Datasheet_SHT4x.pdf),
 [SCD4x-Datenblatt](https://sensirion.com/media/documents/E0F04247/631EF271/CD_DS_SCD40_SCD41_Datasheet_D1.pdf),
 [InfluxDB-Compose-Einrichtung](https://docs.influxdata.com/influxdb/v2/install/use-docker-compose/).
+
+Die Moosspitzenhöhe wird ab dem Boden berechnet: `max(0; 6 cm + Bezugsabstand − Rohabstand)`. Die 6 cm entsprechen der Gitterhöhe; der Bezugsabstand stammt aus der Papierkalibrierung auf dem Gitter.
