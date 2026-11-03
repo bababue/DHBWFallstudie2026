@@ -17,7 +17,9 @@ from configuration import load, setting
 from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl, light_schedule
 from pump_control import water_overview
-from measurements import valid_number, fresh, MAX_DISTANCE_CM, WATER_MAX_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS
+from measurements import (valid_number, fresh, MAX_DISTANCE_CM, WATER_MAX_AGE_SECONDS,
+                          MAX_SAMPLE_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS, FILTER_SAMPLES, MIN_STABLE_FRACTION,
+                          WATER_SPREAD_CM, MOSS_SPREAD_CM)
 
 from temperature import PERIODS, combine
 
@@ -187,7 +189,39 @@ def live_readings():
 
 @app.get('/api/debug/sensors')
 def debug_sensors():
-    return {'readings': live_readings()}
+    readings = live_readings()
+    config = load()
+    now = time.time()
+    values = {(r['side'], r['field']): r for r in readings
+              if r['sensor'] == 'ultrasonic'
+              and fresh(r.get('sampled'), now,
+                        WATER_MAX_AGE_SECONDS if r['side'] == 'tank' else MAX_SAMPLE_AGE_SECONDS)}
+    ultrasonic = {}
+    for side in ('tank', 'moss1', 'moss2', 'moss3', 'moss4'):
+        raw = values.get((side, 'distance_cm'), {})
+        filtered = values.get((side, 'distance_filtered_cm'), {})
+        stable = values.get((side, 'measurement_stable'), {})
+        raw_value = raw.get('value') if valid_number(raw.get('value')) else None
+        value = filtered.get('value')
+        if (not valid_number(value) or stable.get('value') != 1
+                or stable.get('sampled') != filtered.get('sampled')):
+            value = None
+        calculated = None
+        if value is not None:
+            if side == 'tank':
+                level = values.get((side, 'water_level_cm'), {})
+                if valid_number(level.get('value')) and level.get('sampled') == filtered.get('sampled'):
+                    calculated = level['value']
+            else:
+                mount = config[f'moos_{side[-1]}']['montagehoehe_cm']
+                if mount is not None:
+                    calculated = mount - value
+        ultrasonic[side] = {'raw_cm': raw_value, 'filtered_cm': value, 'calculated_cm': calculated}
+    return {'readings': readings, 'ultrasonic': ultrasonic,
+            'filter': {'samples': FILTER_SAMPLES, 'fraction': MIN_STABLE_FRACTION,
+                       'water_spread_cm': WATER_SPREAD_CM, 'moss_spread_cm': MOSS_SPREAD_CM},
+            'mounting_heights_cm': {f'moss{i}': config[f'moos_{i}']['montagehoehe_cm'] for i in range(1, 5)},
+            'water_floor_distance_cm': config['wasserstand']['sensor_boden_abstand_cm']}
 
 
 @app.get('/api/temperature')

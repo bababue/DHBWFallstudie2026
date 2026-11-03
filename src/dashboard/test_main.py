@@ -129,6 +129,51 @@ class DashboardTests(unittest.TestCase):
                 path.write_text(json.dumps({'updated': now - 6, 'readings': readings}))
                 self.assertEqual(main.live_readings(), [])
 
+    def test_ultrasonic_debug_uses_fresh_filtered_readings_and_mounting_heights(self):
+        config = main.load()
+        config['moos_3']['montagehoehe_cm'] = None
+        now = 100
+        def reading(side, field, value, sampled=now):
+            return dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=sampled)
+        data = [reading('tank', 'distance_cm', 4.0),
+                reading('tank', 'distance_filtered_cm', 4.1),
+                reading('tank', 'measurement_stable', 1),
+                reading('tank', 'water_level_cm', 4.165),
+                reading('moss1', 'distance_cm', 5.1),
+                reading('moss1', 'distance_filtered_cm', 5.2),
+                reading('moss1', 'measurement_stable', 1),
+                reading('moss2', 'distance_cm', 4.0, 80),
+                reading('moss2', 'distance_filtered_cm', 4.1, 80),
+                reading('moss2', 'measurement_stable', 1, 80),
+                reading('moss3', 'distance_cm', 5),
+                reading('moss3', 'distance_filtered_cm', 5),
+                reading('moss3', 'measurement_stable', 1),
+                reading('moss4', 'distance_cm', 5),
+                reading('moss4', 'distance_filtered_cm', 4.9),
+                reading('moss4', 'measurement_stable', 0)]
+        with patch.object(main, 'live_readings', return_value=data), \
+                patch.object(main, 'load', return_value=config), \
+                patch.object(main.time, 'time', return_value=now):
+            result = main.debug_sensors()['ultrasonic']
+        self.assertEqual(result['tank'], dict(raw_cm=4, filtered_cm=4.1, calculated_cm=4.165))
+        self.assertAlmostEqual(result['moss1']['calculated_cm'], config['moos_1']['montagehoehe_cm'] - 5.2)
+        self.assertEqual(result['moss2'], dict(raw_cm=None, filtered_cm=None, calculated_cm=None))
+        self.assertEqual(result['moss3'], dict(raw_cm=5, filtered_cm=5, calculated_cm=None))
+        self.assertEqual(result['moss4'], dict(raw_cm=5, filtered_cm=None, calculated_cm=None))
+
+    def test_ultrasonic_debug_does_not_mix_old_water_or_inconsistent_samples(self):
+        now = 100
+        data = [dict(side='tank', sensor='ultrasonic', field=field, value=value, sampled=sampled)
+                for field, value, sampled in [('distance_cm', 4, 96), ('distance_filtered_cm', 4, 96),
+                                              ('measurement_stable', 1, 96), ('water_level_cm', 4, 96)]]
+        data += [dict(side='moss1', sensor='ultrasonic', field=field, value=value, sampled=sampled)
+                 for field, value, sampled in [('distance_cm', 5, 100), ('distance_filtered_cm', 5, 99),
+                                               ('measurement_stable', 1, 100)]]
+        with patch.object(main, 'live_readings', return_value=data), patch.object(main.time, 'time', return_value=now):
+            result = main.debug_sensors()['ultrasonic']
+        self.assertEqual(result['tank'], dict(raw_cm=None, filtered_cm=None, calculated_cm=None))
+        self.assertEqual(result['moss1'], dict(raw_cm=5, filtered_cm=None, calculated_cm=None))
+
     def test_manual_shows_live_values_and_history(self):
         readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21)]
         record = SimpleNamespace(values={'side': 'left', 'sensor': 'sht45'},

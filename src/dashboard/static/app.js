@@ -641,6 +641,38 @@ async function updateDebug() {
       );
       if (cell) cell.textContent = String(reading.value);
     }
+    const fmt = (value) =>
+      Number.isFinite(value)
+        ? value.toLocaleString("de-DE", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 3,
+        })
+        : "–";
+    for (const [side, values] of Object.entries(data.ultrasonic)) {
+      for (const [field, value] of Object.entries(values)) {
+        const column = {
+          raw_cm: "raw",
+          filtered_cm: "filtered",
+          calculated_cm: "calculated",
+        }[field];
+        const cell = document.getElementById(`ultrasonic-${side}-${column}`);
+        if (cell) cell.textContent = fmt(value);
+      }
+    }
+    const filter = data.filter;
+    document.getElementById("ultrasonic-filter-note").textContent =
+      `${filter.samples} Messungen; mindestens ${
+        Math.ceil(filter.samples * filter.fraction)
+      } müssen innerhalb ±${fmt(filter.water_spread_cm)} cm (Wasser) bzw. ±${
+        fmt(filter.moss_spread_cm)
+      } cm (Moos) um den Median liegen. Angezeigt wird der Median dieser Werte; bei instabiler Messung „–“.`;
+    const mounts = Object.entries(data.mounting_heights_cm)
+      .map(([side, value]) => side.replace("moss", "Moos ") + ": " + fmt(value))
+      .join(" · ");
+    document.getElementById("ultrasonic-height-note").textContent =
+      `Höhe ab Tankboden = Montagehöhe − geglätteter Abstand; Wassertiefe mindestens 0. Montagehöhen (cm): Wasser ${
+        fmt(data.water_floor_distance_cm)
+      } · ${mounts}.`;
     debugStatus.textContent = data.readings.length
       ? ""
       : "Keine aktuellen Messwerte";

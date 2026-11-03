@@ -39,7 +39,7 @@
       </header>
       <div class="grid">
         <section class="card" id="debug-panel" hidden>
-          <p class="label">Sensoren · Rohwerte</p>
+          <p class="label">Klima- und Lichtsensoren</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -87,79 +87,61 @@
                   <td id="left-bh1750-illuminance_lux">–</td>
                   <td id="right-bh1750-illuminance_lux">–</td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="label ultrasonic-title">Ultraschallsensoren</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <td>Wasser</td>
-                  <td>Ultraschall</td>
-                  <td>
-                    <small>Wassersensor (cm)</small>
-                    <br>
-                    <span id="tank-ultrasonic-distance_cm">–</span>
-                  </td>
-                  <td>
-                    <small>Wassertiefe gefiltert (cm)</small>
-                    <br>
-                    <span id="tank-ultrasonic-water_level_cm">–</span>
-                  </td>
+                  <th>Sensor</th>
+                  <th>Rohabstand¹ (cm)</th>
+                  <th>Geglätteter Abstand² (cm)</th>
+                  <th>Berechnete Höhe³ (cm)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Wasser</th>
+                  <td id="ultrasonic-tank-raw">–</td>
+                  <td id="ultrasonic-tank-filtered">–</td>
+                  <td id="ultrasonic-tank-calculated">–</td>
                 </tr>
                 <tr>
-                  <td>Moos 1</td>
-                  <td>Ultraschall</td>
-                  <td>
-                    <small>Deckenabstand roh (cm)</small>
-                    <br>
-                    <span id="moss1-ultrasonic-distance_cm">–</span>
-                  </td>
-                  <td>
-                    <small>Deckenabstand gefiltert (cm)</small>
-                    <br>
-                    <span id="moss1-ultrasonic-distance_filtered_cm">–</span>
-                  </td>
+                  <th scope="row">Moos 1</th>
+                  <td id="ultrasonic-moss1-raw">–</td>
+                  <td id="ultrasonic-moss1-filtered">–</td>
+                  <td id="ultrasonic-moss1-calculated">–</td>
                 </tr>
                 <tr>
-                  <td>Moos 2</td>
-                  <td>Ultraschall</td>
-                  <td>
-                    <small>Deckenabstand roh (cm)</small>
-                    <br>
-                    <span id="moss2-ultrasonic-distance_cm">–</span>
-                  </td>
-                  <td>
-                    <small>Deckenabstand gefiltert (cm)</small>
-                    <br>
-                    <span id="moss2-ultrasonic-distance_filtered_cm">–</span>
-                  </td>
+                  <th scope="row">Moos 2</th>
+                  <td id="ultrasonic-moss2-raw">–</td>
+                  <td id="ultrasonic-moss2-filtered">–</td>
+                  <td id="ultrasonic-moss2-calculated">–</td>
                 </tr>
                 <tr>
-                  <td>Moos 3</td>
-                  <td>Ultraschall</td>
-                  <td>
-                    <small>Deckenabstand roh (cm)</small>
-                    <br>
-                    <span id="moss3-ultrasonic-distance_cm">–</span>
-                  </td>
-                  <td>
-                    <small>Deckenabstand gefiltert (cm)</small>
-                    <br>
-                    <span id="moss3-ultrasonic-distance_filtered_cm">–</span>
-                  </td>
+                  <th scope="row">Moos 3</th>
+                  <td id="ultrasonic-moss3-raw">–</td>
+                  <td id="ultrasonic-moss3-filtered">–</td>
+                  <td id="ultrasonic-moss3-calculated">–</td>
                 </tr>
                 <tr>
-                  <td>Moos 4</td>
-                  <td>Ultraschall</td>
-                  <td>
-                    <small>Deckenabstand roh (cm)</small>
-                    <br>
-                    <span id="moss4-ultrasonic-distance_cm">–</span>
-                  </td>
-                  <td>
-                    <small>Deckenabstand gefiltert (cm)</small>
-                    <br>
-                    <span id="moss4-ultrasonic-distance_filtered_cm">–</span>
-                  </td>
+                  <th scope="row">Moos 4</th>
+                  <td id="ultrasonic-moss4-raw">–</td>
+                  <td id="ultrasonic-moss4-filtered">–</td>
+                  <td id="ultrasonic-moss4-calculated">–</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          <ol class="debug-notes">
+            <li>Abstand von der Sensorfläche zur Wasser- bzw. Moosoberfläche.</li>
+            <li
+              id="ultrasonic-filter-note">Geglätteter Abstand: Median gültiger Messwerte.</li>
+            <li
+              id="ultrasonic-height-note">Wassertiefe bzw. Mooshöhe ab Tankboden: Montagehöhe minus geglätteter Abstand.</li>
+          </ol>
           <p class="status" id="debug-status">Verbinde …</p>
         </section>
         <div class="overview-row">
