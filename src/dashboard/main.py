@@ -17,7 +17,7 @@ from influxdb_client import InfluxDBClient
 from configuration import load, setting
 from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl, light_schedule
-from pump_control import water_overview, valid_number
+from pump_control import StableWaterTarget, valid_number
 
 from temperature import PERIODS, combine
 
@@ -32,6 +32,7 @@ app.mount('/static', StaticFiles(directory=Path(__file__).parent / 'static'), na
 
 actuators = None
 automatic = None
+water_target = StableWaterTarget()
 
 
 def water_snapshot():
@@ -62,7 +63,7 @@ def water_pump_allowed():
 
 def pump_state():
     config = load()
-    result = water_overview(live_readings(), config, time.time())
+    result = water_target.update(live_readings(), config, time.time())
     snapshot = water_snapshot()
     water = config['wasserstand']
     result.update({'water_ready': bool(snapshot and snapshot.get('measurement_stable') == 1

@@ -1,5 +1,8 @@
 """Moss-relative water target and continuous pump control."""
 import math
+import json
+import statistics
+from threading import Lock
 
 
 def valid_number(value):
@@ -32,6 +35,72 @@ def water_overview(readings, config, now):
             heights.append(reading['value'])
     height = sum(heights) / len(heights) if heights else None
     return {'moss_height_cm': height, 'moss_averaged': len(heights) > 1, 'target_cm': target_level(config, height)}
+
+
+class StableWaterTarget:
+    """Confirm a consistent set of stable moss readings before changing the target."""
+
+    CONFIRM_SECONDS = 180
+    MAX_SPREAD_CM = 0.2
+    DEADBAND_CM = 0.1
+
+    def __init__(self):
+        self.lock = Lock()
+        self.signature = None
+        self.reset()
+
+    def reset(self):
+        self.height = None
+        self.candidate = []
+        self.last_sample = None
+
+    def update(self, readings, config, now):
+        with self.lock:
+            signature = json.dumps(config, sort_keys=True)
+            if signature != self.signature:
+                self.reset()
+                self.signature = signature
+            result = water_overview(readings, config, now)
+            expected = {f'moss{i}' for i in range(1, 5)
+                        if config.get(f'moos_{i}', {}).get('bezugsabstand_cm') is not None}
+            fresh = {(r['side'], r['field']): r for r in readings
+                     if r.get('sensor') == 'ultrasonic' and r.get('side') in expected
+                     and valid_number(r.get('sampled')) and 0 <= now - r['sampled'] <= 12}
+            heights = []
+            samples = []
+            for side in expected:
+                height = fresh.get((side, 'height_median_1m_cm'), {})
+                stable = fresh.get((side, 'measurement_stable'), {})
+                if (not valid_number(height.get('value')) or height['value'] < 0
+                        or stable.get('value') != 1
+                        or height.get('sampled') != stable.get('sampled')):
+                    self.reset()
+                    result['target_cm'] = None
+                    return result
+                heights.append(height['value'])
+                samples.append(height['sampled'])
+            if not heights:
+                self.reset()
+                result['target_cm'] = None
+                return result
+            sampled = min(samples)
+            height = statistics.mean(heights)
+            if self.last_sample is not None and (sampled < self.last_sample or sampled - self.last_sample > 12):
+                self.reset()
+            if sampled != self.last_sample:
+                self.last_sample = sampled
+                if self.height is not None and abs(height - self.height) <= self.DEADBAND_CM:
+                    self.candidate = []
+                else:
+                    values = [value for _, value in self.candidate] + [height]
+                    if max(values) - min(values) > self.MAX_SPREAD_CM:
+                        self.candidate = []
+                    self.candidate.append((sampled, height))
+                    if sampled - self.candidate[0][0] >= self.CONFIRM_SECONDS:
+                        self.height = statistics.median(value for _, value in self.candidate)
+                        self.candidate = []
+            result['target_cm'] = target_level(config, self.height)
+            return result
 
 
 class PumpRegulator:

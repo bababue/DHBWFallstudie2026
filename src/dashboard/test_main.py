@@ -90,7 +90,8 @@ class DashboardTests(unittest.TestCase):
 
     def test_automatic_water_combines_demo_moss_with_real_water(self):
         from test_pump_control import CONFIG
-        config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265))
+        config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265),
+                      moos_1={'bezugsabstand_cm': 6.94}, moos_2={'bezugsabstand_cm': 6.059})
         now = time.time()
         readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
                     for side in ('moss1', 'moss2')
@@ -101,9 +102,10 @@ class DashboardTests(unittest.TestCase):
                                         'water_level_cm': 4.265, 'measurement_stable': 1}))
             with patch.object(main, 'WATER_SAFETY_FILE', path), \
                     patch.object(main, 'load', return_value=config), \
-                    patch.object(main, 'live_readings', return_value=readings):
+                    patch.object(main, 'live_readings', return_value=readings), \
+                    patch.object(main, 'water_target', main.StableWaterTarget()):
                 state, _ = main.pump_state()
-        self.assertEqual(state['target_cm'], 5.5)
+        self.assertIsNone(state['target_cm'])
         self.assertTrue(state['water_ready'])
         self.assertTrue(state['pump_allowed'])
         self.assertEqual(state['moss_height_cm'], 7.5)

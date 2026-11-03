@@ -527,7 +527,7 @@ function initMetric(metric, unit) {
           state.moss_averaged === true,
         );
         document.getElementById("water-source").textContent =
-          state.reason && (!state.water_ready || !state.pump_allowed)
+          state.reason && (!state.water_ready || !state.pump_allowed || state.target_cm === null)
             ? state.reason
             : "";
       } catch (e) {

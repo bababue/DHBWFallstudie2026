@@ -55,3 +55,66 @@ class PumpTests(unittest.TestCase):
             data[key] = False
             self.assertEqual(pump.value(data, OPTIONS), 0)
         self.assertEqual(PumpRegulator().value(None, OPTIONS), 0)
+
+
+class StableTargetTests(unittest.TestCase):
+    def setUp(self):
+        from pump_control import StableWaterTarget
+        self.target = StableWaterTarget()
+        self.config = dict(CONFIG, moos_1={'bezugsabstand_cm': 7}, moos_2={'bezugsabstand_cm': 6})
+
+    def update(self, now, left=7.5, right=7.5, stable=1, missing=False):
+        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
+                    for side, height in [('moss1', left), ('moss2', right)]
+                    if not (missing and side == 'moss2')
+                    for field, value in [('height_median_1m_cm', height), ('measurement_stable', stable)]]
+        return self.target.update(readings, self.config, now)['target_cm']
+
+    def confirm(self, start=0, height=7.5):
+        for now in range(start, start + 181, 4):
+            value = self.update(now, height, height)
+        return value
+
+    def test_waits_for_three_minutes_of_real_stable_samples(self):
+        for now in range(0, 180, 4):
+            self.assertIsNone(self.update(now))
+        self.assertEqual(self.update(180), 5.5)
+
+    def test_jitter_does_not_move_confirmed_target(self):
+        self.assertEqual(self.confirm(), 5.5)
+        for now in range(184, 500, 4):
+            height = 7.55 if now % 8 else 7.45
+            self.assertEqual(self.update(now, height, height), 5.5)
+
+    def test_larger_change_requires_confirmation_and_outlier_does_not_shift_target(self):
+        self.confirm()
+        self.assertEqual(self.update(184, 9, 9), 5.5)
+        self.assertEqual(self.update(188), 5.5)
+        for now in range(192, 372, 4):
+            self.assertEqual(self.update(now, 8, 8), 5.5)
+        self.assertEqual(self.update(372, 8, 8), 6)
+
+    def test_missing_or_unstable_sensor_blocks_pumping_and_requires_new_confirmation(self):
+        for condition in [{'missing': True}, {'stable': 0}]:
+            self.target.reset()
+            self.confirm()
+            self.assertIsNone(self.update(184, **condition))
+            self.assertIsNone(self.update(188))
+            self.assertEqual(self.confirm(192), 5.5)
+
+    def test_cached_readings_cannot_complete_confirmation(self):
+        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=0)
+                    for side in ['moss1', 'moss2']
+                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1)]]
+        self.target.update(readings, self.config, 0)
+        self.assertIsNone(self.target.update(readings, self.config, 180)['target_cm'])
+
+    def test_configuration_change_resets_confirmation(self):
+        self.confirm()
+        self.config['moos_2']['bezugsabstand_cm'] = None
+        self.assertIsNone(self.update(184))
+
+    def test_missing_moss_target_stops_a_running_pump(self):
+        pump = PumpRegulator()
+        self.assertEqual(pump.value(state(), OPTIONS), 25)
+        self.assertEqual(pump.value(state(target=None), OPTIONS), 0)
