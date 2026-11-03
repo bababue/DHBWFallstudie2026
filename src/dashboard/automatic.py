@@ -1,11 +1,14 @@
 """Automatic actuator setpoints and their application outside manual."""
 import logging
 import time
+import json
+import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from configuration import load
-from pump_control import PumpRegulator
+from pump_control import PumpRegulator, pump_ready
+from measurements import CONTROL_INTERVAL_SECONDS
 from thermal_control import ThermalRegulator
 from threading import Event, RLock, Thread
 
@@ -34,61 +37,114 @@ class AutomaticControl:
         self.actuators = actuators
         self.get_mode = get_mode
         self.get_water_state = get_water_state
+        self.get_readings = get_readings
         self.pump = PumpRegulator()
         self.thermal = ThermalRegulator()
-        self.get_readings = get_readings
         self.lock = RLock()
         self.stop_event = Event()
         self.thread = None
         self.manual_initialized = False
+        self.context = None
+        self.mode = None
+        self.enabled = False
+        self.confirmation = uuid.uuid4().hex
+        self.water_state = {'target_cm': None, 'water_level_cm': None, 'moss_distances_cm': {}}
+
+    def disable_pump(self):
+        with self.lock:
+            self.enabled = False
+            self.confirmation = uuid.uuid4().hex
+            self.pump.reset()
+            if self.actuators.status()['pump']:
+                self.actuators.set('pump', 0)
+
+    def status(self):
+        with self.lock:
+            return {**self.water_state, 'pump_enabled': self.enabled,
+                    'pump_state': self.pump.state, 'reason': self.pump.reason,
+                    'confirmation': self.confirmation if self.mode == 'AUTO' else None,
+                    'pump_active': bool(self.actuators.status()['pump'])}
+
+    def set_pump_enabled(self, enabled, confirmation):
+        with self.lock:
+            if not enabled:
+                self.disable_pump()
+                return self.status()
+            # Recheck mode, process session and configuration after the dialog closes.
+            self.apply()
+            if self.mode != 'AUTO':
+                raise PermissionError('Freigabe nur im AUTO-Modus möglich')
+            if confirmation != self.confirmation:
+                raise ValueError('Modus oder Konfiguration geändert; bitte erneut bestätigen')
+            if not pump_ready(self.water_state):
+                raise ValueError('Freigabe erst mit sicheren Wasser- und Moosmessungen möglich')
+            self.enabled = True
+            self.apply()
+            return self.status()
 
     def apply(self):
         with self.lock:
-            current = self.actuators.status()
-            if current['pump'] and not self.actuators.pump_allowed():
-                LOG.warning('Wasserstandssperre: Pumpe wird abgeschaltet')
+            try:
+                self._apply()
+            except Exception:
+                self.disable_pump()
+                raise
+
+    def _apply(self):
+        config = load()
+        state = self.get_mode()
+        self.mode = state.get('mode') if state.get('session') else None
+        context = (self.mode, state.get('session'), json.dumps(config, sort_keys=True))
+        if context != self.context:
+            self.disable_pump()
+            self.context = context
+        if self.get_water_state is not None:
+            self.water_state = self.get_water_state(config)
+        current = self.actuators.status()
+        if current['pump'] and not self.actuators.pump_allowed():
+            self.actuators.set('pump', 0)
+            current['pump'] = 0
+        if self.mode != 'MANUAL':
+            self.manual_initialized = False
+        if self.mode != 'AUTO':
+            self.enabled = False
+            self.pump.reset()
+            if self.mode == 'MANUAL':
+                self.initialize_manual()
+            elif current['pump']:
                 self.actuators.set('pump', 0)
-                current['pump'] = 0
-            mode = self.get_mode()
-            if mode != 'MANUAL':
-                self.manual_initialized = False
-            if mode != 'AUTO':
-                if mode == 'MANUAL':
-                    self.initialize_manual()
-                    self.pump.reset()
-                elif current['pump']:
-                    self.actuators.set('pump', 0)
-                    self.pump.reset()
+            return
+        options = config['automatik']
+        schedule = light_schedule(options)
+        values = auto_setpoints(schedule)
+        if self.get_readings is not None:
+            thermal = self.thermal.update(self.get_readings(), options, schedule, time.time())
+            values.update(fan=thermal['fan'], led=thermal['led'])
+        if self.enabled:
+            values['pump'] = self.pump.value(self.water_state, options, time.monotonic())
+        else:
+            self.pump.reset()
+        for device, value in values.items():
+            latest = self.get_mode()
+            if (latest.get('mode'), latest.get('session')) != (state.get('mode'), state.get('session')):
+                self.disable_pump()
                 return
-            options = load()['automatik']
-            schedule = light_schedule(options)
-            values = auto_setpoints(schedule)
-            if self.get_readings is not None:
-                thermal = self.thermal.update(self.get_readings(), options, schedule, time.time())
-                values.update(fan=thermal["fan"], led=thermal["led"])
-            if self.get_water_state is not None:
-                data, options = self.get_water_state()
-                values['pump'] = self.pump.value(data, options)
-            for device, value in values.items():
-                if self.get_mode() != 'AUTO':
-                    return
-                if current[device] != value:
-                    self.actuators.set(device, value)
+            if current[device] != value:
+                self.actuators.set(device, value)
 
     def initialize_manual(self):
-        """Apply entry values once, preserving subsequent slider adjustments."""
         if self.manual_initialized:
             return
         self.pump.reset()
         for device, value in MANUAL_DEFAULTS.items():
-            if self.get_mode() != 'MANUAL':
+            if self.get_mode().get('mode') != 'MANUAL':
                 return
             self.actuators.set(device, value)
         self.manual_initialized = True
 
     def set_manual(self, device, value):
         with self.lock:
-            if self.get_mode() != 'MANUAL':
+            if self.get_mode().get('mode') != 'MANUAL':
                 raise PermissionError('Nur im Manual-Modus verfügbar')
             self.initialize_manual()
             return self.actuators.set(device, value)
@@ -101,12 +157,13 @@ class AutomaticControl:
                 except Exception:
                     LOG.exception('Automatische Aktorsteuerung fehlgeschlagen')
                     try:
-                        self.actuators.set('pump', 0)
+                        self.disable_pump()
+                        self.water_state = {'target_cm': None, 'water_level_cm': None, 'moss_distances_cm': {}}
                         self.actuators.set('led', 0)
                         self.actuators.set('fan', 100)
                     except Exception:
-                        LOG.exception('Pumpe konnte nach Steuerungsfehler nicht gestoppt werden')
-                self.stop_event.wait(0.1)
+                        LOG.exception('Sicheres Abschalten fehlgeschlagen')
+                self.stop_event.wait(CONTROL_INTERVAL_SECONDS)
         self.thread = Thread(target=loop, name='moos-automatic', daemon=True)
         self.thread.start()
 
@@ -114,3 +171,4 @@ class AutomaticControl:
         self.stop_event.set()
         if self.thread is not None:
             self.thread.join()
+        self.disable_pump()

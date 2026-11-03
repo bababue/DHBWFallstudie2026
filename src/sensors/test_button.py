@@ -7,6 +7,19 @@ from button import ButtonModes, MODES, apply_mode_command
 
 
 class ButtonModesTests(unittest.TestCase):
+    def test_restart_and_every_actual_mode_transition_have_new_sessions(self):
+        modes = ButtonModes()
+        initial = modes.control_state()
+        self.assertNotEqual(initial['session'], ButtonModes().control_state()['session'])
+        modes.set_mode('MANUAL')
+        manual = modes.control_state()
+        modes.set_mode('AUTO')
+        auto = modes.control_state()
+        self.assertEqual(auto['mode'], 'AUTO')
+        self.assertEqual(len({initial['session'], manual['session'], auto['session']}), 3)
+        modes.set_mode('AUTO')
+        self.assertEqual(auto, modes.control_state())
+
     def test_short_press_cycles_modes_only_after_release(self):
         modes = ButtonModes()
         self.assertEqual(MODES, ("AUTO", "MANUAL"))

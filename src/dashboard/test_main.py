@@ -18,9 +18,9 @@ class DashboardTests(unittest.TestCase):
             state = Path(directory) / 'mode.json'
             with patch.object(main, 'MODE_FILE', state):
                 self.assertIsNone(main.mode()['mode'])
-                state.write_text(json.dumps({'mode': 'MANUAL', 'updated': time.time()}))
+                state.write_text(json.dumps({'mode': 'MANUAL', 'session': 'one', 'updated': time.time()}))
                 self.assertEqual(main.mode()['mode'], 'MANUAL')
-                state.write_text(json.dumps({'mode': 'AUTO', 'updated': time.time() - 10}))
+                state.write_text(json.dumps({'mode': 'AUTO', 'session': 'one', 'updated': time.time() - 10}))
                 self.assertIsNone(main.mode()['mode'])
 
     def test_mode_request_writes_command_and_checks_sensor_state(self):
@@ -58,7 +58,7 @@ class DashboardTests(unittest.TestCase):
         controller = MagicMock()
         controller.status.return_value = {'fan': 20, 'pump': 0, 'led': 40}
         controller.set.return_value = {'fan': 30, 'pump': 0, 'led': 40}
-        automatic = main.AutomaticControl(controller, lambda: main.mode_state().get('mode'))
+        automatic = main.AutomaticControl(controller, lambda: main.mode_state())
         with patch.object(main, 'actuators', controller), patch.object(main, 'automatic', automatic):
             self.assertEqual(main.actuator_status()['fan'], 20)
             with patch.object(main, 'mode_state', return_value={'mode': 'AUTO'}):
@@ -72,9 +72,8 @@ class DashboardTests(unittest.TestCase):
         with patch.object(main, 'actuators', None):
             self.assertEqual(main.actuator_status().status_code, 503)
 
-    def test_water_lock_uses_fresh_raw_distance_and_margin(self):
-        water = {'sensor_boden_abstand_cm': 8.265, 'max_fuellhoehe_cm': 6.0,
-                 'sicherheitsabstand_cm': 1.0}
+    def test_water_lock_uses_fresh_raw_distance_and_hard_limit(self):
+        water = {'sensor_boden_abstand_cm': 8.265, 'max_fuellhoehe_cm': 5.0}
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'water.json'
             with patch.object(main, 'WATER_SAFETY_FILE', path), \
@@ -88,27 +87,35 @@ class DashboardTests(unittest.TestCase):
                 water['max_fuellhoehe_cm'] = None
                 self.assertFalse(main.water_pump_allowed())
 
-    def test_automatic_water_waits_for_stable_real_moss(self):
-        from test_pump_control import CONFIG
-        config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265),
-                      moos_1={'bezugsabstand_cm': 6.94}, moos_2={'bezugsabstand_cm': 6.059})
+    def test_water_state_uses_direct_ceiling_distances_and_one_water_snapshot(self):
+        from test_pump_control import CONFIG, readings
+        config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265))
         now = time.time()
-        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
-                    for side in ('moss1', 'moss2')
-                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1)]]
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'water.json'
-            path.write_text(json.dumps({'sampled': now, 'distance_cm': 4.0,
-                                        'water_level_cm': 4.265, 'measurement_stable': 1}))
-            with patch.object(main, 'WATER_SAFETY_FILE', path), \
-                    patch.object(main, 'load', return_value=config), \
-                    patch.object(main, 'live_readings', return_value=readings), \
-                    patch.object(main, 'water_target', main.StableWaterTarget()):
-                state, _ = main.pump_state()
-        self.assertIsNone(state['target_cm'])
+        with patch.object(main, 'water_snapshot', return_value={'sampled': now, 'distance_cm': 4.0,
+                                'water_level_cm': 4.265, 'measurement_stable': 1}), \
+                patch.object(main, 'live_readings', return_value=readings(now)):
+            state = main.pump_state(config)
+        self.assertAlmostEqual(state['target_cm'], 5.0)
         self.assertTrue(state['water_ready'])
         self.assertTrue(state['pump_allowed'])
-        self.assertEqual(state['moss_height_cm'], 7.5)
+        self.assertEqual(state['moss_distances_cm']['moss1'], 5.44)
+
+    def test_water_api_only_reads_controller_snapshot(self):
+        control = MagicMock()
+        control.status.return_value = {'pump_enabled': False, 'target_cm': 5}
+        with patch.object(main, 'automatic', control), patch.object(main, 'pump_state', side_effect=AssertionError):
+            self.assertEqual(main.automatic_water(), control.status.return_value)
+        control.apply.assert_not_called()
+
+    def test_enable_endpoint_requires_boolean_and_passes_current_confirmation(self):
+        control = MagicMock()
+        control.set_pump_enabled.return_value = {'pump_enabled': True}
+        with patch.object(main, 'automatic', control):
+            self.assertEqual(main.enable_pump({'enabled': 'true'}).status_code, 400)
+            self.assertEqual(main.enable_pump({'enabled': True, 'confirmation': 'current'}), {'pump_enabled': True})
+            control.set_pump_enabled.assert_called_once_with(True, 'current')
+            control.set_pump_enabled.side_effect = ValueError('stale')
+            self.assertEqual(main.enable_pump({'enabled': True, 'confirmation': 'old'}).status_code, 409)
 
     def test_live_readings_expire_and_debug_uses_them(self):
         now = time.time()

@@ -3,6 +3,7 @@
 import json
 import logging
 import time
+import uuid
 from threading import Lock, Thread
 
 
@@ -21,6 +22,7 @@ class ButtonModes:
         self._pressed = False
         self._pressed_since = None
         self._show_info = False
+        self._session = uuid.uuid4().hex
         self._mode = 0
         self._version = 0
 
@@ -36,6 +38,7 @@ class ButtonModes:
                 else:
                     if self._pressed_since is not None and now - self._pressed_since < self.HOLD_SECONDS:
                         self._mode = (self._mode + 1) % len(MODES)
+                        self._session = uuid.uuid4().hex
                     self._show_info = False
                     self._pressed_since = None
                 self._version += 1
@@ -51,7 +54,12 @@ class ButtonModes:
             index = MODES.index(mode)
             if self._mode != index:
                 self._mode = index
+                self._session = uuid.uuid4().hex
                 self._version += 1
+
+    def control_state(self):
+        with self._lock:
+            return {'mode': MODES[self._mode], 'session': self._session}
 
     def snapshot(self):
         with self._lock:

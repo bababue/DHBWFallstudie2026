@@ -13,7 +13,7 @@ Der dokumentierte physische Aufbau hat zwei Moos-Messstellen (links und rechts),
 | GY-302 mit BH1750 | 2 | Beleuchtungsstärke in Lux, je einer links und rechts |
 | SCD40 | 2 | **Primäre Messung von CO₂** in ppm; seine Temperatur- und Feuchtewerte dienen nur als Backup zum SHT45, je einer links und rechts |
 | Ultraschallsensor für Wasserstand | 1 | Trigger an GPIO 6, Echo an GPIO 13; dokumentierter Abstand vom Sensor zum Boden: **86,2 mm**; Sensormodell nicht angegeben. Den Betriebswert nach Kalibrierung in `config/config.json` prüfen. |
-| Ultraschallsensoren für Mooshöhe | 2 | Je ein Trigger- und Echo-Pin gemäß Tabelle unten; Abstände zur moosfreien Bezugsfläche noch zu messen |
+| Ultraschallsensoren für Mooshöhe | 2 | Je ein Trigger- und Echo-Pin gemäß Tabelle unten; Direkte Abstandsmessung ab Decke; Montagehöhen siehe unten |
 | OLED, SSD1306 | 1 | 0,96 Zoll, 128 × 64 Pixel, am linken I²C-Bus; Anzeige um 180° gedreht |
 | Taster | 1 | An GPIO 26 eingebaut; kurzer Druck wechselt den angezeigten Modus, Halten zeigt die Sensorübersicht |
 | Pi-Kamera, Sensor IMX708 | 1 | Anschluss CAM/DISP1; in der Übergabe als Kamera 0 erkannt |
@@ -49,8 +49,9 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 ## Konfigurations- und Kalibrierstatus
 
 Die Software kennt vier Moos-Sensoren und misst ausschließlich echte Echos.
-Sensoren 1 und 2 haben Bezugsabstände in `config/config.json`. Sensoren 3 und 4
-haben noch keinen Kalibrierwert und liefern deshalb nur Rohabstände.
+Sensoren 1 und 2 haben übernommene Montagehöhen (Sensorfläche–Tankboden) von
+12,94 cm und 12,059 cm. Sensoren 3 und 4 messen ebenfalls echte Abstände; ihre
+Montagehöhen sind noch nicht eingetragen, daher dienen sie noch nicht der Pumpenregelung.
 
 Die Wasserstand-Konfiguration enthält einen Sensor-Boden-Abstand von 8,265 cm;
 die Hardware-Übergabe nennt 8,62 cm (86,2 mm). Das sind unterschiedliche Werte.
@@ -71,4 +72,4 @@ Der dokumentierte 5-Hz-Betrieb führt bei kleinen Stellwerten zu einzelnen Impul
 - **SCD40:** Beide Sensoren wurden laut Übergabe per Forced Recalibration auf 430 ppm eingestellt, unter der Annahme frischer Luft am offenen Fenster. Dabei waren teils ungewöhnlich große Korrekturen nötig. Die CO₂-Werte und mögliche Drift sollten weiter beobachtet werden; die automatische Selbstkalibrierung war zum Übergabezeitpunkt aktiv.
 - **Lastverhalten:** Wasserfluss und Lüfterlauf bei niedrigen Stellwerten sind offen.
 - **Wasserstand-Ultraschallsensor:** Die aktuelle Pinangabe ist Trigger GPIO 6 und Echo GPIO 13. Der Abstand vom Sensor zum Boden muss am echten Einbau kalibriert werden: Die Übergabe nennt 86,2 mm, während `config/config.json` derzeit 8,265 cm enthält. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; vor dem Anschluss sicherstellen, dass am Pi-Eingang höchstens 3,3 V anliegen.
-- **Mooshöhen-Ultraschallsensoren:** Für Sensoren 1 und 2 sind Bezugsabstände in `config/config.json` eingetragen; Montageabstände am realen Aufbau prüfen. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.
+- **Mooshöhen-Ultraschallsensoren:** Für Sensoren 1 und 2 sind Montagehöhen in `config/config.json` eingetragen. Sie wurden mit Zustimmung aus der bisherigen Geometrie übernommen; Sensorfläche–Tankboden beträgt 12,94 cm bzw. 12,059 cm. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.

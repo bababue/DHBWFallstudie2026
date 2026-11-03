@@ -57,13 +57,13 @@ class IntegrationTests(unittest.TestCase):
         from unittest.mock import MagicMock, patch
         actuator = MagicMock()
         actuator.status.return_value = dict(fan=0, pump=0, led=100)
-        control = AutomaticControl(actuator, lambda: 'AUTO', get_readings=lambda: readings(25))
+        control = AutomaticControl(actuator, lambda: {'mode': 'AUTO', 'session': 'one'}, get_readings=lambda: readings(25))
         with patch('automatic.time.time', return_value=100), patch('automatic.load', return_value={'automatik': OPTIONS}), patch('automatic.light_schedule', return_value=dict(active=True, level=100)), patch('automatic.auto_setpoints', return_value=dict(fan=0, pump=0, led=100)):
             control.apply()
             actuator.set.assert_any_call('fan', 100)
             actuator.set.assert_any_call('led', 0)
             actuator.set.reset_mock()
-            control.get_mode = lambda: 'MANUAL'
+            control.get_mode = lambda: {'mode': 'MANUAL', 'session': 'two'}
             control.apply()
             actuator.set.assert_any_call('pump', 0)
             actuator.set.assert_any_call('led', 20)

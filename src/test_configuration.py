@@ -20,20 +20,13 @@ class ConfigurationTests(unittest.TestCase):
         data['messintervalle']['schnelle_sensoren_s'] = 0
         with self.assertRaises(ValueError): validate(data)
 
-    def test_fixed_target_requires_boolean_flag_and_valid_height(self):
-        for value in ('true', 1, None):
-            data = copy.deepcopy(load())
-            data['automatik']['zielwasserstand_fest'] = value
-            with self.assertRaises(ValueError):
-                validate(data)
-        for value in (-1, float('nan'), float('inf'), True, None):
-            data = copy.deepcopy(load())
-            data['automatik']['zielwasserstand_cm'] = value
-            with self.assertRaises(ValueError):
-                validate(data)
+    def test_mounting_height_may_be_unset_but_must_be_positive(self):
         data = copy.deepcopy(load())
-        data['automatik'].update(zielwasserstand_fest=True, zielwasserstand_cm=0)
+        data['moos_1']['montagehoehe_cm'] = None
         validate(data)
+        data['moos_1']['montagehoehe_cm'] = -1
+        with self.assertRaises(ValueError):
+            validate(data)
 
     def test_actuator_gpio_collisions_and_invalid_frequency_are_rejected(self):
         data = copy.deepcopy(load())
@@ -43,11 +36,11 @@ class ConfigurationTests(unittest.TestCase):
         data['aktoren']['licht_pwm_hz'] = 0
         with self.assertRaises(ValueError): validate(data)
 
-    def test_water_margin_must_be_below_maximum(self):
+    def test_maximum_must_be_below_water_sensor(self):
         data = copy.deepcopy(load())
-        data['wasserstand']['max_fuellhoehe_cm'] = 6
-        data['wasserstand']['sicherheitsabstand_cm'] = 6
-        with self.assertRaises(ValueError): validate(data)
+        data['wasserstand']['max_fuellhoehe_cm'] = data['wasserstand']['sensor_boden_abstand_cm']
+        with self.assertRaises(ValueError):
+            validate(data)
 
     def test_light_schedule_requires_configuration_and_valid_values(self):
         data = copy.deepcopy(load())

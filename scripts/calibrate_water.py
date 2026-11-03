@@ -100,6 +100,7 @@ def main():
     import lgpio
     import configuration
     from water_level import TimestampUltrasonic
+    from measurements import WATER_SPREAD_CM
     water = configuration.load()['wasserstand']
     handle = lgpio.gpiochip_open(int(os.getenv('GPIOCHIP_DEVICE', '/dev/gpiochip0').removeprefix('/dev/gpiochip')))
     sensor = None
@@ -121,7 +122,7 @@ def main():
         print('Zu wenige gültige Echos; keine Kalibrierung gespeichert.')
         return 1
     median = statistics.median(samples)
-    inliers = [value for value in samples if abs(value - median) <= water['max_streuung_cm']]
+    inliers = [value for value in samples if abs(value - median) <= WATER_SPREAD_CM]
     deviation = statistics.median(abs(value - median) for value in samples)
     print(f'Rohabstand Median: {median:.3f} cm; mediane Abweichung: {deviation:.3f} cm')
     if len(inliers) < MIN_STABLE_FRACTION * len(samples):

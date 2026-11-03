@@ -43,8 +43,9 @@ Der Taster an GPIO 26 wechselt mit kurzem Druck zwischen `AUTO` und `MANUAL`.
 Gedrückthalten zeigt die Sensorübersicht. Nach einem Neustart startet das System
 in `AUTO`. Der Modus lässt sich auch im Dashboard umschalten.
 
-- **AUTO:** Lichtplan, Temperaturregelung und Bewässerung laufen nach
-  `config/config.json`.
+- **AUTO:** Licht und Temperatur werden automatisch geregelt. Die Pumpe bleibt
+  zunächst gesperrt. „Automatische Pumpe freigeben“ einschalten und den Dialog
+  bestätigen. Nach jedem Moduswechsel in AUTO oder Neustart erneut freigeben.
 - **MANUAL:** Lüfter, Pumpe und Licht lassen sich im Dashboard einstellen.
   Die Wasserstands-Sperre für die Pumpe gilt in beiden Modi.
 
@@ -58,17 +59,13 @@ Hardware und Sollwerte stehen in `config/config.json`; Zugangsdaten stehen in
 Die Sensoren liefern ausschließlich echte Messungen. Details zum Aufbau stehen
 in [HARDWARE.md](HARDWARE.md).
 
-Ein fester Zielwasserstand lässt sich unter `automatik` vorgeben:
-
-```json
-"zielwasserstand_fest": true,
-"zielwasserstand_cm": 5.0
-```
-
-Die Höhe wird in cm ab Tankboden angegeben. Standardmäßig ist die Flag `false`;
-dann folgt das Ziel den stabilen Moosmessungen mit 2,5 cm Abstand.
-Das Dashboard zeigt „Fest eingestellt“ an, wenn die Vorgabe aktiv ist.
-Wasserstandssperre, Glättung und Sicherheitsgrenze gelten weiterhin.
+Die Moossensoren messen direkt den Abstand ab Decke. Pro Sensor steht unter
+`montagehoehe_cm` der Abstand seiner Sensorfläche zum Tankboden; übernommen
+wurden 12,94 cm und 12,059 cm. `null` bedeutet: noch nicht für Bewässerung eingerichtet.
+Das Ziel liegt 2,5 cm unter der aus diesen Abständen berechneten Moosoberfläche.
+Die Pumpe startet nach 30 Sekunden bestätigt niedrigem Wasserstand und stoppt
+am gefilterten Ziel. Ein Rohwasserstand ab 7 cm sperrt sie sofort.
+Filter- und Zeitgrenzen stehen gesammelt in `src/measurements.py`.
 
 Änderungen an Sensorpins oder Intervallen starten `sensors`
 automatisch neu. Einstellungen in `automatik` werden live gelesen. Nach einer
@@ -84,7 +81,7 @@ GPIO-Belegungen.
 
 Die Wasserstands-Pumpensperre benötigt eine konfigurierte maximale Füllhöhe und
 einen höchstens drei Sekunden alten Messwert. Fehlende oder ungültige Werte
-sperren die Pumpe. Der Sicherheitsabstand zur Maximalhöhe gilt auch in MANUAL.
+sperren die Pumpe. Die maximale Füllhöhe gilt auch in MANUAL.
 Diese Software-Sperre ersetzt keinen unabhängigen Schwimmerschalter.
 
 ## Kalibrierung
@@ -95,20 +92,18 @@ zuvor lief.
 
 ```sh
 python3 scripts/calibrate_water.py
-python3 scripts/calibrate_moss.py
 python3 scripts/calibrate_co2.py
 ```
 
 Wasserstand: Behälter leeren, ruhige Oberfläche und freien Schallweg sicherstellen.
 Optional kann eine bekannte Wassertiefe angegeben werden, z. B.
-`--water-height 1.5`. Mooshöhe: Kalibrierungszettel auf die Halterung legen.
+`--water-height 1.5`. Moos-Montagehöhen direkt vom Sensor bis zum Tankboden messen.
 CO₂: Kasten geöffnet draußen aufstellen; ein Referenzmessgerät ist genauer als
 die Voreinstellung von 430 ppm. Die Skripte fragen vor dem Speichern nach einer
 Bestätigung.
 
 Die Wasserstands-Kalibrierung speichert den Bodenabstand in
-`config/config.json`. Die Mooskalibrierung speichert pro Sensor den Abstand zur
-moosfreien Bezugsfläche. Ohne Bezugsabstand wird nur der Rohabstand angezeigt.
+`config/config.json`. Eine Papierkalibrierung für Moossensoren ist nicht erforderlich.
 
 ## Diagnose
 

@@ -537,24 +537,6 @@ th {
   display: none;
 }
 
-.pump-now {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: .9rem;
-}
-
-.pump-now[hidden] {
-  display: none;
-}
-
-.pump-now input {
-  width: 16px;
-  height: 16px;
-  accent-color: #333;
-}
-
 .averaged::before {
   content: "Ø";
   font-size: .55em;
@@ -562,7 +544,39 @@ th {
   vertical-align: .12em;
 }
 
-#next-pump,
 #light-hours {
   font-weight: 700;
+}
+
+#pump-release[hidden] {
+  display: none;
+}
+.pump-release-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+#pump-confirm {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: min(440px, 90vw);
+}
+#pump-confirm::backdrop {
+  background: #0007;
+}
+#pump-confirm h2 {
+  margin-top: 0;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.dialog-actions button {
+  font: inherit;
+  padding: 10px 16px;
+  cursor: pointer;
 }

@@ -1,17 +1,16 @@
 """Ultrasonic distance measurement and water depth in the tank."""
 
-import statistics
-import math
 import time
-from collections import deque
 from threading import Event, Lock
+from measurements import (DistanceFilter, WATER_SPREAD_CM, MAX_DISTANCE_CM,
+                          SOUND_CM_PER_SECOND, ECHO_TIMEOUT_SECONDS, TRIGGER_SECONDS)
 
 
 class TimestampUltrasonic:
     """Measure ultrasonic echo width from kernel edge timestamps."""
 
-    SOUND_CM_PER_S = 34300
-    MAX_DISTANCE_CM = 400
+    SOUND_CM_PER_S = SOUND_CM_PER_SECOND
+    MAX_DISTANCE_CM = MAX_DISTANCE_CM
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, pull_down=False):
         self.gpio, self.handle = gpio, handle
@@ -55,9 +54,9 @@ class TimestampUltrasonic:
             self._rise = self._distance = None
             self._armed = True
         self.gpio.gpio_write(self.handle, self.trigger_pin, 1)
-        time.sleep(.00001)
+        time.sleep(TRIGGER_SECONDS)
         self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
-        self._done.wait(.05)
+        self._done.wait(ECHO_TIMEOUT_SECONDS)
         with self._lock:
             self._armed = False
             return self._distance
@@ -72,41 +71,16 @@ class TimestampUltrasonic:
 class WaterLevel(TimestampUltrasonic):
     name = "ultrasonic"
 
-    def __init__(self, gpio, handle, trigger_pin, echo_pin, floor_distance_cm,
-                 options=None):
+    def __init__(self, gpio, handle, trigger_pin, echo_pin, floor_distance_cm, max_level):
         super().__init__(gpio, handle, trigger_pin, echo_pin)
-        options = options or {}
         self.floor_distance_cm = floor_distance_cm
-        self.count = options.get('filter_messungen', 15)
-        self.max_spread = options.get('max_streuung_cm', .2)
-        self.max_level = options.get('max_fuellhoehe_cm')
-        self.recent = deque(maxlen=self.count)
-        self.last_sample = None
+        self.max_level = max_level
+        self.filter = DistanceFilter(WATER_SPREAD_CM)
 
     def read(self):
-        distance = self._distance_cm()
-        now = time.monotonic()
-        if self.last_sample is not None and now - self.last_sample > 12:
-            self.recent.clear()
-        self.last_sample = now
-        if distance is None or not 0 < distance <= self.MAX_DISTANCE_CM:
-            self.recent.clear()
-            return None
-        self.recent.append(distance)
-        result = {'distance_cm': distance, 'measurement_stable': 0,
-                  'max_level_configured': int(self.max_level is not None)}
-        # An upper-limit observation is never suppressed by smoothing.
-        if self.max_level is not None:
-            result['max_level_reached'] = int(self.floor_distance_cm - distance >= self.max_level)
-        if len(self.recent) < self.count:
-            return result
-        median = statistics.median(self.recent)
-        inliers = [v for v in self.recent if abs(v - median) <= self.max_spread]
-        if len(inliers) < math.ceil(self.count * 0.8):
-            return result
-        stable = statistics.median(inliers)
-        result.update({'measurement_stable': 1, 'distance_filtered_cm': stable,
-                       'water_level_cm': max(0.0, self.floor_distance_cm - stable)})
-        if self.max_level is not None:
-            result['max_level_reached'] = int(result['max_level_reached'] or result['water_level_cm'] >= self.max_level)
+        result = self.filter.update(self._distance_cm(), time.monotonic())
+        if result is not None:
+            result['max_level_reached'] = int(self.floor_distance_cm - result['distance_cm'] >= self.max_level)
+            if result['measurement_stable']:
+                result['water_level_cm'] = max(0.0, self.floor_distance_cm - result['distance_filtered_cm'])
         return result

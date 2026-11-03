@@ -13,10 +13,11 @@ from threading import Event
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+from measurements import MAX_SAMPLE_AGE_SECONDS
 from configuration import load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, apply_mode_command, start_button_reader
-from moss_height import MossAggregate, MossHeight
+from moss_distance import MossDistance
 from oled import Oled, render, render_mode
 from schedule import ScheduledRead
 from storage import BufferedWriter
@@ -39,7 +40,6 @@ class Config:
     button_pin: int
     water_floor_distance_cm: float
     moss_pins: tuple[tuple[int, int], ...]
-    moss_empty_distances_cm: tuple[float | None, ...]
     moss_interval: float
     delay_us: int
     sht45_address: int
@@ -74,7 +74,6 @@ class Config:
             button_pin=data["taster"]["gpio"],
             water_floor_distance_cm=water["sensor_boden_abstand_cm"],
             moss_pins=tuple((sensor["trigger_gpio"], sensor["echo_gpio"]) for sensor in moss),
-            moss_empty_distances_cm=tuple(sensor["bezugsabstand_cm"] for sensor in moss),
             moss_interval=data["messintervalle"]["moos_s"],
             delay_us=data["i2c"]["taktpause_us"],
             sht45_address=data["i2c"]["sht45_adresse"],
@@ -101,16 +100,20 @@ def sample_points(side: str, sensor_name: str, fields: dict[str, float] | None, 
     return points
 
 
-def update_display_values(values, side, sensor, fields, now, max_age=12):
+def update_display_values(values, side, sensor, fields, now, max_age=MAX_SAMPLE_AGE_SECONDS):
     """Retain each latest field for the dashboard's 12-second window."""
     for key in tuple(values):
         if now - values[key][1] > max_age:
             del values[key]
+    if sensor == 'ultrasonic':
+        for key in tuple(values):
+            if key[:2] == (side, sensor):
+                del values[key]
     if fields:
         values.update({(side, sensor, field): (value, now) for field, value in fields.items()})
 
 
-def display_readings(values, now, max_age=12):
+def display_readings(values, now, max_age=MAX_SAMPLE_AGE_SECONDS):
     return {key: value for key, (value, sampled) in values.items() if now - sampled <= max_age}
 
 
@@ -150,11 +153,10 @@ def run():
             for sensor in (SHT45(bus, config.sht45_address), BH1750(bus, config.bh1750_address), scd)
         ]
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
-                                  config.water_floor_distance_cm, options=load()["wasserstand"])
+                                  config.water_floor_distance_cm, max_level=load()["wasserstand"]["max_fuellhoehe_cm"])
         sensors.append(("tank", water_sensor))
-        for index, ((trigger, echo), empty_distance) in enumerate(
-                zip(config.moss_pins, config.moss_empty_distances_cm), start=1):
-            sensor = MossHeight(lgpio, handle, trigger, echo, empty_distance)
+        for index, (trigger, echo) in enumerate(config.moss_pins, start=1):
+            sensor = MossDistance(lgpio, handle, trigger, echo)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
@@ -164,42 +166,36 @@ def run():
         start_time = time.monotonic()
         tasks = []
         for side, sensor in sensors:
-            if isinstance(sensor, MossHeight):
+            if isinstance(sensor, MossDistance):
                 interval = config.moss_interval
                 first_due = start_time + (int(side[-1]) - 1) * interval / 4
             else:
                 interval = config.co2_poll_interval if isinstance(sensor, SCD40) else config.fast_interval
                 first_due = start_time
             tasks.append(ScheduledRead(side, sensor, interval, first_due))
-        moss_aggregate = MossAggregate()
         started = set()
         last_co2 = {}
         display_values = {}
         next_display = start_time
         displayed_version = None
-        published_mode = None
-        mode_since = time.time()
         last_command_id = None
 
         def refresh_display():
-            nonlocal next_display, displayed_version, published_mode, mode_since
+            nonlocal next_display, displayed_version
             mode, show_info, version = modes.snapshot()
             now = time.monotonic()
             if version == displayed_version and now < next_display:
                 return
             next_display = now + 1
-            if mode != published_mode:
-                published_mode = mode
-                mode_since = time.time()
             try:
                 with open("/run/moos/mode.tmp", "w") as state:
-                    json.dump({"mode": mode, "updated": time.time(), "since": mode_since}, state)
+                    json.dump({**modes.control_state(), "updated": time.time()}, state)
                 os.replace("/run/moos/mode.tmp", "/run/moos/mode.json")
                 wall_now = time.time()
                 readings = [dict(side=side, sensor=sensor, field=field, value=value,
                                  sampled=wall_now - (now - sampled))
                             for (side, sensor, field), (value, sampled) in display_values.items()
-                            if now - sampled <= 12]
+                            if now - sampled <= MAX_SAMPLE_AGE_SECONDS]
                 with open("/run/moos/readings.tmp", "w") as state:
                     json.dump({"updated": wall_now, "readings": readings}, state, allow_nan=False)
                 os.replace("/run/moos/readings.tmp", "/run/moos/readings.json")
@@ -276,10 +272,6 @@ def run():
                             update_display_values(display_values, side, sensor.name, fields, finished)
                             timestamp = datetime.now(timezone.utc)
                             points.extend(sample_points(side, sensor.name, fields, timestamp))
-                            if isinstance(sensor, MossHeight):
-                                aggregate = moss_aggregate.update(
-                                    side, fields.get("height_median_1m_cm") if fields else None, finished)
-                                points.extend(sample_points("moss", "aggregate", aggregate, timestamp))
                         refresh_display()
                         if modes.snapshot()[0] != sample_mode:
                             break

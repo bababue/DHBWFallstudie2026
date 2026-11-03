@@ -35,12 +35,9 @@ class SensorTests(unittest.TestCase):
             self.assertEqual(config.button_pin, 26)
             self.assertEqual(config.water_echo, load()["wasserstand"]["echo_gpio"])
 
-    def test_four_moss_sensor_pins_and_optional_references(self):
+    def test_four_moss_sensor_pins(self):
         with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):
-            config = Config.from_config()
-            self.assertEqual(config.moss_pins, ((9, 11), (0, 5), (22, 10), (17, 27)))
-            self.assertEqual(config.moss_empty_distances_cm, tuple(
-                load()[f"moos_{index}"]["bezugsabstand_cm"] for index in range(1, 5)))
+            self.assertEqual(Config.from_config().moss_pins, ((9, 11), (0, 5), (22, 10), (17, 27)))
 
     def test_independent_fast_and_co2_poll_intervals(self):
         with patch.dict(os.environ, {"INFLUXDB_TOKEN": "test"}, clear=True):

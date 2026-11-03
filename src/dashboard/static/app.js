@@ -73,6 +73,67 @@ modeToggle.addEventListener("change", async () => {
 updateMode();
 setInterval(updateMode, 1000);
 
+const pumpToggle = document.getElementById("pump-enable");
+const pumpDialog = document.getElementById("pump-confirm");
+let pumpState = null, pumpPending = false;
+
+function renderPump(state) {
+  pumpState = state;
+  if (
+    pumpDialog.open &&
+    (!state || state.confirmation !== pumpDialog.dataset.confirmation)
+  ) {
+    pumpDialog.close("cancel");
+  }
+  pumpToggle.checked = state?.pump_enabled === true;
+  pumpToggle.disabled = pumpPending ||
+    document.documentElement.dataset.mode !== "AUTO" ||
+    !state?.confirmation ||
+    (!state.pump_enabled &&
+      (!state.water_ready || !state.pump_allowed || state.target_cm === null));
+}
+
+async function submitPump(enabled, confirmation) {
+  pumpPending = true;
+  renderPump(pumpState);
+  try {
+    const response = await fetch("/api/automatic/pump", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled, confirmation }),
+    });
+    if (!response.ok) throw Error(await response.text());
+    renderPump(await response.json());
+    document.getElementById("pump-release-error").textContent = "";
+  } catch (error) {
+    document.getElementById("pump-release-error").textContent = error.message;
+    renderPump(null);
+  } finally {
+    pumpPending = false;
+    renderPump(pumpState);
+  }
+}
+
+pumpToggle.addEventListener("change", () => {
+  const enabled = pumpToggle.checked;
+  pumpToggle.checked = pumpState?.pump_enabled === true;
+  if (!enabled) {
+    submitPump(false, null);
+    return;
+  }
+  pumpDialog.dataset.confirmation = pumpState.confirmation;
+  pumpDialog.returnValue = "cancel";
+  pumpPending = true;
+  renderPump(pumpState);
+  pumpDialog.showModal();
+});
+pumpDialog.addEventListener("close", () => {
+  pumpPending = false;
+  if (pumpDialog.returnValue === "confirm") {
+    submitPump(true, pumpDialog.dataset.confirmation);
+  } else renderPump(pumpState);
+});
+
 const actuatorPanel = document.getElementById("actuator-panel"),
   actuatorError = document.getElementById("actuator-error");
 
@@ -121,6 +182,9 @@ async function updateActuators() {
   }
 }
 function syncActuatorMode() {
+  document.getElementById("pump-release").hidden =
+    document.documentElement.dataset.mode !== "AUTO";
+  if (document.documentElement.dataset.mode !== "AUTO") renderPump(null);
   actuatorGeneration++;
   document.getElementById("water-pump").hidden = !actuatorVisible();
   document.getElementById("auto-pump-panel").hidden = !actuatorVisible();
@@ -245,7 +309,6 @@ const chartColors = {
   co2: "#7c3aed",
   light: "#ca8a04",
   water: "#2563eb",
-  moss: "#16a34a",
 };
 
 function setReading(id, text, averaged = false) {
@@ -272,9 +335,8 @@ function initMetric(metric, unit) {
     const waterPoints = data.points.filter((p) =>
       p.value !== null && Number.isFinite(p.value)
     );
-    const mossPoints = data.moss_points || [],
-      targetPoints = data.target_points || [];
-    const points = [...waterPoints, ...mossPoints, ...targetPoints];
+    const targetPoints = data.target_points || [];
+    const points = [...waterPoints, ...targetPoints];
 
     const status = document.getElementById(metric + "-chart-status");
     if (!points.length) {
@@ -336,7 +398,7 @@ function initMetric(metric, unit) {
       }) + " " + unit;
     }
     for (
-      const [seriesIndex, series] of [waterPoints, mossPoints, targetPoints]
+      const [seriesIndex, series] of [waterPoints, targetPoints]
         .entries()
     ) {
       let path = "", previous = null;
@@ -344,15 +406,15 @@ function initMetric(metric, unit) {
         const px = x(point.time), py = y(point.value);
         if (px < left || px > width - right) continue;
         path += (previous === null ||
-            (seriesIndex !== 2 &&
+            (seriesIndex !== 1 &&
               point.time - previous >
-                (seriesIndex ? data.moss_window_seconds : data.window_seconds) *
+                data.window_seconds *
                   1.5)
           ? "M"
           : "L") + px + " " + py + " ";
         previous = point.time;
       }
-      if (seriesIndex === 2 && series.length) {
+      if (seriesIndex === 1 && series.length) {
         path = "M" + left + " " + y(series[0].value) + " L" + (width - right) +
           " " + y(series[0].value);
       }
@@ -360,12 +422,12 @@ function initMetric(metric, unit) {
       element("path", {
         d: path,
         fill: "none",
-        stroke: [chartColors[metric], "#16a34a", "#2563eb"][seriesIndex],
+        stroke: [chartColors[metric], "#2563eb"][seriesIndex],
         "stroke-width": "2",
         "stroke-linejoin": "round",
         "stroke-linecap": "round",
         "vector-effect": "non-scaling-stroke",
-        ...(seriesIndex === 2 ? { "stroke-dasharray": "6 4" } : {}),
+        ...(seriesIndex === 1 ? { "stroke-dasharray": "6 4" } : {}),
       });
     }
     for (const point of waterPoints) {
@@ -447,28 +509,6 @@ function initMetric(metric, unit) {
       const data = await response.json();
       if (metric === "water") {
         try {
-          const mossResponse = await fetch(
-            "/api/moss?period=" + periodSelect.value,
-            { cache: "no-store" },
-          );
-          if (!mossResponse.ok) throw Error();
-          const moss = await mossResponse.json(), windows = new Map();
-          for (const series of Object.values(moss.series)) {
-            for (const point of series) {
-              if (Number.isFinite(point.value)) {
-                const values = windows.get(point.time) || [];
-                values.push(point.value);
-                windows.set(point.time, values);
-              }
-            }
-          }
-          data.moss_points = [...windows].sort((a, b) => a[0] - b[0]).map((
-            [time, values],
-          ) => ({
-            time,
-            value: values.reduce((a, b) => a + b, 0) / values.length,
-          }));
-          data.moss_window_seconds = moss.window_seconds;
           const targetResponse = await fetch("/api/automatic/water", {
             cache: "no-store",
           });
@@ -489,7 +529,6 @@ function initMetric(metric, unit) {
               value: target.target_cm,
             }];
         } catch (e) {
-          data.moss_points = data.moss_points || [];
           data.target_points = [];
         }
       }
@@ -521,21 +560,22 @@ function initMetric(metric, unit) {
         document.getElementById("water-target").textContent = fmt(
           state.target_cm,
         );
-        document.getElementById("water-target-source").textContent =
-          state.target_source === "fixed"
-            ? (state.target_limited ? "Fest eingestellt · sicherheitsbegrenzt" : "Fest eingestellt")
-            : "Aus Moosmessungen";
-        setReading(
-          "water-moss",
-          fmt(state.moss_height_cm),
-          state.moss_averaged === true,
-        );
+        renderPump(state);
+        document.getElementById("water-moss").textContent = Object.entries(
+          state.moss_distances_cm,
+        )
+          .map(([side, value]) => side.replace("moss", "") + ": " + fmt(value))
+          .join(" · ");
         document.getElementById("water-source").textContent =
-          state.reason && (!state.water_ready || !state.pump_allowed || state.target_cm === null || state.reason.startsWith("Warte"))
-            ? state.reason
-            : "";
+          document.documentElement.dataset.mode === "MANUAL"
+            ? "Manuelle Pumpensteuerung"
+            : ({
+              blocked: "Gesperrt",
+              waiting: "Warten",
+              filling: "Nachfüllen",
+            }[state.pump_state] || "Gesperrt") + " · " + state.reason;
       } catch (e) {
-        document.getElementById("water-target-source").textContent = "";
+        renderPump(null);
         for (const id of ["water", "water-target", "water-moss"]) {
           setReading(id, "–");
         }
@@ -601,16 +641,6 @@ async function updateDebug() {
       );
       if (cell) cell.textContent = String(reading.value);
     }
-    const heights = data.readings.filter((r) =>
-      /^moss[1-4]$/.test(r.side) && r.sensor === "ultrasonic" &&
-      r.field === "height_cm" && Number.isFinite(r.value)
-    ).map((r) => r.value);
-    document.getElementById("moss-average").textContent = heights.length
-      ? (heights.reduce((a, b) => a + b, 0) / heights.length).toLocaleString(
-        "de-DE",
-        { minimumFractionDigits: 1, maximumFractionDigits: 1 },
-      ) + " cm (" + heights.length + "/4)"
-      : "–";
     debugStatus.textContent = data.readings.length
       ? ""
       : "Keine aktuellen Messwerte";

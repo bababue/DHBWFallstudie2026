@@ -17,19 +17,14 @@ def validate(data):
         raise ValueError('Die Konfigurationsbereiche müssen vollständig erhalten bleiben.')
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
-              'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000), 'WATER_FILTER_SAMPLES': (3, 31), 'WATER_MAX_SPREAD_CM': (.01, 5),
-              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2),
-              'FIXED_WATER_TARGET_CM': (0, 400)}
+              'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000),
+              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
     for group, keys in expected.items():
         if not isinstance(data[group], dict) or set(data[group]) != keys:
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
     for name, (group, key) in KEYS.items():
         value = data[group][key]
-        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
-            continue
-        if name == 'FIXED_WATER_TARGET_ENABLED':
-            if type(value) is not bool:
-                raise ValueError(f'{group}.{key}: true oder false erforderlich')
+        if value is None and name.endswith('MOUNT_HEIGHT_CM'):
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError(f'{group}.{key}: gültige Zahl erforderlich')
@@ -42,10 +37,6 @@ def validate(data):
                          'AUTO_LIGHT_LEVEL_PERCENT': (0, 100)}[name]
             if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
                 raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
-        elif name in ('PUMP_START_HOUR', 'PUMP_START_MINUTE'):
-            high = 23 if name == 'PUMP_START_HOUR' else 59
-            if type(value) is not int or not 0 <= value <= high:
-                raise ValueError(f'{group}.{key}: ganze Zahl von 0 bis {high} erforderlich')
         elif name == 'PUMP_LEVEL_PERCENT':
             if type(value) is not int or not 5 <= value <= 100:
                 raise ValueError('automatik.pumpe_leistung_prozent: ganze Zahl 5 bis 100 erforderlich')
@@ -63,12 +54,7 @@ def validate(data):
                 raise ValueError('i2c.taktpause_us: ganze Zahl erforderlich')
     if data['automatik']['temperatur_max_c'] - data['automatik']['temperatur_ziel_c'] < 2:
         raise ValueError('Temperaturmaximum muss mindestens 2 °C über dem Ziel liegen')
-    count = data['wasserstand']['filter_messungen']
-    if type(count) is not int or count % 2 == 0:
-        raise ValueError('wasserstand.filter_messungen: ungerade ganze Zahl erforderlich')
     maximum = data['wasserstand']['max_fuellhoehe_cm']
-    if maximum is not None and data['wasserstand']['sicherheitsabstand_cm'] >= maximum:
-        raise ValueError('Sicherheitsabstand muss kleiner als die maximale Füllhöhe sein')
     if maximum is not None and maximum >= data['wasserstand']['sensor_boden_abstand_cm']:
         raise ValueError('Maximale Füllhöhe muss kleiner als der Sensor-Boden-Abstand sein')
     if len(pins) != len(set(pins)):

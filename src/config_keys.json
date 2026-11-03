@@ -51,10 +51,6 @@
     "moos_1",
     "echo_gpio"
   ],
-  "MOSS_1_EMPTY_DISTANCE_CM": [
-    "moos_1",
-    "bezugsabstand_cm"
-  ],
   "MOSS_2_TRIGGER_GPIO": [
     "moos_2",
     "trigger_gpio"
@@ -62,10 +58,6 @@
   "MOSS_2_ECHO_GPIO": [
     "moos_2",
     "echo_gpio"
-  ],
-  "MOSS_2_EMPTY_DISTANCE_CM": [
-    "moos_2",
-    "bezugsabstand_cm"
   ],
   "BUTTON_GPIO": [
     "taster",
@@ -83,14 +75,6 @@
     "messintervalle",
     "co2_bereitschaft_s"
   ],
-  "WATER_FILTER_SAMPLES": [
-    "wasserstand",
-    "filter_messungen"
-  ],
-  "WATER_MAX_SPREAD_CM": [
-    "wasserstand",
-    "max_streuung_cm"
-  ],
   "WATER_MAX_LEVEL_CM": [
     "wasserstand",
     "max_fuellhoehe_cm"
@@ -103,10 +87,6 @@
     "moos_3",
     "echo_gpio"
   ],
-  "MOSS_3_EMPTY_DISTANCE_CM": [
-    "moos_3",
-    "bezugsabstand_cm"
-  ],
   "MOSS_4_TRIGGER_GPIO": [
     "moos_4",
     "trigger_gpio"
@@ -114,10 +94,6 @@
   "MOSS_4_ECHO_GPIO": [
     "moos_4",
     "echo_gpio"
-  ],
-  "MOSS_4_EMPTY_DISTANCE_CM": [
-    "moos_4",
-    "bezugsabstand_cm"
   ],
   "LED_GPIO": [
     "aktoren",
@@ -142,10 +118,6 @@
   "PUMP_PWM_HZ": [
     "aktoren",
     "pumpe_pwm_hz"
-  ],
-  "WATER_SAFETY_MARGIN_CM": [
-    "wasserstand",
-    "sicherheitsabstand_cm"
   ],
   "AUTO_LIGHT_START_HOUR": [
     "automatik",
@@ -179,12 +151,20 @@
     "automatik",
     "wasser_unter_moosspitzen_cm"
   ],
-  "FIXED_WATER_TARGET_ENABLED": [
-    "automatik",
-    "zielwasserstand_fest"
+  "MOSS_1_MOUNT_HEIGHT_CM": [
+    "moos_1",
+    "montagehoehe_cm"
   ],
-  "FIXED_WATER_TARGET_CM": [
-    "automatik",
-    "zielwasserstand_cm"
+  "MOSS_2_MOUNT_HEIGHT_CM": [
+    "moos_2",
+    "montagehoehe_cm"
+  ],
+  "MOSS_3_MOUNT_HEIGHT_CM": [
+    "moos_3",
+    "montagehoehe_cm"
+  ],
+  "MOSS_4_MOUNT_HEIGHT_CM": [
+    "moos_4",
+    "montagehoehe_cm"
   ]
 }

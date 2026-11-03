@@ -96,7 +96,7 @@
                     <span id="tank-ultrasonic-distance_cm">–</span>
                   </td>
                   <td>
-                    <small>Wasserstand (max(0; __WATER_OFFSET__ − Rohabstand), cm)</small>
+                    <small>Wassertiefe gefiltert (cm)</small>
                     <br>
                     <span id="tank-ultrasonic-water_level_cm">–</span>
                   </td>
@@ -105,62 +105,57 @@
                   <td>Moos 1</td>
                   <td>Ultraschall</td>
                   <td>
-                    <small>Abstand (cm)</small>
+                    <small>Deckenabstand roh (cm)</small>
                     <br>
                     <span id="moss1-ultrasonic-distance_cm">–</span>
                   </td>
                   <td>
-                    <small>__MOSS_FORMULA_1__</small>
+                    <small>Deckenabstand gefiltert (cm)</small>
                     <br>
-                    <span id="moss1-ultrasonic-height_cm">–</span>
+                    <span id="moss1-ultrasonic-distance_filtered_cm">–</span>
                   </td>
                 </tr>
                 <tr>
                   <td>Moos 2</td>
                   <td>Ultraschall</td>
                   <td>
-                    <small>Abstand (cm)</small>
+                    <small>Deckenabstand roh (cm)</small>
                     <br>
                     <span id="moss2-ultrasonic-distance_cm">–</span>
                   </td>
                   <td>
-                    <small>__MOSS_FORMULA_2__</small>
+                    <small>Deckenabstand gefiltert (cm)</small>
                     <br>
-                    <span id="moss2-ultrasonic-height_cm">–</span>
+                    <span id="moss2-ultrasonic-distance_filtered_cm">–</span>
                   </td>
                 </tr>
                 <tr>
                   <td>Moos 3</td>
                   <td>Ultraschall</td>
                   <td>
-                    <small>Abstand (cm)</small>
+                    <small>Deckenabstand roh (cm)</small>
                     <br>
                     <span id="moss3-ultrasonic-distance_cm">–</span>
                   </td>
                   <td>
-                    <small>__MOSS_FORMULA_3__</small>
+                    <small>Deckenabstand gefiltert (cm)</small>
                     <br>
-                    <span id="moss3-ultrasonic-height_cm">–</span>
+                    <span id="moss3-ultrasonic-distance_filtered_cm">–</span>
                   </td>
                 </tr>
                 <tr>
                   <td>Moos 4</td>
                   <td>Ultraschall</td>
                   <td>
-                    <small>Abstand (cm)</small>
+                    <small>Deckenabstand roh (cm)</small>
                     <br>
                     <span id="moss4-ultrasonic-distance_cm">–</span>
                   </td>
                   <td>
-                    <small>__MOSS_FORMULA_4__</small>
+                    <small>Deckenabstand gefiltert (cm)</small>
                     <br>
-                    <span id="moss4-ultrasonic-height_cm">–</span>
+                    <span id="moss4-ultrasonic-distance_filtered_cm">–</span>
                   </td>
-                </tr>
-                <tr>
-                  <td>Mooshöhe Ø</td>
-                  <td>Ultraschall</td>
-                  <td colspan="2" id="moss-average">–</td>
                 </tr>
               </tbody>
             </table>
@@ -169,7 +164,8 @@
         </section>
         <div class="overview-row">
           <section class="card camera">
-            <p class="label" id="camera-status" aria-live="polite">Live Feed: Verbinde …</p>
+            <p class="label" id="camera-status"
+              aria-live="polite">Live Feed: Verbinde …</p>
             <img id="camera" alt="Kamerafeed">
           </section>
           <section class="card actuator-panel" id="actuator-panel" hidden>
@@ -203,7 +199,8 @@
                 <div class="thermal-bar" role="img"
                   aria-label="Temperaturregelung" id="thermal-bar">
                   <span class="thermal-target" style="left:40%"></span>
-                  <span class="thermal-marker" id="thermal-marker" hidden></span>
+                  <span class="thermal-marker" id="thermal-marker"
+                    hidden></span>
                 </div>
                 <div class="auto-ticks">
                   <span id="thermal-low">20 °C</span>
@@ -249,7 +246,6 @@
                   Zielwasserstand
                 </span>
               <p class="water-value" id="water-target">–</p>
-              <p class="status" id="water-target-source"></p>
             </div>
             <div>
               <span class="water-metric-label">
@@ -261,9 +257,9 @@
             <div>
               <span class="water-metric-label">
                   <i class="legend-moss"></i>
-                  Moosspitzenhöhe
+                  Moos: Abstand ab Decke
                 </span>
-              <p class="water-value" id="water-moss">–</p>
+              <p class="status" id="water-moss">–</p>
             </div>
             <div id="water-pump" hidden>
               <div id="auto-pump-panel" hidden>
@@ -272,12 +268,23 @@
               </div>
             </div>
           </div>
+          <div id="pump-release" hidden>
+            <label class="pump-release-label">
+              <span class="mode-switch">
+                <input type="checkbox" id="pump-enable" role="switch" aria-label="Automatische Pumpe freigeben" disabled>
+                <span class="mode-slider"></span>
+              </span>
+              Automatische Pumpe freigeben
+            </label>
+            <p class="status" id="pump-release-error" role="alert"></p>
+          </div>
           <p class="status" id="water-source"></p>
           <div class="chart-container">
             <svg class="chart" id="water-chart" viewBox="0 0 800 230" role="img"
-              aria-label="Verlauf von Wasserstand und Mooshöhe"></svg>
+              aria-label="Wasserstand und aktueller Zielwasserstand"></svg>
           </div>
-          <p class="status chart-status" id="water-chart-status">Lade Verlauf …</p>
+          <p class="status chart-status"
+            id="water-chart-status">Lade Verlauf …</p>
         </section>
         <section class="card">
           <div class="temperature-head">
@@ -293,7 +300,8 @@
             <svg class="chart" id="temperature-chart" viewBox="0 0 800 230"
               role="img" aria-label="Temperaturverlauf"></svg>
           </div>
-          <p class="status chart-status" id="temperature-chart-status">Lade Verlauf …</p>
+          <p class="status chart-status"
+            id="temperature-chart-status">Lade Verlauf …</p>
         </section>
         <section class="card">
           <div class="humidity-head">
@@ -309,7 +317,8 @@
             <svg class="chart" id="humidity-chart" viewBox="0 0 800 230"
               role="img" aria-label="Luftfeuchtigkeitverlauf"></svg>
           </div>
-          <p class="status chart-status" id="humidity-chart-status">Lade Verlauf …</p>
+          <p class="status chart-status"
+            id="humidity-chart-status">Lade Verlauf …</p>
         </section>
         <section class="card">
           <div class="co2-head">
@@ -325,7 +334,8 @@
             <svg class="chart" id="co2-chart" viewBox="0 0 800 230" role="img"
               aria-label="CO₂verlauf"></svg>
           </div>
-          <p class="status chart-status" id="co2-chart-status">Lade Verlauf …</p>
+          <p class="status chart-status"
+            id="co2-chart-status">Lade Verlauf …</p>
         </section>
         <section class="card">
           <div class="light-head">
@@ -341,10 +351,21 @@
             <svg class="chart" id="light-chart" viewBox="0 0 800 230" role="img"
               aria-label="Lichtverlauf"></svg>
           </div>
-          <p class="status chart-status" id="light-chart-status">Lade Verlauf …</p>
+          <p class="status chart-status"
+            id="light-chart-status">Lade Verlauf …</p>
         </section>
       </div>
     </main>
+    <dialog id="pump-confirm" aria-labelledby="pump-confirm-title">
+      <form method="dialog">
+        <h2 id="pump-confirm-title">Automatische Pumpe freigeben?</h2>
+        <p>Die Pumpe füllt selbstständig bis zum Zielwasserstand nach. Tank und Schläuche prüfen.</p>
+        <div class="dialog-actions">
+          <button value="cancel" autofocus>Abbrechen</button>
+          <button value="confirm">Pumpe freigeben</button>
+        </div>
+      </form>
+    </dialog>
     <script src="/static/app.js" defer></script>
   </body>
 </html>

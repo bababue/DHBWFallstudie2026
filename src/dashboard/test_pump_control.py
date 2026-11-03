@@ -1,188 +1,72 @@
+import copy
 import unittest
+from pump_control import PumpRegulator, water_overview, pump_ready
 
-from pump_control import PumpRegulator, water_overview, target_level
+OPTIONS = {'wasser_unter_moosspitzen_cm': 2.5, 'pumpe_hysterese_cm': .2, 'pumpe_leistung_prozent': 25}
+CONFIG = {'wasserstand': {'max_fuellhoehe_cm': 7}, 'automatik': OPTIONS,
+          **{f'moos_{i}': {'montagehoehe_cm': mount}
+             for i, mount in enumerate([12.94, 12.059, None, None], 1)}}
 
-OPTIONS = {'wasser_unter_moosspitzen_cm': 2, 'pumpe_hysterese_cm': 0.2, 'pumpe_leistung_prozent': 25}
-CONFIG = {'wasserstand': {'max_fuellhoehe_cm': 8, 'sicherheitsabstand_cm': 1},
-          'automatik': OPTIONS}
+
+def state(level=3, target=5):
+    return dict(water_ready=True, pump_allowed=True, water_level_cm=level, target_cm=target)
 
 
-def state(level=0.5, target=1.3):
-    return dict(water_ready=True, pump_allowed=True,
-                water_level_cm=level, raw_level_cm=level, target_cm=target)
+def readings(now=10):
+    return [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
+            for side, distance in [('moss1', 5.44), ('moss2', 4.559)]
+            for field, value in [('distance_filtered_cm', distance), ('measurement_stable', 1)]]
+
+
+class TargetTests(unittest.TestCase):
+    def test_target_uses_mount_minus_distance_without_platform_offset(self):
+        result = water_overview(readings(), CONFIG, 11)
+        self.assertAlmostEqual(result['target_cm'], 5)
+        self.assertEqual(result['moss_distances_cm']['moss1'], 5.44)
+        self.assertIsNone(result['moss_distances_cm']['moss3'])
+
+    def test_missing_stale_unstable_or_impossible_moss_blocks_target(self):
+        for data in [[], readings()[:2], readings(now=-10),
+                     [dict(r, value=0) if r['field'] == 'measurement_stable' else r for r in readings()],
+                     [dict(r, value=20) if r['field'] == 'distance_filtered_cm' else r for r in readings()]]:
+            self.assertIsNone(water_overview(data, CONFIG, 11)['target_cm'])
+
+    def test_target_capped_below_hard_limit_and_at_zero(self):
+        config = copy.deepcopy(CONFIG)
+        config['automatik']['wasser_unter_moosspitzen_cm'] = 0
+        self.assertAlmostEqual(water_overview(readings(), config, 11)['target_cm'], 6.8)
+        config['automatik']['wasser_unter_moosspitzen_cm'] = 20
+        self.assertEqual(water_overview(readings(), config, 11)['target_cm'], 0)
 
 
 class PumpTests(unittest.TestCase):
-    def test_target_tracks_moss_and_respects_safety(self):
-        self.assertEqual(target_level(CONFIG, 7.5), 5.5)
-        self.assertEqual(target_level(CONFIG, 1), 0)
-        self.assertAlmostEqual(target_level(CONFIG, 20), 6.8)
-        self.assertIsNone(water_overview([], CONFIG, 0)['target_cm'])
-        self.assertEqual(PumpRegulator().value(state(target=None), OPTIONS), 0)
-
-    def test_moss_remains_displayed_and_expires(self):
-        readings = [dict(side=side, sensor='ultrasonic', field='height_median_1m_cm', value=7.5, sampled=10)
-                    for side in ('moss1', 'moss2')]
-        self.assertEqual(water_overview(readings, CONFIG, 11)['moss_height_cm'], 7.5)
-        self.assertEqual(water_overview(readings, CONFIG, 11)['target_cm'], 5.5)
-        self.assertIsNone(water_overview(readings, CONFIG, 23)['target_cm'])
-
-    def test_runs_continuously_at_25_percent_until_target(self):
+    def test_same_start_threshold_on_first_run_and_restart(self):
         pump = PumpRegulator()
-        self.assertEqual(pump.value(state(), OPTIONS, now=0), 0)
-        for now in (30, 100, 1000):
-            self.assertEqual(pump.value(state(), OPTIONS, now=now), 25)
-        self.assertEqual(pump.value(state(level=1.3), OPTIONS), 0)
+        for now in (0, 30, 60): self.assertEqual(pump.value(state(4.9), OPTIONS, now), 0)
+        self.assertEqual(pump.value(state(4.7), OPTIONS, 61), 0)
+        self.assertEqual(pump.value(state(4.7), OPTIONS, 91), 25)
+        self.assertEqual(pump.state, 'filling')
+        self.assertEqual(pump.value(state(4.9), OPTIONS, 92), 25)
+        self.assertEqual(pump.value(state(5), OPTIONS, 93), 0)
+        self.assertEqual(pump.value(state(4.9), OPTIONS, 94), 0)
 
-    def test_initial_start_just_below_target_and_hysteresis_after_reaching(self):
+    def test_wave_at_normal_target_does_not_stop_filling_but_hard_limit_does(self):
         pump = PumpRegulator()
-        self.assertEqual(pump.value(state(level=1.2), OPTIONS, now=0), 0)
-        self.assertEqual(pump.value(state(level=1.2), OPTIONS, now=30), 25)
-        self.assertEqual(pump.value(state(level=1.3), OPTIONS), 0)
-        self.assertEqual(pump.value(state(level=1.2), OPTIONS), 0)
-        self.assertEqual(pump.value(state(level=1.0), OPTIONS, now=40), 0)
-        self.assertEqual(pump.value(state(level=1.0), OPTIONS, now=70), 25)
+        pump.value(state(), OPTIONS, 0)
+        self.assertEqual(pump.value(state(), OPTIONS, 30), 25)
+        # A raw wave near the normal target has not crossed the independent hard limit.
+        data = dict(state(4.8), raw_level_cm=5.1)
+        self.assertEqual(pump.value(data, OPTIONS, 31), 25)
+        data['pump_allowed'] = False
+        self.assertEqual(pump.value(data, OPTIONS, 32), 0)
+        self.assertEqual(pump.state, 'blocked')
 
-    def test_raw_high_reading_stops_even_if_filtered_water_is_lower(self):
+    def test_sensor_fault_resets_start_confirmation(self):
         pump = PumpRegulator()
-        pump.value(state(), OPTIONS, now=0)
-        self.assertEqual(pump.value(state(), OPTIONS, now=30), 25)
-        data = state()
-        data['raw_level_cm'] = 1.3
-        self.assertEqual(pump.value(data, OPTIONS), 0)
-
-    def test_missing_water_or_safety_clearance_stops_pump(self):
-        for key in ('water_ready', 'pump_allowed'):
-            pump = PumpRegulator()
-            pump.value(state(), OPTIONS, now=0)
-            self.assertEqual(pump.value(state(), OPTIONS, now=30), 25)
-            data = state()
-            data[key] = False
-            self.assertEqual(pump.value(data, OPTIONS), 0)
-        self.assertEqual(PumpRegulator().value(None, OPTIONS), 0)
-
-    def test_wave_troughs_do_not_restart_the_pump(self):
-        pump = PumpRegulator()
-        self.assertEqual(pump.value(state(level=1.3), OPTIONS, now=0), 0)
-        for now in range(1, 100):
-            data = state(level=1.0)
-            # The raw water surface crosses the restart threshold every other second.
-            data['raw_level_cm'] = 1.15 if now % 2 else 1.0
-            self.assertEqual(pump.value(data, OPTIONS, now=now), 0)
-        self.assertEqual(pump.value(state(level=1.0), OPTIONS, now=100), 0)
-        self.assertEqual(pump.value(state(level=1.0), OPTIONS, now=130), 25)
-
-    def test_sensor_failure_restarts_low_water_confirmation(self):
-        pump = PumpRegulator()
-        self.assertEqual(pump.value(state(), OPTIONS, now=0), 0)
-        self.assertEqual(pump.value(None, OPTIONS, now=29), 0)
-        self.assertEqual(pump.value(state(), OPTIONS, now=30), 0)
-        self.assertEqual(pump.value(state(), OPTIONS, now=59), 0)
-        self.assertEqual(pump.value(state(), OPTIONS, now=60), 25)
-
-
-class StableTargetTests(unittest.TestCase):
-    def setUp(self):
-        from pump_control import StableWaterTarget
-        self.target = StableWaterTarget()
-        self.config = dict(CONFIG, moos_1={'bezugsabstand_cm': 7}, moos_2={'bezugsabstand_cm': 6})
-
-    def update(self, now, left=7.5, right=7.5, stable=1, missing=False):
-        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
-                    for side, height in [('moss1', left), ('moss2', right)]
-                    if not (missing and side == 'moss2')
-                    for field, value in [('height_median_1m_cm', height), ('measurement_stable', stable)]]
-        return self.target.update(readings, self.config, now)['target_cm']
-
-    def confirm(self, start=0, height=7.5):
-        for now in range(start, start + 181, 4):
-            value = self.update(now, height, height)
-        return value
-
-    def test_waits_for_three_minutes_of_real_stable_samples(self):
-        for now in range(0, 180, 4):
-            self.assertIsNone(self.update(now))
-        self.assertEqual(self.update(180), 5.5)
-
-    def test_jitter_does_not_move_confirmed_target(self):
-        self.assertEqual(self.confirm(), 5.5)
-        for now in range(184, 500, 4):
-            height = 7.55 if now % 8 else 7.45
-            self.assertEqual(self.update(now, height, height), 5.5)
-
-    def test_larger_change_requires_confirmation_and_outlier_does_not_shift_target(self):
-        self.confirm()
-        self.assertEqual(self.update(184, 9, 9), 5.5)
-        self.assertEqual(self.update(188), 5.5)
-        for now in range(192, 372, 4):
-            self.assertEqual(self.update(now, 8, 8), 5.5)
-        self.assertEqual(self.update(372, 8, 8), 6)
-
-    def test_missing_or_unstable_sensor_blocks_pumping_and_requires_new_confirmation(self):
-        for condition in [{'missing': True}, {'stable': 0}]:
-            self.target.reset()
-            self.confirm()
-            self.assertIsNone(self.update(184, **condition))
-            self.assertIsNone(self.update(188))
-            self.assertEqual(self.confirm(192), 5.5)
-
-    def test_cached_readings_cannot_complete_confirmation(self):
-        readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=0)
-                    for side in ['moss1', 'moss2']
-                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1)]]
-        self.target.update(readings, self.config, 0)
-        self.assertIsNone(self.target.update(readings, self.config, 180)['target_cm'])
-
-    def test_configuration_change_resets_confirmation(self):
-        self.confirm()
-        self.config['moos_2']['bezugsabstand_cm'] = None
-        self.assertIsNone(self.update(184))
-
-    def test_missing_moss_target_stops_a_running_pump(self):
-        pump = PumpRegulator()
-        pump.value(state(), OPTIONS, now=0)
-        self.assertEqual(pump.value(state(), OPTIONS, now=30), 25)
-        self.assertEqual(pump.value(state(target=None), OPTIONS), 0)
-
-
-class FixedTargetTests(unittest.TestCase):
-    def setUp(self):
-        from pump_control import StableWaterTarget
-        self.target = StableWaterTarget()
-        self.config = dict(CONFIG, automatik=dict(OPTIONS, zielwasserstand_fest=True,
-                                                  zielwasserstand_cm=5.0))
-
-    def test_fixed_target_works_without_moss_and_is_marked(self):
-        result = self.target.update([], self.config, 0)
-        self.assertEqual(result['target_cm'], 5.0)
-        self.assertIsNone(result['moss_height_cm'])
-        self.assertEqual(result['target_source'], 'fixed')
-        self.assertFalse(result['target_limited'])
-
-    def test_safety_ceiling_still_limits_fixed_target(self):
-        self.config['automatik']['zielwasserstand_cm'] = 20
-        result = self.target.update([], self.config, 0)
-        self.assertAlmostEqual(result['target_cm'], 6.8)
-        self.assertTrue(result['target_limited'])
-
-    def test_fixed_target_cannot_bypass_water_measurement_or_start_confirmation(self):
-        result = self.target.update([], self.config, 0)
-        data = dict(state(), target_cm=result['target_cm'])
-        pump = PumpRegulator()
-        self.assertEqual(pump.value(data, OPTIONS, now=0), 0)
-        self.assertEqual(pump.value(data, OPTIONS, now=30), 25)
-        data['water_ready'] = False
-        self.assertEqual(pump.value(data, OPTIONS, now=31), 0)
-
-    def test_disabling_override_requires_moss_confirmation(self):
-        self.target.update([], self.config, 0)
-        self.config['automatik']['zielwasserstand_fest'] = False
-        result = self.target.update([], self.config, 1)
-        self.assertIsNone(result['target_cm'])
-        self.assertEqual(result['target_source'], 'moss')
-
-    def test_zero_target_keeps_pump_off(self):
-        self.config['automatik']['zielwasserstand_cm'] = 0
-        result = self.target.update([], self.config, 0)
-        self.assertEqual(result['target_cm'], 0)
-        self.assertEqual(PumpRegulator().value(dict(state(), target_cm=0), OPTIONS), 0)
+        pump.value(state(), OPTIONS, 0)
+        self.assertEqual(pump.value(None, OPTIONS, 29), 0)
+        self.assertEqual(pump.value(state(), OPTIONS, 30), 0)
+        self.assertEqual(pump.value(state(), OPTIONS, 59), 0)
+        self.assertEqual(pump.value(state(), OPTIONS, 60), 25)
+        self.assertEqual(pump.value(dict(state(), target_cm=None), OPTIONS, 61), 0)
+        self.assertFalse(pump_ready(dict(state(), water_ready=False)))

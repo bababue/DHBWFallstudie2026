@@ -1,61 +1,66 @@
-# Technische Hinweise
+# Messung und Bewässerung
 
-## Automatik
+## Messwerte
 
-- Im AUTO-Modus prüft die Regelung laufend den Zielwasserstand und füllt bei Bedarf nach.
-- Die Zielhöhe ist der Mittelwert der aktuellen 60-Sekunden-Mediane aller
-  kalibrierten Moosmessstellen, abzüglich `wasser_unter_moosspitzen_cm`. Sie ist
-  auf mindestens 0 cm und höchstens `max_fuellhoehe_cm - sicherheitsabstand_cm -
-  pumpe_hysterese_cm` begrenzt.
-- Mit `automatik.zielwasserstand_fest: true` wird stattdessen
-  `zielwasserstand_cm` direkt als Ziel ab Tankboden verwendet, auch ohne
-  kalibrierte oder verfügbare Moossensoren. Das Dashboard kennzeichnet diese
-  Vorgabe und eine eventuelle Begrenzung durch die Sicherheitsgrenze.
-  Wasserstandsmessung, Pumpensperre und 30-Sekunden-Startbestätigung bleiben nötig.
-- Bei ausgeschalteter fester Vorgabe gilt die folgende Moosbestätigung.
-- Der Zielwert wird erst übernommen, wenn alle kalibrierten Moossensoren
-  aktuelle, als stabil markierte Messungen liefern und der gemeinsame Höhenwert
-  drei Minuten lang höchstens 0,2 cm streut (Maximum minus Minimum).
-  Übernommen wird der Median dieser bestätigten Höhenwerte.
-- Änderungen bis 0,1 cm gegenüber der bestätigten Höhe werden ignoriert.
-  Größere Änderungen müssen erneut drei Minuten bestätigt werden; bis dahin
-  gilt der bisherige Zielwert. Ein Ausreißer startet diese Bestätigung neu.
-- Bei fehlenden oder instabilen Moosmessungen wird der Zielwert ungültig und
-  die Pumpe gesperrt. Erst nach erneuter Bestätigung wird nachgefüllt.
-  Konfigurationsänderungen und ein Dashboard-Neustart erfordern ebenfalls
-  eine neue Bestätigung. Unkalibrierte Messstellen werden nicht verwendet.
-- Der aktuelle Wasserstand verwendet einen Medianfilter mit standardmäßig
-  15 Rohmessungen (`wasserstand.filter_messungen`). Mindestens 80 % müssen
-  innerhalb von `max_streuung_cm` (0,2 cm) um den Median liegen. Aus diesen
-  Werten wird der Median gebildet. Bei fehlenden Echos oder instabilen Werten
-  bleibt die automatische Nachfüllung gesperrt.
-- Vor jedem Pumpenstart muss der gefilterte und der rohe Wasserstand 30 Sekunden
-  durchgehend unter dem Ziel liegen; nach Erreichen des Ziels zusätzlich um die
-  Hysterese darunter. Wellen oder Messausfälle setzen diese Wartezeit zurück.
-  Beim Nachfüllen bleiben Zielabschaltung und Wasserstandssperre anhand des
-  Rohwerts sofort wirksam. Der steigende Wasserstand wird nicht mehrere Minuten
-  zurückgehalten.
-- Ein Pumpvorgang endet am Ziel. Bei erreichtem Ziel stoppt sie; bei erneutem Absinken unter die Hysterese
-  füllt sie wieder nach. Fehlen sichere Wasser- oder Mooswerte,
-  endet ein laufender Vorgang. Die Wasserstands-Sperre gilt in AUTO und MANUAL.
-- In AUTO dimmt das Licht oberhalb des Temperaturziels. Die wärmere Seite zählt;
-  SCD40 ersetzt dort einen fehlenden SHT45. Bei fehlender Seite gilt Licht aus
-  und Lüfter 100 %. Beim konfigurierten Temperaturmaximum greift derselbe Schutz
-  und bleibt aktiv, bis beide Seiten unter Maximum minus 1 °C liegen.
+Alle Ultraschallsensoren liefern `distance_cm` direkt ab ihrer Sensorfläche.
+Bei den Moossensoren ist das der Abstand ab Decke zur Moosoberfläche.
+Der gemeinsame Filter in `src/measurements.py` verwendet 15 Messungen:
+Mindestens 80 % müssen innerhalb von ±0,2 cm (Wasser) bzw. ±0,3 cm (Moos)
+um den Median liegen. Aus diesen Werten wird der Median gebildet.
+Bei fehlenden Echos oder einer Messpause über 12 Sekunden beginnt der Filter neu.
+Rohwert, gefilterter Wert und Gültigkeit werden von Anzeige, Datenbank und
+Regelung gemeinsam verwendet. Fehlgeschlagene Messungen ersetzen alte Werte.
 
-## InfluxDB
+Die Montagehöhe ist der Abstand Sensorfläche–Tankboden. Für Sensor 1 und 2
+wurden 12,94 cm und 12,059 cm aus den bisherigen Kalibrierungen übernommen.
+Sensoren 3 und 4 messen ebenfalls Abstände, werden aber erst mit eingetragener
+`montagehoehe_cm` zur Bewässerung herangezogen.
 
-`moos_sensor` verwendet die Tags `side` und `sensor`. Häufige Felder:
+## Ziel und Pumpenfreigabe
 
-| Messung | Felder |
-| --- | --- |
-| SHT45 | `temperature_c`, `humidity_pct` |
-| BH1750 | `illuminance_lux` |
-| SCD40 | `co2_ppm`, `temperature_c`, `humidity_pct` |
-| Wasser-Ultraschall | `distance_cm`, `distance_filtered_cm`, `water_level_cm`, `measurement_stable` |
-| Moos-Ultraschall | `distance_cm`, `height_cm`, `height_median_1m_cm` |
-| Aggregat | `height_median_cm` |
+```text
+Ziel = Mittelwert(Montagehöhe − gefilterter Moosabstand) − 2,5 cm
+```
 
-`side` ist `left`, `right`, `tank`, `moss1` bis `moss4` oder `moss`;
-`sensor` ist `sht45`, `bh1750`, `scd40`, `ultrasonic` oder `aggregate`.
-`moos_sensor_health` speichert je Messstelle und Sensor das Feld `healthy`.
+Alle zur Regelung eingetragenen Moossensoren müssen stabile, höchstens
+12 Sekunden alte Messungen liefern. Zielwerte werden auf 0 bis
+`max_fuellhoehe_cm − pumpe_hysterese_cm` begrenzt, aktuell 0 bis 6,8 cm.
+Ein fester Zielwert und eine zusätzliche Mooshöhen-Aggregation entfallen.
+
+Nach jedem Eintritt in AUTO muss „Automatische Pumpe freigeben“ im Dashboard
+angeschaltet und im Dialog bestätigt werden. Die Freigabe wird nicht gespeichert.
+Neue Modussitzung, Sensor-/Dashboard-/Pi-Neustart, abgelaufener Modus-Snapshot
+oder Konfigurationsänderung entziehen sie. Eine Bestätigung aus einem zuvor
+geöffneten Dialog wird dann abgewiesen. Ausschalten ist ohne Dialog möglich.
+Ein kurzzeitig ungültiger Abstand sperrt das Nachfüllen innerhalb der Sitzung;
+nach der Erholung muss die Einschaltbedingung erneut 30 Sekunden bestehen.
+
+Die Regelung kennt drei Zustände:
+
+- **Gesperrt:** keine Freigabe, ungültige Messwerte oder Sicherheitsgrenze erreicht.
+- **Warten:** Wasser im Zielbereich oder niedriger Stand noch nicht bestätigt.
+- **Nachfüllen:** gefilterter Wasserstand seit 30 Sekunden unter Ziel minus 0,2 cm.
+  Die Pumpe läuft mit 25 % bis zum gefilterten Zielwasserstand.
+
+Eine einzelne Welle am normalen Zielwert beendet das Nachfüllen nicht.
+Der rohe Wasserstand ab **7,0 cm** schaltet die Pumpe dagegen sofort ab,
+auch in MANUAL. Die Grenze ist jetzt direkt `wasserstand.max_fuellhoehe_cm`;
+der bisherige Sicherheitsabstand wurde bereits eingerechnet.
+Fehlende Wasser-Echos oder Wasserwerte älter als 3 Sekunden sperren ebenfalls.
+Der gemeinsame Sensor-Snapshot und der Modus dürfen höchstens 5 Sekunden alt sein.
+Die Pumpensteuerung besitzt den Zustand; HTTP-Abfragen lesen nur seinen Snapshot.
+Alle Filter-, Alters- und Zeitgrenzen stehen zentral in `src/measurements.py`.
+
+## Speicherung und Anzeige
+
+`moos_sensor` hat die Tags `side` (`left`, `right`, `tank`, `moss1` bis `moss4`)
+und `sensor` (`sht45`, `bh1750`, `scd40`, `ultrasonic`).
+Ultraschallfelder: `distance_cm`, `distance_filtered_cm`, `measurement_stable`;
+beim Wasser zusätzlich `water_level_cm` und `max_level_reached`.
+Die bisherigen Papier-Bezugsabstände und Mooshöhenfelder werden nicht mehr erzeugt.
+Historische Daten bleiben erhalten. `moos_sensor_health.healthy` dokumentiert
+Sensorantworten; die Verwendbarkeit gefilterter Abstände bestimmt `measurement_stable`.
+
+Das Dashboard zeigt Deckenabstände je Moossensor, Wasserstand, Ziel und Pumpenzustand.
+Der Wassergraph enthält Messhistorie und eine Linie für das aktuelle Ziel.
+OLED und Debug-Tabelle verwenden dieselben gefilterten Abstände.

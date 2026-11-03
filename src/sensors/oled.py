@@ -138,7 +138,7 @@ def overview_values(readings):
         return average(selected)
 
     return {
-        "moos": average([readings.get((f"moss{index}", "ultrasonic", "height_cm"))
+        "moos": average([readings.get((f"moss{index}", "ultrasonic", "distance_filtered_cm"))
                          for index in range(1, 5)]),
         "temperatur": sides("temperature_c", ("sht45", "scd40")),
         "luftfeuchtigkeit": sides("humidity_pct", ("sht45", "scd40")),
@@ -153,7 +153,7 @@ def render(readings):
     image = Bild()
     image.text(0, 0, "Sensoren")
     image.rechteck(0, 9, BREITE, 1)
-    rows = (("Moos", "moos", "cm"), ("Temp", "temperatur", "°C"),
+    rows = (("Abstand", "moos", "cm"), ("Temp", "temperatur", "°C"),
             ("Luft", "luftfeuchtigkeit", "%"), ("CO2", "co2", "ppm"),
             ("Licht", "licht", "lx"))
     for index, (label, key, unit) in enumerate(rows):

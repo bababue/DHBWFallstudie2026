@@ -1,12 +1,11 @@
 """Daytime proportional cooling with an immediate, latched thermal cutoff."""
-from pump_control import valid_number
+from measurements import valid_number, fresh
 
 
 def temperatures(readings, now):
     values = {}
     for r in readings:
-        if (r.get('field') == 'temperature_c' and valid_number(r.get('sampled'))
-                and 0 <= now - r['sampled'] <= 12 and valid_number(r.get('value'))
+        if (r.get('field') == 'temperature_c' and fresh(r.get('sampled'), now) and valid_number(r.get('value'))
                 and -40 <= r['value'] <= 125):
             values[(r.get('side'), r.get('sensor'))] = r['value']
     selected = [next((values[(side, sensor)] for sensor in ('sht45', 'scd40')

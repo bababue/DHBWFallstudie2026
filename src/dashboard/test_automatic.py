@@ -1,111 +1,163 @@
+import copy
 import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+from automatic import AutomaticControl, light_schedule, auto_setpoints
+from configuration import load
+from test_pump_control import state
 
-from automatic import AutomaticControl, auto_setpoints, light_schedule
+
+class Actuator:
+    def __init__(self):
+        self.values = dict(fan=0, pump=0, led=0)
+        self.allowed = True
+    def status(self): return dict(self.values)
+    def set(self, device, value):
+        self.values[device] = value
+        return self.status()
+    def pump_allowed(self): return self.allowed
 
 
 class AutomaticControlTests(unittest.TestCase):
     def setUp(self):
-        self.mode = 'MANUAL'
-        self.controller = MagicMock()
-        self.controller.status.return_value = {'fan': 30, 'pump': 20, 'led': 80}
-        self.automatic = AutomaticControl(self.controller, lambda: self.mode)
-        self.automatic.manual_initialized = True
-        self.schedule = patch('automatic.auto_setpoints', return_value={'fan': 0, 'pump': 0, 'led': 0})
-        self.schedule.start()
-        self.addCleanup(self.schedule.stop)
+        self.mode = {'mode': 'AUTO', 'session': 'first'}
+        self.data = state()
+        self.config = copy.deepcopy(load())
+        self.actuator = Actuator()
+        self.control = self.make_control()
+        self.now = 0
+        patcher = patch('automatic.load', side_effect=lambda: self.config)
+        patcher.start(); self.addCleanup(patcher.stop)
+        patcher = patch('automatic.time.monotonic', side_effect=lambda: self.now)
+        patcher.start(); self.addCleanup(patcher.stop)
 
-    def test_manual_defaults_once_and_slider_preserved(self):
-        self.automatic.manual_initialized = False
-        self.automatic.apply()
-        self.controller.set.assert_any_call('pump', 0)
-        self.controller.set.assert_any_call('led', 20)
-        self.controller.set.assert_any_call('fan', 20)
-        self.controller.set.reset_mock()
-        self.automatic.set_manual('led', 35)
-        self.automatic.apply()
-        self.controller.set.assert_called_once_with('led', 35)
+    def make_control(self):
+        return AutomaticControl(self.actuator, lambda: dict(self.mode), lambda config: dict(self.data))
+
+    def arm(self):
+        self.control.apply()
+        token = self.control.status()['confirmation']
+        self.control.set_pump_enabled(True, token)
+        return token
+
+    def test_auto_starts_blocked_and_needs_explicit_current_confirmation(self):
+        self.control.apply()
+        self.now = 100
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 0)
+        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, 'old-token')
+        self.arm()
+        self.now += 30
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 25)
+        self.control.set_pump_enabled(False, None)
+        self.assertEqual(self.actuator.values['pump'], 0)
+        self.assertFalse(self.control.enabled)
+
+    def test_mode_switch_and_quick_return_need_new_confirmation(self):
+        old = self.arm()
+        self.mode = {'mode': 'MANUAL', 'session': 'manual'}
+        self.control.apply()
+        self.assertFalse(self.control.enabled)
+        self.mode = {'mode': 'AUTO', 'session': 'again'}
+        self.control.apply()
+        self.assertFalse(self.control.enabled)
+        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, old)
+        self.arm()
+        # Intermediate MANUAL need not have been observed by the dashboard loop.
+        self.mode['session'] = 'quick-manual-auto'
+        self.control.apply()
+        self.assertFalse(self.control.enabled)
+
+    def test_sensor_restart_dashboard_restart_and_connection_loss_revoke_release(self):
+        self.arm()
+        self.mode['session'] = 'restarted-sensor'
+        self.control.apply()
+        self.assertFalse(self.control.enabled)
+        old = self.arm()
+        replacement = self.make_control()
+        replacement.apply()
+        with self.assertRaises(ValueError): replacement.set_pump_enabled(True, old)
+        self.mode = {}
+        self.control.apply()
+        self.assertFalse(self.control.enabled)
+        self.assertEqual(self.actuator.values['pump'], 0)
+
+    def test_config_change_rejects_dialog_opened_before_change(self):
+        self.control.apply()
+        token = self.control.status()['confirmation']
+        self.config['automatik']['wasser_unter_moosspitzen_cm'] = 3
+        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, token)
+        self.assertFalse(self.control.enabled)
+
+    def test_switch_off_stops_running_pump_and_invalidates_old_confirmation(self):
+        old = self.arm()
+        self.now = 30
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 25)
+        self.control.set_pump_enabled(False, None)
+        self.assertEqual(self.actuator.values['pump'], 0)
+        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, old)
+
+    def test_new_mode_session_stops_a_running_pump_immediately(self):
+        self.arm()
+        self.now = 30
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 25)
+        self.mode['session'] = 'new-auto'
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 0)
+        self.assertFalse(self.control.enabled)
+
+    def test_heartbeat_refresh_does_not_revoke_current_session(self):
+        self.mode['updated'] = 0
+        self.arm()
+        self.mode['updated'] = 1
+        self.now = 30
+        self.control.apply()
+        self.assertTrue(self.control.enabled)
+        self.assertEqual(self.actuator.values['pump'], 25)
+
+    def test_control_error_and_shutdown_revoke_release_and_stop_outputs(self):
+        self.arm()
+        self.now = 30
+        self.control.apply()
+        with patch.object(self.control, 'get_water_state', side_effect=OSError('snapshot unavailable')):
+            with self.assertRaises(OSError): self.control.apply()
+        self.assertFalse(self.control.enabled)
+        self.assertEqual(self.actuator.values['pump'], 0)
+        self.arm()
+        self.control.close()
+        self.assertFalse(self.control.enabled)
+        self.assertEqual(self.actuator.values['pump'], 0)
+
+    def test_status_is_read_only_and_unsafe_readings_cannot_be_armed(self):
+        self.control.apply()
+        token = self.control.status()['confirmation']
+        self.data['water_ready'] = False
+        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, token)
+        self.assertFalse(self.control.enabled)
+        context = self.control.context
+        self.control.status(); self.control.status()
+        self.assertEqual(self.control.context, context)
+
+    def test_manual_remains_manual_and_water_lock_still_stops_it(self):
+        self.mode = {'mode': 'MANUAL', 'session': 'manual'}
+        self.control.apply()
+        self.control.set_manual('led', 35)
+        self.control.apply()
+        self.assertEqual(self.actuator.values['led'], 35)
+        self.control.set_manual('pump', 25)
+        self.actuator.allowed = False
+        self.control.apply()
+        self.assertEqual(self.actuator.values['pump'], 0)
 
     def test_light_schedule_boundaries_and_midnight(self):
-        self.schedule.stop()
-        berlin = ZoneInfo('Europe/Berlin')
-        config = {'licht_start_stunde': 6, 'lichtdauer_stunden': 16, 'lichtstaerke_prozent': 80}
-        def value(hour, minute):
-            return auto_setpoints(light_schedule(
-                config, datetime(2026, 5, 3, hour, minute, tzinfo=berlin)
-            ))['led']
-        self.assertEqual([value(5, 59), value(6, 0), value(21, 59), value(22, 0)], [0, 80, 80, 0])
-        night = light_schedule(config, datetime(2026, 5, 3, 22, 0, tzinfo=berlin))
-        self.assertFalse(night['active'])
-        self.assertEqual((night['start'], night['duration'], night['current']), (360, 960, 1320))
-        config['licht_start_stunde'] = 18
-        self.assertEqual([value(17, 59), value(18, 0), value(9, 59), value(10, 0)], [0, 80, 80, 0])
-
-    def test_water_lock_stops_running_pump_even_in_manual_or_unknown_mode(self):
-        self.controller.pump_allowed.return_value = False
-        self.automatic.apply()
-        self.controller.set.assert_called_once_with('pump', 0)
-        self.controller.set.reset_mock()
-        self.controller.status.return_value['pump'] = 20
-        self.mode = None
-        self.automatic.apply()
-        self.controller.set.assert_called_once_with('pump', 0)
-
-    def test_auto_restores_all_setpoints_after_manual(self):
-        self.automatic.apply()
-        self.controller.set.assert_not_called()
-        self.mode = 'AUTO'
-        self.automatic.apply()
-        self.assertEqual(self.automatic.get_mode(), 'AUTO')
-        self.assertEqual(self.controller.set.call_count, 3)
-        for device in ('fan', 'pump', 'led'):
-            self.controller.set.assert_any_call(device, 0)
-
-    def test_auto_drives_pump_from_regulator_and_manual_keeps_control(self):
-        from test_pump_control import OPTIONS, state
-        self.automatic.get_water_state = lambda: (state(), OPTIONS)
-        self.mode = 'AUTO'
-        self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
-        with patch('pump_control.time.monotonic', return_value=0):
-            self.automatic.apply()
-        self.controller.set.assert_not_called()
-        with patch('pump_control.time.monotonic', return_value=30):
-            self.automatic.apply()
-        self.controller.set.assert_called_once_with('pump', 25)
-        self.controller.set.reset_mock()
-        self.mode = 'MANUAL'
-        self.automatic.apply()
-        self.controller.set.assert_any_call('pump', 0)
-        self.controller.set.assert_any_call('led', 20)
-        self.controller.set.assert_any_call('fan', 20)
-        self.assertFalse(self.automatic.pump.reached)
-
-    def test_manual_values_are_only_set_in_manual(self):
-        self.automatic.set_manual('fan', 30)
-        self.controller.set.assert_called_once_with('fan', 30)
-        self.mode = 'AUTO'
-        with self.assertRaises(PermissionError):
-            self.automatic.set_manual('fan', 50)
-
-    def test_unknown_mode_stops_pump_without_applying_other_values(self):
-        self.mode = None
-        self.automatic.apply()
-        self.controller.set.assert_called_once_with('pump', 0)
-
-    def test_auto_does_not_repeat_unchanged_outputs(self):
-        self.mode = 'AUTO'
-        self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
-        self.automatic.apply()
-        self.controller.set.assert_not_called()
-
-    def test_auto_stops_if_mode_changes_during_update(self):
-        modes = iter(['AUTO', 'AUTO', 'MANUAL'])
-        self.automatic.get_mode = lambda: next(modes)
-        self.automatic.apply()
-        self.assertEqual(self.controller.set.call_count, 1)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        options = dict(licht_start_stunde=6, lichtdauer_stunden=16, lichtstaerke_prozent=80)
+        def value(hour):
+            now = datetime(2026, 5, 3, hour, tzinfo=ZoneInfo('Europe/Berlin'))
+            return auto_setpoints(light_schedule(options, now))['led']
+        self.assertEqual([value(h) for h in (5, 6, 21, 22)], [0, 80, 80, 0])
+        options['licht_start_stunde'] = 18
+        self.assertEqual([value(h) for h in (17, 18, 9, 10)], [0, 80, 80, 0])

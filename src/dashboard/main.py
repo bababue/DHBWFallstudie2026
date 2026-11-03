@@ -1,6 +1,5 @@
 """Dashboard for the current operating mode and camera."""
 import json
-import html
 import logging
 import os
 import tempfile
@@ -17,7 +16,8 @@ from influxdb_client import InfluxDBClient
 from configuration import load, setting
 from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl, light_schedule
-from pump_control import StableWaterTarget, valid_number
+from pump_control import water_overview
+from measurements import valid_number, fresh, MAX_DISTANCE_CM, WATER_MAX_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS
 
 from temperature import PERIODS, combine
 
@@ -32,7 +32,6 @@ app.mount('/static', StaticFiles(directory=Path(__file__).parent / 'static'), na
 
 actuators = None
 automatic = None
-water_target = StableWaterTarget()
 
 
 def water_snapshot():
@@ -40,8 +39,8 @@ def water_snapshot():
     try:
         snapshot = json.loads(WATER_SAFETY_FILE.read_text())
         sampled, distance = snapshot['sampled'], snapshot['distance_cm']
-        if (not valid_number(sampled) or not 0 <= time.time() - sampled <= 3
-                or not valid_number(distance) or not 0 < distance <= 400):
+        if (not valid_number(sampled) or not fresh(sampled, time.time(), WATER_MAX_AGE_SECONDS)
+                or not valid_number(distance) or not 0 < distance <= MAX_DISTANCE_CM):
             return None
         return snapshot
     except (OSError, ValueError, TypeError, KeyError):
@@ -56,38 +55,40 @@ def water_pump_allowed():
         maximum = water['max_fuellhoehe_cm']
         return bool(snapshot is not None and maximum is not None
                     and water['sensor_boden_abstand_cm'] - snapshot['distance_cm']
-                    < maximum - water['sicherheitsabstand_cm'])
+                    < maximum)
     except (OSError, ValueError, TypeError, KeyError):
         return False
 
 
-def pump_state():
-    config = load()
-    result = water_target.update(live_readings(), config, time.time())
+def pump_state(config):
+    result = water_overview(live_readings(), config, time.time())
     snapshot = water_snapshot()
     water = config['wasserstand']
-    result.update({'water_ready': bool(snapshot and snapshot.get('measurement_stable') == 1
-                                      and valid_number(snapshot.get('water_level_cm'))),
-                   'water_level_cm': snapshot.get('water_level_cm') if snapshot else None,
-                   'raw_level_cm': max(0, water['sensor_boden_abstand_cm'] - snapshot['distance_cm']) if snapshot else None,
-                   'pump_allowed': water_pump_allowed(),
-                   'target_ceiling_cm': (max(0, water['max_fuellhoehe_cm'] - water['sicherheitsabstand_cm']
-                                            - config['automatik']['pumpe_hysterese_cm'])
-                                         if water['max_fuellhoehe_cm'] is not None else None)})
-    return result, config['automatik']
+    raw = max(0.0, water['sensor_boden_abstand_cm'] - snapshot['distance_cm']) if snapshot else None
+    result.update(water_ready=bool(snapshot and snapshot.get('measurement_stable') == 1
+                                  and valid_number(snapshot.get('water_level_cm'))),
+                  water_level_cm=snapshot.get('water_level_cm') if snapshot else None,
+                  pump_allowed=raw is not None and raw < water['max_fuellhoehe_cm'])
+    return result
 
 
 @app.get('/api/automatic/water')
 def automatic_water():
+    if automatic is None:
+        return Response('Steuerung nicht verfügbar', status_code=503)
+    return automatic.status()
+
+
+@app.post('/api/automatic/pump')
+def enable_pump(body: dict):
+    if automatic is None:
+        return Response('Steuerung nicht verfügbar', status_code=503)
+    if type(body.get('enabled')) is not bool:
+        return Response('Ungültige Freigabe', status_code=400)
     try:
-        state, options = pump_state()
-        is_automatic = automatic is not None and mode_state().get('mode') == 'AUTO'
-        state['reason'] = automatic.pump.reason if is_automatic else ''
-        state['pump_active'] = bool(is_automatic and actuators.status()['pump'])
-        return state
-    except (OSError, ValueError, TypeError, KeyError):
-        LOG.exception('Wasserregelung nicht verfügbar')
-        return Response('Wasserregelung nicht verfügbar', status_code=503)
+        return automatic.set_pump_enabled(body['enabled'], body.get('confirmation'))
+    except (PermissionError, ValueError) as exc:
+        return Response(str(exc), status_code=409)
 
 
 @app.on_event('startup')
@@ -107,7 +108,7 @@ def start_actuators():
             options['pumpe_pwm_hz'],
             pump_allowed=water_pump_allowed,
         )
-        automatic = AutomaticControl(actuators, lambda: mode_state().get('mode'), get_water_state=pump_state, get_readings=live_readings)
+        automatic = AutomaticControl(actuators, mode_state, get_water_state=pump_state, get_readings=live_readings)
         automatic.start()
     except Exception:
         LOG.exception('Aktoren konnten nicht initialisiert werden')
@@ -162,7 +163,8 @@ def mode_state():
     try:
         data = json.loads(MODE_FILE.read_text())
         now = time.time()
-        if data['mode'] in ('AUTO', 'MANUAL') and 0 <= now - data['updated'] < 5:
+        if (data['mode'] in ('AUTO', 'MANUAL') and isinstance(data.get('session'), str)
+                and data['session'] and fresh(data.get('updated'), now, SNAPSHOT_MAX_AGE_SECONDS)):
             return data
     except (OSError, ValueError, TypeError, KeyError):
         pass
@@ -174,11 +176,10 @@ def live_readings():
     try:
         data = json.loads(READINGS_FILE.read_text())
         now = time.time()
-        if not 0 <= now - data['updated'] <= 5:
+        if not fresh(data.get('updated'), now, SNAPSHOT_MAX_AGE_SECONDS):
             return []
         return [r for r in data['readings']
-                if isinstance(r, dict) and isinstance(r.get('sampled'), (int, float))
-                and 0 <= now - r['sampled'] <= 12
+                if isinstance(r, dict) and fresh(r.get('sampled'), now)
                 and all(key in r for key in ('side', 'sensor', 'field', 'value'))]
     except (OSError, ValueError, TypeError, KeyError):
         return []
@@ -256,43 +257,6 @@ def metric_data(field, unit, period, current_only):
         return Response('Messdaten nicht erreichbar', status_code=503)
 
 
-@app.get('/api/moss')
-def moss(period: str = '1h', current_only: bool = False):
-    if period not in PERIODS:
-        return Response('Ungültiger Zeitraum', status_code=400)
-    duration, window, function = PERIODS[period]
-    # Each sensor reports about every four seconds.
-    if period == '10m':
-        window = '10s'
-    org = setting('INFLUXDB_ORG', 'moos')
-    base = (f'from(bucket: {json.dumps(setting("INFLUXDB_BUCKET", "moos_sensors"))})\n'
-            '  |> range(start: -DURATION)\n'
-            '  |> filter(fn: (r) => r._measurement == "moos_sensor" and r.sensor == "ultrasonic" '
-            'and r._field == "height_median_1m_cm" and (r.side == "moss1" or r.side == "moss2" or r.side == "moss3" or r.side == "moss4"))\n')
-    current = {r['side']: r['value'] for r in live_readings()
-               if r['sensor'] == 'ultrasonic' and r['field'] == 'height_cm'
-               and r['side'] in {f'moss{index}' for index in range(1, 5)}}
-    if current_only:
-        return {'current': current}
-    try:
-        with InfluxDBClient(url=setting('INFLUXDB_URL', 'http://influxdb:8086'),
-                            token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
-            api = client.query_api()
-            series = {f'moss{index}': [] for index in range(1, 5)}
-            query = base.replace('DURATION', duration) + f'  |> aggregateWindow(every: {window}, fn: {function}, createEmpty: false, timeSrc: "_start")'
-            for table in api.query(query, org=org):
-                for record in table.records:
-                    side = record.values.get('side')
-                    if side in series:
-                        series[side].append({'time': int(record.get_time().timestamp()), 'value': record.get_value()})
-            for points in series.values():
-                points.sort(key=lambda point: point['time'])
-        return {'current': current, 'series': series, 'window_seconds': int(window[:-1]) * (60 if window.endswith('m') else 1)}
-    except Exception:
-        LOG.exception('Could not read moss heights')
-        return Response('Moosdaten nicht erreichbar', status_code=503)
-
-
 @app.get('/api/mode')
 def mode():
     return {'mode': mode_state().get('mode')}
@@ -305,6 +269,8 @@ def request_mode(body: dict):
         return Response('Ungültiger Modus', status_code=400)
     if not mode_state().get('mode'):
         return Response('Sensorprozess nicht erreichbar', status_code=503)
+    if automatic is not None:
+        automatic.disable_pump()
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode='w', dir=MODE_COMMAND_FILE.parent, delete=False) as output:
@@ -323,18 +289,7 @@ def request_mode(body: dict):
 
 @app.get('/', response_class=HTMLResponse)
 def index():
-    config = load()
     page = (Path(__file__).parent / 'static' / 'index.html').read_text()
-    water_offset = config['wasserstand']['sensor_boden_abstand_cm']
-    page = page.replace('__WATER_OFFSET__', html.escape(f'{water_offset:g}'.replace('.', ',')))
-    for sensor_index in range(1, 5):
-        reference = config[f'moos_{sensor_index}']['bezugsabstand_cm']
-        if reference is not None:
-            formatted_reference = f'{reference:g}'.replace('.', ',')
-            label = f'Moosspitze (max(0; 6 + {formatted_reference} − Rohabstand), cm)'
-        else:
-            label = 'Moosspitze (nicht kalibriert, cm)'
-        page = page.replace(f'__MOSS_FORMULA_{sensor_index}__', html.escape(label))
     return HTMLResponse(headers={'Cache-Control': 'no-store'}, content=page)
 
 

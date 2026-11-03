@@ -13,30 +13,27 @@
     "trigger_gpio": 6,
     "echo_gpio": 13,
     "sensor_boden_abstand_cm": 8.265,
-    "filter_messungen": 15,
-    "max_streuung_cm": 0.2,
-    "max_fuellhoehe_cm": 8.0,
-    "sicherheitsabstand_cm": 1.0
+    "max_fuellhoehe_cm": 7.0
   },
   "moos_1": {
     "trigger_gpio": 9,
     "echo_gpio": 11,
-    "bezugsabstand_cm": 6.94
+    "montagehoehe_cm": 12.94
   },
   "moos_2": {
     "trigger_gpio": 0,
     "echo_gpio": 5,
-    "bezugsabstand_cm": 6.059
+    "montagehoehe_cm": 12.059
   },
   "moos_3": {
     "trigger_gpio": 22,
     "echo_gpio": 10,
-    "bezugsabstand_cm": null
+    "montagehoehe_cm": null
   },
   "moos_4": {
     "trigger_gpio": 17,
     "echo_gpio": 27,
-    "bezugsabstand_cm": null
+    "montagehoehe_cm": null
   },
   "taster": {
     "gpio": 26
@@ -62,8 +59,6 @@
     "pumpe_leistung_prozent": 25,
     "temperatur_ziel_c": 22,
     "temperatur_max_c": 25,
-    "wasser_unter_moosspitzen_cm": 2.5,
-    "zielwasserstand_fest": true,
-    "zielwasserstand_cm": 7.0
+    "wasser_unter_moosspitzen_cm": 2.5
   }
 }

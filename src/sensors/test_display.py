@@ -34,8 +34,8 @@ class OledTests(unittest.TestCase):
             ("right", "scd40", "co2_ppm"): 600,
             ("left", "bh1750", "illuminance_lux"): 12,
             ("right", "bh1750", "illuminance_lux"): 18,
-            ("moss1", "ultrasonic", "height_cm"): 1,
-            ("moss2", "ultrasonic", "height_cm"): 3,
+            ("moss1", "ultrasonic", "distance_filtered_cm"): 1,
+            ("moss2", "ultrasonic", "distance_filtered_cm"): 3,
         }
         self.assertEqual(overview_values(readings), {
             "moos": 2, "temperatur": 21, "luftfeuchtigkeit": 75,
@@ -43,11 +43,11 @@ class OledTests(unittest.TestCase):
         })
         self.assertEqual(overview_values({})['moos'], None)
 
-    def test_display_keeps_recent_value_during_failed_read(self):
+    def test_failed_echo_removes_previous_filtered_distance(self):
         values = {}
-        update_display_values(values, "moss1", "ultrasonic", {"height_cm": 2}, 10)
+        update_display_values(values, "moss1", "ultrasonic", {"distance_filtered_cm": 2}, 10)
         update_display_values(values, "moss1", "ultrasonic", None, 11)
-        self.assertEqual(display_readings(values, 11)[("moss1", "ultrasonic", "height_cm")], 2)
+        self.assertEqual(display_readings(values, 11), {})
         self.assertEqual(display_readings(values, 23), {})
 
     def test_each_mode_has_its_own_screen(self):
