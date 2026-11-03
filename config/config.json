@@ -15,7 +15,7 @@
     "sensor_boden_abstand_cm": 8.265,
     "filter_messungen": 5,
     "max_streuung_cm": 0.2,
-    "max_fuellhoehe_cm": 7.0,
+    "max_fuellhoehe_cm": 8.0,
     "sicherheitsabstand_cm": 1.0
   },
   "moos_1": {
@@ -61,5 +61,10 @@
     "licht_pwm_hz": 2000,
     "luefter_pwm_hz": 5,
     "pumpe_pwm_hz": 5
+  },
+  "automatik": {
+    "licht_start_stunde": 6,
+    "lichtdauer_stunden": 16,
+    "lichtstaerke_prozent": 100
   }
 }

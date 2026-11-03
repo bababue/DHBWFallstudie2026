@@ -15,6 +15,8 @@ def upgrade(data):
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
         data.pop("deckel", None)
+        data.setdefault("automatik", {"licht_start_stunde": 6, "lichtdauer_stunden": 16,
+                                      "lichtstaerke_prozent": 100})
         data.setdefault("aktoren", {"licht_gpio": 20, "luefter_gpio": 21, "pumpe_gpio": 16,
                                     "licht_pwm_hz": 2000, "luefter_pwm_hz": 5, "pumpe_pwm_hz": 5})
         if isinstance(data.get("wasserstand"), dict):
@@ -63,6 +65,11 @@ def validate(data):
             if type(value) is not int or not 0 <= value <= 27:
                 raise ValueError(f'{group}.{key}: GPIO muss eine ganze Zahl von 0 bis 27 sein')
             pins.append(value)
+        elif name in ('AUTO_LIGHT_START_HOUR', 'AUTO_LIGHT_DURATION_HOURS', 'AUTO_LIGHT_LEVEL_PERCENT'):
+            low, high = {'AUTO_LIGHT_START_HOUR': (0, 23), 'AUTO_LIGHT_DURATION_HOURS': (1, 23),
+                         'AUTO_LIGHT_LEVEL_PERCENT': (0, 100)}[name]
+            if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
+                raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
         elif name.endswith('_PWM_HZ'):
             if type(value) is not int or not 1 <= value <= 20000:
                 raise ValueError(f'{group}.{key}: PWM-Frequenz muss eine ganze Zahl von 1 bis 20000 sein')

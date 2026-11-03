@@ -146,8 +146,9 @@ Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalt
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
 Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
-Im AUTO-Modus setzt die automatische Steuerung Lüfter, Pumpe und Licht derzeit
-auf 0 %. Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
+Im AUTO-Modus sind Lüfter und Pumpe derzeit auf 0 % gesetzt. Das Licht folgt
+`automatik` in der Konfiguration: standardmäßig 06:00 bis 22:00 Uhr mit 100 %,
+die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin). Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
 Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
 werden die Ausgänge auf 0 gesetzt. Die GPIOs und PWM-Frequenzen stehen unter

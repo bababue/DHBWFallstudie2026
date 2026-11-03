@@ -178,5 +178,17 @@
   "WATER_SAFETY_MARGIN_CM": [
     "wasserstand",
     "sicherheitsabstand_cm"
+  ],
+  "AUTO_LIGHT_START_HOUR": [
+    "automatik",
+    "licht_start_stunde"
+  ],
+  "AUTO_LIGHT_DURATION_HOURS": [
+    "automatik",
+    "lichtdauer_stunden"
+  ],
+  "AUTO_LIGHT_LEVEL_PERCENT": [
+    "automatik",
+    "lichtstaerke_prozent"
   ]
 }

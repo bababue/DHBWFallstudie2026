@@ -71,3 +71,13 @@ class ConfigurationTests(unittest.TestCase):
         data['wasserstand']['max_fuellhoehe_cm'] = 6
         data['wasserstand']['sicherheitsabstand_cm'] = 6
         with self.assertRaises(ValueError): validate(data)
+
+    def test_light_schedule_validation_and_defaults(self):
+        data = copy.deepcopy(load())
+        del data['automatik']
+        self.assertEqual(validate(upgrade(data))['automatik']['lichtdauer_stunden'], 16)
+        for key, value in [('licht_start_stunde', 24), ('lichtdauer_stunden', 0),
+                           ('lichtstaerke_prozent', 101), ('lichtstaerke_prozent', 1)]:
+            data = copy.deepcopy(load())
+            data['automatik'][key] = value
+            with self.assertRaises(ValueError): validate(data)

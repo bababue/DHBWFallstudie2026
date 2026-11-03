@@ -1,5 +1,7 @@
 import unittest
-from unittest.mock import MagicMock
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from unittest.mock import MagicMock, patch
 
 from automatic import AutomaticControl, auto_setpoints
 
@@ -10,6 +12,19 @@ class AutomaticControlTests(unittest.TestCase):
         self.controller = MagicMock()
         self.controller.status.return_value = {'fan': 30, 'pump': 20, 'led': 80}
         self.automatic = AutomaticControl(self.controller, lambda: self.mode)
+        self.schedule = patch('automatic.auto_setpoints', return_value={'fan': 0, 'pump': 0, 'led': 0})
+        self.schedule.start()
+        self.addCleanup(self.schedule.stop)
+
+    def test_light_schedule_boundaries_and_midnight(self):
+        self.schedule.stop()
+        berlin = ZoneInfo('Europe/Berlin')
+        config = {'licht_start_stunde': 6, 'lichtdauer_stunden': 16, 'lichtstaerke_prozent': 80}
+        def value(hour, minute):
+            return auto_setpoints(config, datetime(2026, 5, 3, hour, minute, tzinfo=berlin))['led']
+        self.assertEqual([value(5, 59), value(6, 0), value(21, 59), value(22, 0)], [0, 80, 80, 0])
+        config['licht_start_stunde'] = 18
+        self.assertEqual([value(17, 59), value(18, 0), value(9, 59), value(10, 0)], [0, 80, 80, 0])
 
     def test_water_lock_stops_running_pump_even_in_manual_or_unknown_mode(self):
         self.controller.pump_allowed.return_value = False
