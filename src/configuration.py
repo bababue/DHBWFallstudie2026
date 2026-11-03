@@ -15,7 +15,7 @@ def upgrade(data):
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
         data.pop("deckel", None)
-        data.setdefault("automatik", {"licht_start_stunde": 6, "lichtdauer_stunden": 16,
+        data.setdefault("automatik", {"licht_start_stunde": 4, "lichtdauer_stunden": 16,
                                       "lichtstaerke_prozent": 100})
         if isinstance(data.get("automatik"), dict):
             options = dict(data["automatik"])

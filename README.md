@@ -148,7 +148,7 @@ Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
 Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
 Im AUTO-Modus ist der Lüfter derzeit auf 0 % gesetzt. Die Pumpe hält einen festen Wasserstand
 von 1,3 cm und läuft dafür durchgehend mit 25 %, bis dieser erreicht ist. Das Licht folgt
-`automatik` in der Konfiguration: standardmäßig 06:00 bis 22:00 Uhr mit 100 %,
+`automatik` in der Konfiguration: standardmäßig 04:00 bis 20:00 Uhr mit 100 %,
 die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin). Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
 Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
