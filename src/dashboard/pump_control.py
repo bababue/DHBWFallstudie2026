@@ -15,6 +15,12 @@ def target_level(config, moss_height):
     return max(0.0, min(moss_height - options['wasser_unter_moosspitzen_cm'], ceiling))
 
 
+def pump_ready(data):
+    return bool(data and data.get('water_ready') and data.get('pump_allowed')
+                and all(valid_number(data.get(key))
+                        for key in ('target_cm', 'water_level_cm', 'raw_level_cm')))
+
+
 def water_overview(readings, config, now):
     """Derive the target from the mean of fresh, smoothed moss tip heights."""
     heights = []
@@ -38,12 +44,8 @@ class PumpRegulator:
         self.reached = False
         self.reason = ''
 
-    def value(self, data, options, now):
-        valid = (data and data.get('water_ready') and data.get('pump_allowed')
-                 and valid_number(data.get('target_cm'))
-                 and valid_number(data.get('water_level_cm'))
-                 and valid_number(data.get('raw_level_cm')))
-        if not valid:
+    def value(self, data, options):
+        if not pump_ready(data):
             self.reason = 'Warte auf sichere Messwerte'
             return 0
         target, level = data['target_cm'], data['water_level_cm']

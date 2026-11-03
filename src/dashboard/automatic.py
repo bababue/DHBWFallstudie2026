@@ -25,9 +25,8 @@ def light_schedule(config=None, now=None):
             'level': config['lichtstaerke_prozent']}
 
 
-def auto_setpoints(config=None, now=None):
+def auto_setpoints(schedule):
     """Set the LED by the local daily schedule; other outputs are currently off."""
-    schedule = light_schedule(config, now)
     return {'fan': 0, 'pump': 0, 'led': schedule['level'] if schedule['active'] else 0}
 
 
@@ -62,10 +61,11 @@ class AutomaticControl:
                 elif current['pump']:
                     self.actuators.set('pump', 0)
                 return
-            values = auto_setpoints()
+            options = load()['automatik']
+            schedule = light_schedule(options)
+            values = auto_setpoints(schedule)
             if self.get_readings is not None:
-                options = load()["automatik"]
-                thermal = self.thermal.update(self.get_readings(), options, light_schedule(options), time.time())
+                thermal = self.thermal.update(self.get_readings(), options, schedule, time.time())
                 values.update(fan=thermal["fan"], led=thermal["led"])
             if self.get_water_state is not None:
                 data, options = self.get_water_state()

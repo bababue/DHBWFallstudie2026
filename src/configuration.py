@@ -9,52 +9,6 @@ PATH = Path('/config/config.json') if Path('/config').exists() else Path(__file_
 KEYS = json.loads(Path(__file__).with_name('config_keys.json').read_text())
 
 
-def upgrade(data):
-    if isinstance(data, dict):
-        data = dict(data)
-        data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
-        data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
-        data.pop("deckel", None)
-        data.setdefault("automatik", {"licht_start_stunde": 6, "lichtdauer_stunden": 16,
-                                      "lichtstaerke_prozent": 50})
-        if isinstance(data.get("automatik"), dict):
-            options = dict(data["automatik"])
-            legacy_pulse = 'pumpe_impuls_s' in options
-            for key in ('wasser_ziel_cm', 'pumpe_impuls_s', 'pumpe_pause_s', 'pumpe_max_laufzeit_s'):
-                options.pop(key, None)
-            options.setdefault('temperatur_ziel_c', 22)
-            options.setdefault('temperatur_max_c', 25)
-            options.setdefault('wasser_unter_moosspitzen_cm', 2)
-            options.setdefault('pumpe_hysterese_cm', 0.2)
-            options.setdefault('pumpe_start_stunde', 6)
-            options.setdefault('pumpe_start_minute', 0)
-            # Replace the previous pulse default when upgrading to continuous operation.
-            if legacy_pulse and options.get('pumpe_leistung_prozent') == 30:
-                options['pumpe_leistung_prozent'] = 25
-            options.setdefault('pumpe_leistung_prozent', 25)
-            data["automatik"] = options
-        data.setdefault("aktoren", {"licht_gpio": 20, "luefter_gpio": 21, "pumpe_gpio": 16,
-                                    "licht_pwm_hz": 2000, "luefter_pwm_hz": 5, "pumpe_pwm_hz": 5})
-        if isinstance(data.get("wasserstand"), dict):
-            water = dict(data["wasserstand"])
-            water.setdefault("sicherheitsabstand_cm", 1.0)
-            data["wasserstand"] = water
-        legacy_demo = data.pop("moos_demo", None)
-        for index in range(1, 5):
-            key = f"moos_{index}"
-            if isinstance(data.get(key), dict):
-                sensor = dict(data[key])
-                legacy_enabled = isinstance(legacy_demo, dict) and legacy_demo.get("demo_data") is True
-                sensor.setdefault("demo", legacy_enabled)
-                reference = sensor.get("bezugsabstand_cm")
-                default_distance = (round(reference + 1, 3)
-                                    if isinstance(reference, (int, float)) and not isinstance(reference, bool)
-                                    and math.isfinite(reference) and 0 < reference <= 399 else None)
-                sensor.setdefault("demo_abstand_cm", default_distance)
-                data[key] = sensor
-    return data
-
-
 def validate(data):
     expected = {}
     for group, key in KEYS.values():
@@ -122,7 +76,7 @@ def validate(data):
 
 
 def load():
-    return validate(upgrade(json.loads(PATH.read_text())))
+    return validate(json.loads(PATH.read_text()))
 
 
 def setting(name, default=None):

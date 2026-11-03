@@ -18,8 +18,8 @@ class DashboardTests(unittest.TestCase):
             state = Path(directory) / 'mode.json'
             with patch.object(main, 'MODE_FILE', state):
                 self.assertIsNone(main.mode()['mode'])
-                state.write_text(json.dumps({'mode': 'MEASURING', 'updated': time.time()}))
-                self.assertEqual(main.mode()['mode'], 'MEASURING')
+                state.write_text(json.dumps({'mode': 'MANUAL', 'updated': time.time()}))
+                self.assertEqual(main.mode()['mode'], 'MANUAL')
                 state.write_text(json.dumps({'mode': 'AUTO', 'updated': time.time() - 10}))
                 self.assertIsNone(main.mode()['mode'])
 
@@ -38,7 +38,8 @@ class DashboardTests(unittest.TestCase):
         body = main.index().body.decode()
         self.assertIn('class="topbar"', body)
         self.assertIn('id="mode"', body)
-        self.assertIn('/camera/stream.mjpg', body)
+        script = (Path(main.__file__).parent / 'static' / 'app.js').read_text()
+        self.assertIn('/camera/stream.mjpg', script)
         self.assertNotIn('led-slider', body)
         self.assertIn('id="debug-toggle"', body)
         self.assertIn('id="debug-panel" hidden', body)
@@ -49,7 +50,7 @@ class DashboardTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('node'), 'Node.js nicht installiert')
     def test_rendered_javascript_has_valid_syntax(self):
         body = main.index().body.decode()
-        script = body.split('<script>', 1)[1].split('</script>', 1)[0]
+        script = (Path(main.__file__).parent / 'static' / 'app.js').read_text()
         result = subprocess.run(['node', '--check'], input=script, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -64,6 +65,8 @@ class DashboardTests(unittest.TestCase):
                 self.assertEqual(main.set_actuator('fan', {'value': 30}).status_code, 409)
                 controller.set.assert_not_called()
             with patch.object(main, 'mode_state', return_value={'mode': 'MANUAL'}):
+                automatic.initialize_manual()
+                controller.set.reset_mock()
                 self.assertEqual(main.set_actuator('fan', {'value': 30})['fan'], 30)
                 controller.set.assert_called_once_with('fan', 30)
         with patch.object(main, 'actuators', None):

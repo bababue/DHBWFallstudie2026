@@ -13,7 +13,7 @@ from threading import Event
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-from configuration import setting, load
+from configuration import load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, apply_mode_command, start_button_reader
 from moss_height import MossAggregate, MossHeight, WaterNoise
@@ -25,10 +25,6 @@ from water_level import WaterLevel
 
 LOG = logging.getLogger("moos.sensors")
 STOP = Event()
-
-
-def env_int(name: str, default: str) -> int:
-    return int(setting(name, default), 0)
 
 
 @dataclass(frozen=True)
@@ -58,59 +54,39 @@ class Config:
 
     @classmethod
     def from_config(cls):
-        config = cls(
-            chip=setting("GPIOCHIP_DEVICE", "/dev/gpiochip0"),
-            left_sda=env_int("LEFT_I2C_SDA_GPIO", "15"),
-            left_scl=env_int("LEFT_I2C_SCL_GPIO", "14"),
-            right_sda=env_int("RIGHT_I2C_SDA_GPIO", "23"),
-            right_scl=env_int("RIGHT_I2C_SCL_GPIO", "24"),
-            water_trigger=env_int("WATER_TRIGGER_GPIO", "6"),
-            water_echo=env_int("WATER_ECHO_GPIO", "13"),
-            button_pin=env_int("BUTTON_GPIO", "26"),
-            water_floor_distance_cm=float(setting("WATER_FLOOR_DISTANCE_CM", "8.62")),
-            moss_pins=tuple((env_int(f"MOSS_{index}_TRIGGER_GPIO", str(trigger)),
-                             env_int(f"MOSS_{index}_ECHO_GPIO", str(echo)))
-                            for index, (trigger, echo) in enumerate(
-                                ((9, 11), (0, 5), (22, 10), (17, 27)), start=1)),
-            moss_empty_distances_cm=tuple(
-                float(value) if (value := setting(f"MOSS_{index}_EMPTY_DISTANCE_CM", "")) else None
-                for index in range(1, 5)),
-            moss_interval=float(setting("MOSS_SAMPLE_INTERVAL_SECONDS", "4")),
-            delay_us=env_int("I2C_DELAY_US", "12"),
-            sht45_address=env_int("SHT45_ADDRESS", "0x44"),
-            bh1750_address=env_int("BH1750_ADDRESS", "0x23"),
-            scd40_address=env_int("SCD40_ADDRESS", "0x62"),
-            fast_interval=float(setting("FAST_SAMPLE_INTERVAL_SECONDS", "1")),
-            co2_poll_interval=float(setting("CO2_READY_POLL_SECONDS", "0.5")),
-            influx_url=setting("INFLUXDB_URL", "http://influxdb:8086"),
-            influx_org=setting("INFLUXDB_ORG", "moos"),
-            influx_bucket=setting("INFLUXDB_BUCKET", "moos_sensors"),
-            influx_token=setting("INFLUXDB_TOKEN", ""),
-        )
-        pins = (config.left_sda, config.left_scl, config.right_sda, config.right_scl,
-                config.water_trigger, config.water_echo, config.button_pin,
-                *(pin for pair in config.moss_pins for pin in pair))
-        if len(set(pins)) != len(pins) or not all(0 <= pin <= 27 for pin in pins):
-            raise ValueError("Sensor GPIO pins must be distinct BCM numbers 0..27")
-        if not 0 < config.water_floor_distance_cm <= WaterLevel.MAX_DISTANCE_CM:
-            raise ValueError("WATER_FLOOR_DISTANCE_CM must be within the sensor range")
-        if not 4 <= config.moss_interval <= 60:
-            raise ValueError("MOSS_SAMPLE_INTERVAL_SECONDS must be 4..60")
-        if any(distance is not None and not 0 < distance <= MossHeight.MAX_DISTANCE_CM
-               for distance in config.moss_empty_distances_cm):
-            raise ValueError("MOSS_N_EMPTY_DISTANCE_CM must be within the sensor range")
-        if not re.fullmatch(r"/dev/gpiochip\d+", config.chip):
+        data = load()
+        water = data["wasserstand"]
+        moss = tuple(data[f"moos_{index}"] for index in range(1, 5))
+        chip = os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0")
+        token = os.getenv("INFLUXDB_TOKEN", "")
+        if not re.fullmatch(r"/dev/gpiochip\d+", chip):
             raise ValueError("GPIOCHIP_DEVICE must be /dev/gpiochipN")
-        if not 0.5 <= config.fast_interval <= 60:
-            raise ValueError("FAST_SAMPLE_INTERVAL_SECONDS must be 0.5..60")
-        if not 0.2 <= config.co2_poll_interval <= 5:
-            raise ValueError("CO2_READY_POLL_SECONDS must be 0.2..5")
-        if config.delay_us < 5:
-            raise ValueError("I2C_DELAY_US must be >=5")
-        if not all(0x03 <= a <= 0x77 for a in (config.sht45_address, config.bh1750_address, config.scd40_address)):
-            raise ValueError("I2C addresses must be 7-bit addresses")
-        if not config.influx_token:
+        if not token:
             raise ValueError("INFLUXDB_TOKEN is required")
+        config = cls(
+            chip=chip,
+            left_sda=data["i2c"]["links_sda_gpio"],
+            left_scl=data["i2c"]["links_scl_gpio"],
+            right_sda=data["i2c"]["rechts_sda_gpio"],
+            right_scl=data["i2c"]["rechts_scl_gpio"],
+            water_trigger=water["trigger_gpio"],
+            water_echo=water["echo_gpio"],
+            button_pin=data["taster"]["gpio"],
+            water_floor_distance_cm=water["sensor_boden_abstand_cm"],
+            moss_pins=tuple((sensor["trigger_gpio"], sensor["echo_gpio"]) for sensor in moss),
+            moss_empty_distances_cm=tuple(sensor["bezugsabstand_cm"] for sensor in moss),
+            moss_interval=data["messintervalle"]["moos_s"],
+            delay_us=data["i2c"]["taktpause_us"],
+            sht45_address=data["i2c"]["sht45_adresse"],
+            bh1750_address=data["i2c"]["bh1750_adresse"],
+            scd40_address=data["i2c"]["scd40_adresse"],
+            fast_interval=data["messintervalle"]["schnelle_sensoren_s"],
+            co2_poll_interval=data["messintervalle"]["co2_bereitschaft_s"],
+            influx_url=os.getenv("INFLUXDB_URL", "http://influxdb:8086"),
+            influx_org=os.getenv("INFLUXDB_ORG", "moos"),
+            influx_bucket=os.getenv("INFLUXDB_BUCKET", "moos_sensors"),
+            influx_token=token,
+        )
         return config
 
 
@@ -272,9 +248,7 @@ def run():
                         error = False
                         try:
                             if isinstance(sensor, MossHeight) and sensor.demo_enabled:
-                                sigma = water_noise.sigma(time.monotonic())
-                                if sigma is not None:
-                                    sensor.demo_sigma_cm = sigma
+                                sensor.demo_sigma_cm = water_noise.sigma(time.monotonic())
                             if is_co2 and side not in started:
                                 sensor.start()
                                 started.add(side)
@@ -306,11 +280,10 @@ def run():
                             LOG.warning("%s/scd40 has no fresh CO2; restarting next poll", side)
                             started.remove(side)
                             error = True
-                        if not is_co2 or fields is not None or error:
-                            update_display_values(display_values, side, sensor.name, fields, finished)
                         # The SCD40 has no new value between its 5 s conversions.
                         # Do not publish a false unhealthy or repeat a stale sample.
                         if not is_co2 or fields is not None or error:
+                            update_display_values(display_values, side, sensor.name, fields, finished)
                             timestamp = datetime.now(timezone.utc)
                             points.extend(sample_points(side, sensor.name, fields, timestamp))
                             if isinstance(sensor, MossHeight):

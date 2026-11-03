@@ -6,47 +6,11 @@ from collections import deque
 from threading import Event, Lock
 
 
-class Ultrasonic:
+class TimestampUltrasonic:
+    """Measure ultrasonic echo width from kernel edge timestamps."""
+
     SOUND_CM_PER_S = 34300
     MAX_DISTANCE_CM = 400
-    START_TIMEOUT_S = 0.01
-
-    def __init__(self, gpio, handle: int, trigger_pin: int, echo_pin: int, pull_down=False):
-        self.gpio = gpio
-        self.handle = handle
-        self.trigger_pin = trigger_pin
-        self.echo_pin = echo_pin
-        gpio.gpio_claim_output(handle, trigger_pin, 0)
-        try:
-            gpio.gpio_claim_input(handle, echo_pin, gpio.SET_PULL_DOWN) if pull_down else gpio.gpio_claim_input(handle, echo_pin)
-        except Exception:
-            gpio.gpio_free(handle, trigger_pin)
-            raise
-
-    def _distance_cm(self):
-        self.gpio.gpio_write(self.handle, self.trigger_pin, 1)
-        time.sleep(0.00001)
-        self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
-
-        deadline = time.perf_counter() + self.START_TIMEOUT_S
-        while not self.gpio.gpio_read(self.handle, self.echo_pin):
-            if time.perf_counter() >= deadline:
-                return None
-        start = time.perf_counter()
-        echo_timeout = 2 * self.MAX_DISTANCE_CM / self.SOUND_CM_PER_S
-        while self.gpio.gpio_read(self.handle, self.echo_pin):
-            if time.perf_counter() - start >= echo_timeout:
-                return None
-        return (time.perf_counter() - start) * self.SOUND_CM_PER_S / 2
-
-    def close(self):
-        self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
-        self.gpio.gpio_free(self.handle, self.echo_pin)
-        self.gpio.gpio_free(self.handle, self.trigger_pin)
-
-
-class TimestampUltrasonic(Ultrasonic):
-    """Measure echo width from kernel edge timestamps, not Python polling."""
 
     def __init__(self, gpio, handle, trigger_pin, echo_pin, pull_down=False):
         self.gpio, self.handle = gpio, handle
@@ -99,7 +63,9 @@ class TimestampUltrasonic(Ultrasonic):
 
     def close(self):
         self._callback.cancel()
-        super().close()
+        self.gpio.gpio_write(self.handle, self.trigger_pin, 0)
+        self.gpio.gpio_free(self.handle, self.echo_pin)
+        self.gpio.gpio_free(self.handle, self.trigger_pin)
 
 
 class WaterLevel(TimestampUltrasonic):

@@ -75,7 +75,7 @@ def main():
                 return 1
             sys.path.insert(0, str(root / 'src'))
             import configuration
-            config = configuration.upgrade(json.loads(original))
+            config = configuration.validate(json.loads(original))
             config['wasserstand']['sensor_boden_abstand_cm'] = result
             configuration.validate(config)
             temporary = None

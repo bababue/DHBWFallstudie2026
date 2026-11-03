@@ -33,7 +33,9 @@ class AutomaticControlTests(unittest.TestCase):
         berlin = ZoneInfo('Europe/Berlin')
         config = {'licht_start_stunde': 6, 'lichtdauer_stunden': 16, 'lichtstaerke_prozent': 80}
         def value(hour, minute):
-            return auto_setpoints(config, datetime(2026, 5, 3, hour, minute, tzinfo=berlin))['led']
+            return auto_setpoints(light_schedule(
+                config, datetime(2026, 5, 3, hour, minute, tzinfo=berlin)
+            ))['led']
         self.assertEqual([value(5, 59), value(6, 0), value(21, 59), value(22, 0)], [0, 80, 80, 0])
         night = light_schedule(config, datetime(2026, 5, 3, 22, 0, tzinfo=berlin))
         self.assertFalse(night['active'])

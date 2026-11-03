@@ -18,7 +18,7 @@ class PumpTests(unittest.TestCase):
         self.assertEqual(target_level(CONFIG, 1), 0)
         self.assertAlmostEqual(target_level(CONFIG, 20), 6.8)
         self.assertIsNone(water_overview([], CONFIG, 0)['target_cm'])
-        self.assertEqual(PumpRegulator().value(state(target=None), OPTIONS, 0), 0)
+        self.assertEqual(PumpRegulator().value(state(target=None), OPTIONS), 0)
 
     def test_moss_remains_displayed_and_expires(self):
         readings = [dict(side=side, sensor='ultrasonic', field='height_median_1m_cm', value=7.5, sampled=10)
@@ -29,29 +29,29 @@ class PumpTests(unittest.TestCase):
 
     def test_runs_continuously_at_25_percent_until_target(self):
         pump = PumpRegulator()
-        for now in (0, 1, 6, 30, 100, 1000):
-            self.assertEqual(pump.value(state(), OPTIONS, now), 25)
-        self.assertEqual(pump.value(state(level=1.3), OPTIONS, 1001), 0)
+        for _ in (0, 1, 6, 30, 100, 1000):
+            self.assertEqual(pump.value(state(), OPTIONS), 25)
+        self.assertEqual(pump.value(state(level=1.3), OPTIONS), 0)
 
     def test_initial_start_just_below_target_and_hysteresis_after_reaching(self):
         pump = PumpRegulator()
-        self.assertEqual(pump.value(state(level=1.2), OPTIONS, 0), 25)
-        self.assertEqual(pump.value(state(level=1.3), OPTIONS, 1), 0)
-        self.assertEqual(pump.value(state(level=1.2), OPTIONS, 2), 0)
-        self.assertEqual(pump.value(state(level=1.0), OPTIONS, 3), 25)
+        self.assertEqual(pump.value(state(level=1.2), OPTIONS), 25)
+        self.assertEqual(pump.value(state(level=1.3), OPTIONS), 0)
+        self.assertEqual(pump.value(state(level=1.2), OPTIONS), 0)
+        self.assertEqual(pump.value(state(level=1.0), OPTIONS), 25)
 
     def test_raw_high_reading_stops_even_if_filtered_water_is_lower(self):
         pump = PumpRegulator()
-        pump.value(state(), OPTIONS, 0)
+        pump.value(state(), OPTIONS)
         data = state()
         data['raw_level_cm'] = 1.3
-        self.assertEqual(pump.value(data, OPTIONS, .1), 0)
+        self.assertEqual(pump.value(data, OPTIONS), 0)
 
     def test_missing_water_or_safety_clearance_stops_pump(self):
         for key in ('water_ready', 'pump_allowed'):
             pump = PumpRegulator()
-            pump.value(state(), OPTIONS, 0)
+            pump.value(state(), OPTIONS)
             data = state()
             data[key] = False
-            self.assertEqual(pump.value(data, OPTIONS, .2), 0)
-        self.assertEqual(PumpRegulator().value(None, OPTIONS, 0), 0)
+            self.assertEqual(pump.value(data, OPTIONS), 0)
+        self.assertEqual(PumpRegulator().value(None, OPTIONS), 0)

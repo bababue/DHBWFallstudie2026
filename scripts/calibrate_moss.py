@@ -78,7 +78,7 @@ def main():
                 return 1
             sys.path.insert(0, str(root / 'src'))
             import configuration
-            config = configuration.upgrade(json.loads(original))
+            config = configuration.validate(json.loads(original))
             for index, distance in results.items():
                 config[f'moos_{index}']['bezugsabstand_cm'] = distance
             configuration.validate(config)

@@ -57,6 +57,8 @@ class MossHeightTests(unittest.TestCase):
             self.assertTrue(sensor.read()['demo_data'])
         draw.assert_called_once_with(6, sensor.demo_sigma_cm)
         self.assertIsNone(noise.sigma(65))
+        sensor.demo_sigma_cm = noise.sigma(65)
+        self.assertIsNone(sensor.read())
 
     def test_height_uses_its_own_reference_and_minute_median(self):
         sensor = MossHeight(MagicMock(), 1, 0, 5, empty_distance_cm=20.0)

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Moosbox</title>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div class="mode-block">
+          <label class="mode-switch">
+            <input type="checkbox" id="mode-toggle" aria-label="Auto-Modus"
+              disabled>
+            <span class="mode-slider"></span>
+          </label>
+          <div>
+            <h1 id="mode">Verbinde …</h1>
+            <p class="status" id="mode-status"></p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label class="debug-switch">
+            <input type="checkbox" id="debug-toggle">
+            Debug-Modus
+          </label>
+          <label>
+            <select id="global-period" aria-label="Zeitraum">
+              <option value="10m">10 Minuten</option>
+              <option value="1h" selected>1 Stunde</option>
+              <option value="24h">24 Stunden</option>
+              <option value="7d">7 Tage</option>
+              <option value="30d">30 Tage</option>
+            </select>
+          </label>
+        </div>
+      </header>
+      <div class="grid">
+        <section class="card" id="debug-panel" hidden>
+          <p class="label">Sensoren · Rohwerte</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Messwert</th>
+                  <th>Sensor</th>
+                  <th>Links</th>
+                  <th>Rechts</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Temperatur (°C)</td>
+                  <td>SHT45</td>
+                  <td id="left-sht45-temperature_c">–</td>
+                  <td id="right-sht45-temperature_c">–</td>
+                </tr>
+                <tr>
+                  <td>Temperatur (°C)</td>
+                  <td>SCD40</td>
+                  <td id="left-scd40-temperature_c">–</td>
+                  <td id="right-scd40-temperature_c">–</td>
+                </tr>
+                <tr>
+                  <td>Luftfeuchtigkeit (%)</td>
+                  <td>SHT45</td>
+                  <td id="left-sht45-humidity_pct">–</td>
+                  <td id="right-sht45-humidity_pct">–</td>
+                </tr>
+                <tr>
+                  <td>Luftfeuchtigkeit (%)</td>
+                  <td>SCD40</td>
+                  <td id="left-scd40-humidity_pct">–</td>
+                  <td id="right-scd40-humidity_pct">–</td>
+                </tr>
+                <tr>
+                  <td>CO₂ (ppm)</td>
+                  <td>SCD40</td>
+                  <td id="left-scd40-co2_ppm">–</td>
+                  <td id="right-scd40-co2_ppm">–</td>
+                </tr>
+                <tr>
+                  <td>Licht (lx)</td>
+                  <td>BH1750</td>
+                  <td id="left-bh1750-illuminance_lux">–</td>
+                  <td id="right-bh1750-illuminance_lux">–</td>
+                </tr>
+                <tr>
+                  <td>Wasser</td>
+                  <td>Ultraschall</td>
+                  <td>
+                    <small>Wassersensor (cm)</small>
+                    <br>
+                    <span id="tank-ultrasonic-distance_cm">–</span>
+                  </td>
+                  <td>
+                    <small>Wasserstand (max(0; __WATER_OFFSET__ − Rohabstand), cm)</small>
+                    <br>
+                    <span id="tank-ultrasonic-water_level_cm">–</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Moos 1</td>
+                  <td>Ultraschall</td>
+                  <td>
+                    <small>Abstand (cm)</small>
+                    <br>
+                    <span id="moss1-ultrasonic-distance_cm">–</span>
+                  </td>
+                  <td>
+                    <small>__MOSS_FORMULA_1__</small>
+                    <br>
+                    <span id="moss1-ultrasonic-height_cm">–</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Moos 2</td>
+                  <td>Ultraschall</td>
+                  <td>
+                    <small>Abstand (cm)</small>
+                    <br>
+                    <span id="moss2-ultrasonic-distance_cm">–</span>
+                  </td>
+                  <td>
+                    <small>__MOSS_FORMULA_2__</small>
+                    <br>
+                    <span id="moss2-ultrasonic-height_cm">–</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Moos 3</td>
+                  <td>Ultraschall</td>
+                  <td>
+                    <small>Abstand (cm)</small>
+                    <br>
+                    <span id="moss3-ultrasonic-distance_cm">–</span>
+                  </td>
+                  <td>
+                    <small>__MOSS_FORMULA_3__</small>
+                    <br>
+                    <span id="moss3-ultrasonic-height_cm">–</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Moos 4</td>
+                  <td>Ultraschall</td>
+                  <td>
+                    <small>Abstand (cm)</small>
+                    <br>
+                    <span id="moss4-ultrasonic-distance_cm">–</span>
+                  </td>
+                  <td>
+                    <small>__MOSS_FORMULA_4__</small>
+                    <br>
+                    <span id="moss4-ultrasonic-height_cm">–</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Mooshöhe Ø</td>
+                  <td>Ultraschall</td>
+                  <td colspan="2" id="moss-average">–</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="status" id="debug-status">Verbinde …</p>
+        </section>
+        <div class="overview-row">
+          <section class="card camera">
+            <p class="label" id="camera-status" aria-live="polite">Live Feed: Verbinde …</p>
+            <img id="camera" alt="Kamerafeed">
+          </section>
+          <section class="card actuator-panel" id="actuator-panel" hidden>
+            <div id="auto-actuators" hidden>
+              <div class="auto-values">
+                <div>
+                  <span>Lüfter</span>
+                  <strong id="auto-fan">–</strong>
+                </div>
+                <div>
+                  <span>Licht</span>
+                  <strong id="auto-led">–</strong>
+                </div>
+              </div>
+              <div class="auto-timeline">
+                <div class="auto-timeline-head">
+                  <span id="light-hours">Zeitplan: –</span>
+                </div>
+                <div class="auto-timeline-bar" id="light-timeline" role="img"
+                  aria-label="Lichtplan"></div>
+                <div class="auto-ticks">
+                  <span>00:00</span>
+                  <span>12:00</span>
+                  <span>24:00</span>
+                </div>
+              </div>
+              <div class="auto-timeline">
+                <div class="auto-timeline-head">
+                  <strong id="thermal-value">Max. Temp: –</strong>
+                </div>
+                <div class="thermal-bar" role="img"
+                  aria-label="Temperaturregelung" id="thermal-bar">
+                  <span class="thermal-target" style="left:40%"></span>
+                  <span class="thermal-marker" id="thermal-marker" hidden></span>
+                </div>
+                <div class="auto-ticks">
+                  <span id="thermal-low">20 °C</span>
+                  <span id="thermal-target">Ziel 22 °C</span>
+                  <span id="thermal-max">Max. 25 °C</span>
+                </div>
+              </div>
+              <div class="auto-timeline">
+                <p class="status" id="next-pump">Nächste Pumpzeit: –</p>
+                <label class="pump-now">
+                    <input type="checkbox" id="pump-now">
+                    Jetzt pumpen
+                  </label>
+                <p class="status" id="pump-error"></p>
+              </div>
+            </div>
+            <div id="manual-actuators" hidden>
+              <div class="actuator-control">
+                <label for="fan-control">
+                    Lüfter
+                    <output id="fan-value">–</output>
+                  </label>
+                <input id="fan-control" type="range" min="0" max="100" step="5"
+                  disabled>
+              </div>
+              <div class="actuator-control">
+                <label for="pump-control">
+                    Pumpe
+                    <output id="pump-value">–</output>
+                  </label>
+                <input id="pump-control" type="range" min="0" max="100" step="5"
+                  disabled>
+              </div>
+              <div class="actuator-control">
+                <label for="led-control">
+                    Licht
+                    <output id="led-value">–</output>
+                  </label>
+                <input id="led-control" type="range" min="0" max="100" step="5"
+                  disabled>
+              </div>
+            </div>
+            <p class="status actuator-error" id="actuator-error"></p>
+          </section>
+        </div>
+        <section class="card water-panel">
+          <div class="water-metrics">
+            <div>
+              <span class="water-metric-label">
+                  <i class="legend-target"></i>
+                  Zielwasserstand
+                </span>
+              <p class="water-value" id="water-target">–</p>
+            </div>
+            <div>
+              <span class="water-metric-label">
+                  <i class="legend-water"></i>
+                  Wasserstand
+                </span>
+              <p class="water-value" id="water">–</p>
+            </div>
+            <div>
+              <span class="water-metric-label">
+                  <i class="legend-moss"></i>
+                  Moosspitzenhöhe
+                </span>
+              <p class="water-value" id="water-moss">–</p>
+            </div>
+            <div id="water-pump" hidden>
+              <div id="auto-pump-panel" hidden>
+                <span class="water-metric-label">Pumpe</span>
+                <p class="water-value" id="auto-pump">–</p>
+              </div>
+            </div>
+          </div>
+          <p class="status" id="water-source"></p>
+          <div class="chart-container">
+            <svg class="chart" id="water-chart" viewBox="0 0 800 230" role="img"
+              aria-label="Verlauf von Wasserstand und Mooshöhe"></svg>
+          </div>
+          <p class="status chart-status" id="water-chart-status">Lade Verlauf …</p>
+        </section>
+        <section class="card">
+          <div class="temperature-head">
+            <div>
+              <p class="label">Temperatur</p>
+              <div class="metric-readout">
+                <p class="temperature-value" id="temperature">–</p>
+                <p class="status" id="temperature-source">Lade Messwerte …</p>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <svg class="chart" id="temperature-chart" viewBox="0 0 800 230"
+              role="img" aria-label="Temperaturverlauf"></svg>
+          </div>
+          <p class="status chart-status" id="temperature-chart-status">Lade Verlauf …</p>
+        </section>
+        <section class="card">
+          <div class="humidity-head">
+            <div>
+              <p class="label">Luftfeuchtigkeit</p>
+              <div class="metric-readout">
+                <p class="humidity-value" id="humidity">–</p>
+                <p class="status" id="humidity-source">Lade Messwerte …</p>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <svg class="chart" id="humidity-chart" viewBox="0 0 800 230"
+              role="img" aria-label="Luftfeuchtigkeitverlauf"></svg>
+          </div>
+          <p class="status chart-status" id="humidity-chart-status">Lade Verlauf …</p>
+        </section>
+        <section class="card">
+          <div class="co2-head">
+            <div>
+              <p class="label">CO₂</p>
+              <div class="metric-readout">
+                <p class="co2-value" id="co2">–</p>
+                <p class="status" id="co2-source">Lade Messwerte …</p>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <svg class="chart" id="co2-chart" viewBox="0 0 800 230" role="img"
+              aria-label="CO₂verlauf"></svg>
+          </div>
+          <p class="status chart-status" id="co2-chart-status">Lade Verlauf …</p>
+        </section>
+        <section class="card">
+          <div class="light-head">
+            <div>
+              <p class="label">Licht</p>
+              <div class="metric-readout">
+                <p class="light-value" id="light">–</p>
+                <p class="status" id="light-source">Lade Messwerte …</p>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <svg class="chart" id="light-chart" viewBox="0 0 800 230" role="img"
+              aria-label="Lichtverlauf"></svg>
+          </div>
+          <p class="status chart-status" id="light-chart-status">Lade Verlauf …</p>
+        </section>
+      </div>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

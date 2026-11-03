@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from pump_control import valid_number
+from pump_control import pump_ready
 
 
 class PumpSchedule:
@@ -55,16 +55,11 @@ class PumpSchedule:
         self.last_day = day
         return True
 
-    @staticmethod
-    def ready(data):
-        return bool(data and data.get('water_ready') and data.get('pump_allowed')
-                    and all(valid_number(data.get(key)) for key in ('target_cm', 'water_level_cm', 'raw_level_cm')))
-
     def request(self, enabled, data):
         if not enabled:
             self.active = False
             return
-        if not self.ready(data):
+        if not pump_ready(data):
             raise ValueError('Keine sicheren aktuellen Messwerte')
         self.active = True
 
@@ -73,16 +68,16 @@ class PumpSchedule:
         day = now.date().isoformat()
         if (now.hour == options['pumpe_start_stunde'] and now.minute == options['pumpe_start_minute']
                 and self.last_day not in (day, 'unknown') and self.mark_today(day)):
-            if self.ready(data):
+            if pump_ready(data):
                 self.active = True
                 regulator.reset()
         if not self.active:
             return 0
-        if not self.ready(data):
+        if not pump_ready(data):
             self.active = False
             regulator.reason = 'Pumpvorgang gestoppt: Messwerte fehlen'
             return 0
-        value = regulator.value(data, options, 0)
+        value = regulator.value(data, options)
         if regulator.reached:
             self.active = False
         return value
