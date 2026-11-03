@@ -17,7 +17,7 @@ Der dokumentierte physische Aufbau hat zwei Moos-Messstellen (links und rechts),
 | OLED, SSD1306 | 1 | 0,96 Zoll, 128 × 64 Pixel, am linken I²C-Bus; Anzeige um 180° gedreht |
 | Taster | 1 | An GPIO 26 eingebaut; kurzer Druck wechselt den angezeigten Modus, Halten zeigt die Sensorübersicht |
 | Pi-Kamera, Sensor IMX708 | 1 | Anschluss CAM/DISP1; in der Übergabe als Kamera 0 erkannt |
-| Pumpe | 1 | 5 V, über IRLB8721-MOSFET an GPIO 16 geschaltet |
+| Pumpe | 1 | 5 V, über IRLB8721-MOSFET an GPIO 16 geschaltet; derzeit softwareseitig deaktiviert |
 | Lüfter | 1 | 5 V, dreipolig, über IRLB8721-MOSFET an GPIO 21 geschaltet; Tacholeitung nicht angeschlossen |
 | LED-Streifen | 1 | 24 V, über IRLB8721-MOSFET an GPIO 20 geschaltet |
 
@@ -48,16 +48,14 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 
 ## Konfigurations- und Kalibrierstatus
 
-Die Software kennt vier Moos-Sensoren und misst ausschließlich echte Echos.
-Sensoren 1 und 2 haben übernommene Montagehöhen (Sensorfläche–Tankboden) von
-12,94 cm und 12,059 cm. Sensoren 3 und 4 messen ebenfalls echte Abstände; ihre
-Montagehöhen sind noch nicht eingetragen, daher dienen sie noch nicht der Pumpenregelung.
+Die Software kennt vier Moos-Sensoren und misst echte Echos. Die derzeit
+gemeinsame Montagehöhe (Sensorfläche–Tankboden) steht unter
+`moos.montagehoehe_cm` in `config/config.json`. Der tatsächliche Einbau von
+Sensor 3 und 4 ist in der Hardware-Übergabe nicht dokumentiert.
 
-Die Wasserstand-Konfiguration enthält einen Sensor-Boden-Abstand von 8,265 cm;
-die Hardware-Übergabe nennt 8,62 cm (86,2 mm). Das sind unterschiedliche Werte.
-Vor Pumpenbetrieb den Abstand am realen Einbau kalibrieren und den gespeicherten
-Wert in `config/config.json` prüfen. Die maximale Füllhöhe muss kleiner als der
-Sensor-Boden-Abstand sein.
+Der Sensor-Boden-Abstand des Wassersensors steht in `config/config.json`;
+die Hardware-Übergabe nennt 8,62 cm. Den Wert am realen Einbau kalibrieren und
+prüfen. Die maximale Füllhöhe muss kleiner als der Sensor-Boden-Abstand sein.
 
 Bei den Sensorbussen wurde ein elektrisches Problem am linken Bus beobachtet: Mit hohem Bildinhalt auf dem OLED fielen Sensorantworten aus. Die dokumentierte Ansteuerung treibt SCL und eigene SDA-High-Bits aktiv; damit liefen beide Busse in einem 22-Sekunden-Test mit OLED fehlerfrei. Die vermutete Ursache sind Pull-ups oder ein Spannungseinbruch am OLED-Modul, **elektrisch bestätigt ist sie nicht**. Die 3,3-V-Verdrahtung der Busse muss geprüft sein, bevor diese Ansteuerung verwendet wird.
 
@@ -71,5 +69,5 @@ Der dokumentierte 5-Hz-Betrieb führt bei kleinen Stellwerten zu einzelnen Impul
 
 - **SCD40:** Beide Sensoren wurden laut Übergabe per Forced Recalibration auf 430 ppm eingestellt, unter der Annahme frischer Luft am offenen Fenster. Dabei waren teils ungewöhnlich große Korrekturen nötig. Die CO₂-Werte und mögliche Drift sollten weiter beobachtet werden; die automatische Selbstkalibrierung war zum Übergabezeitpunkt aktiv.
 - **Lastverhalten:** Wasserfluss und Lüfterlauf bei niedrigen Stellwerten sind offen.
-- **Wasserstand-Ultraschallsensor:** Die aktuelle Pinangabe ist Trigger GPIO 6 und Echo GPIO 13. Der Abstand vom Sensor zum Boden muss am echten Einbau kalibriert werden: Die Übergabe nennt 86,2 mm, während `config/config.json` derzeit 8,265 cm enthält. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; vor dem Anschluss sicherstellen, dass am Pi-Eingang höchstens 3,3 V anliegen.
-- **Mooshöhen-Ultraschallsensoren:** Für Sensoren 1 und 2 sind Montagehöhen in `config/config.json` eingetragen. Sie wurden mit Zustimmung aus der bisherigen Geometrie übernommen; Sensorfläche–Tankboden beträgt 12,94 cm bzw. 12,059 cm. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.
+- **Wasserstand-Ultraschallsensor:** Trigger GPIO 6, Echo GPIO 13. Den Sensor-Boden-Abstand am echten Einbau kalibrieren. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; am Pi-Eingang höchstens 3,3 V sicherstellen.
+- **Mooshöhen-Ultraschallsensoren:** Montagehöhen und Pinverfügbarkeit am echten Aufbau prüfen. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist in der Übergabe nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) prüfen.

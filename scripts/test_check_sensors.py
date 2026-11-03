@@ -12,9 +12,9 @@ def config():
                 'rechts_sda_gpio': 3, 'rechts_scl_gpio': 4, 'taktpause_us': 5,
                 'sht45_adresse': 68, 'bh1750_adresse': 35, 'scd40_adresse': 98},
         'wasserstand': {'trigger_gpio': 5, 'echo_gpio': 6},
-        **{f'moos_{index}': {'trigger_gpio': 2 * index + 5,
-                             'echo_gpio': 2 * index + 6}
-           for index in range(1, 5)},
+        'moos': {'montagehoehe_cm': 13.1, 'sensoren':
+                 {f'moos_{index}': {'trigger_gpio': 2 * index + 5, 'echo_gpio': 2 * index + 6}
+                  for index in range(1, 5)}},
     }
 
 

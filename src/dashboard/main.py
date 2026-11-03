@@ -18,8 +18,7 @@ from actuators import Actuators, PumpLocked
 from automatic import AutomaticControl, light_schedule
 from pump_control import water_overview
 from measurements import (valid_number, fresh, MAX_DISTANCE_CM, WATER_MAX_AGE_SECONDS,
-                          MAX_SAMPLE_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS, FILTER_SAMPLES, MIN_STABLE_FRACTION,
-                          WATER_SPREAD_CM, MOSS_SPREAD_CM)
+                          MAX_SAMPLE_AGE_SECONDS, SNAPSHOT_MAX_AGE_SECONDS, required_inliers)
 
 from temperature import PERIODS, combine
 
@@ -197,11 +196,15 @@ def debug_sensors():
               and fresh(r.get('sampled'), now,
                         WATER_MAX_AGE_SECONDS if r['side'] == 'tank' else MAX_SAMPLE_AGE_SECONDS)}
     ultrasonic = {}
+    ultrasonic_status = {}
     for side in ('tank', 'moss1', 'moss2', 'moss3', 'moss4'):
         raw = values.get((side, 'distance_cm'), {})
         filtered = values.get((side, 'distance_filtered_cm'), {})
         stable = values.get((side, 'measurement_stable'), {})
         raw_value = raw.get('value') if valid_number(raw.get('value')) else None
+        echo = values.get((side, 'echo_received'), {})
+        ultrasonic_status[side] = ('ok' if raw_value is not None else
+                                   'invalid' if echo.get('value') == 0 else 'unavailable')
         value = filtered.get('value')
         if (not valid_number(value) or stable.get('value') != 1
                 or stable.get('sampled') != filtered.get('sampled')):
@@ -213,14 +216,17 @@ def debug_sensors():
                 if valid_number(level.get('value')) and level.get('sampled') == filtered.get('sampled'):
                     calculated = level['value']
             else:
-                mount = config[f'moos_{side[-1]}']['montagehoehe_cm']
+                mount = config['moos']['montagehoehe_cm']
                 if mount is not None:
                     calculated = mount - value
         ultrasonic[side] = {'raw_cm': raw_value, 'filtered_cm': value, 'calculated_cm': calculated}
-    return {'readings': readings, 'ultrasonic': ultrasonic,
-            'filter': {'samples': FILTER_SAMPLES, 'fraction': MIN_STABLE_FRACTION,
-                       'water_spread_cm': WATER_SPREAD_CM, 'moss_spread_cm': MOSS_SPREAD_CM},
-            'mounting_heights_cm': {f'moss{i}': config[f'moos_{i}']['montagehoehe_cm'] for i in range(1, 5)},
+    settings = config['ultraschall_glaettung']
+    return {'readings': readings, 'ultrasonic': ultrasonic, 'ultrasonic_status': ultrasonic_status,
+            'filter': {'samples': settings['messungen'], 'fraction': settings['mindestanteil_prozent'] / 100,
+                       'minimum_samples': required_inliers(settings['messungen'], settings['mindestanteil_prozent']),
+                       'max_gap_seconds': settings['max_messpause_s'],
+                       'water_spread_cm': settings['wasser_streuung_cm'], 'moss_spread_cm': settings['moos_streuung_cm']},
+            'moss_mounting_height_cm': config['moos']['montagehoehe_cm'],
             'water_floor_distance_cm': config['wasserstand']['sensor_boden_abstand_cm']}
 
 
@@ -289,6 +295,40 @@ def metric_data(field, unit, period, current_only):
     except Exception:
         LOG.exception('Could not read metric history')
         return Response('Messdaten nicht erreichbar', status_code=503)
+
+
+@app.get('/api/ultrasonic')
+def ultrasonic_history(period: str = '1h'):
+    if period not in PERIODS:
+        return Response('Ungültiger Zeitraum', status_code=400)
+    duration, window, _ = PERIODS[period]
+    if period == '10m':
+        window = '1s'
+    org = setting('INFLUXDB_ORG', 'moos')
+    bucket = setting('INFLUXDB_BUCKET', 'moos_sensors')
+    sides = ('tank', 'moss1', 'moss2', 'moss3', 'moss4')
+    side_filter = ' or '.join(f'r.side == {json.dumps(side)}' for side in sides)
+    query = (f'from(bucket: {json.dumps(bucket)})\n'
+             f'  |> range(start: -{duration})\n'
+             '  |> filter(fn: (r) => r._measurement == "moos_sensor" '
+             'and r.sensor == "ultrasonic" and r._field == "distance_cm" '
+             f'and ({side_filter}))\n'
+             f'  |> aggregateWindow(every: {window}, fn: last, createEmpty: false, timeSrc: "_start")')
+    series = {side: [] for side in sides}
+    try:
+        with InfluxDBClient(url=setting('INFLUXDB_URL', 'http://influxdb:8086'),
+                            token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
+            for table in client.query_api().query(query, org=org):
+                for record in table.records:
+                    side, value = record.values.get('side'), record.get_value()
+                    if side in series and valid_number(value):
+                        series[side].append({'time': int(record.get_time().timestamp()), 'value': value})
+        for points in series.values():
+            points.sort(key=lambda point: point['time'])
+        return {'series': series, 'window_seconds': int(window[:-1]) * (60 if window.endswith('m') else 1)}
+    except Exception:
+        LOG.exception('Ultraschallverlauf nicht verfügbar')
+        return Response('Ultraschallverlauf nicht erreichbar', status_code=503)
 
 
 @app.get('/api/mode')

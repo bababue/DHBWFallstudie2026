@@ -201,14 +201,6 @@
                   disabled>
               </div>
               <div class="actuator-control">
-                <label for="pump-control">
-                    Pumpe
-                    <output id="pump-value">–</output>
-                  </label>
-                <input id="pump-control" type="range" min="0" max="100" step="5"
-                  disabled>
-              </div>
-              <div class="actuator-control">
                 <label for="led-control">
                     Licht
                     <output id="led-value">–</output>
@@ -220,53 +212,19 @@
             <p class="status actuator-error" id="actuator-error"></p>
           </section>
         </div>
-        <section class="card water-panel">
-          <div class="water-metrics">
-            <div>
-              <span class="water-metric-label">
-                  <i class="legend-target"></i>
-                  Zielwasserstand
-                </span>
-              <p class="water-value" id="water-target">–</p>
-            </div>
-            <div>
-              <span class="water-metric-label">
-                  <i class="legend-water"></i>
-                  Wasserstand
-                </span>
-              <p class="water-value" id="water">–</p>
-            </div>
-            <div>
-              <span class="water-metric-label">
-                  <i class="legend-moss"></i>
-                  Moos: Abstand ab Decke
-                </span>
-              <p class="status" id="water-moss">–</p>
-            </div>
-            <div id="water-pump" hidden>
-              <div id="auto-pump-panel" hidden>
-                <span class="water-metric-label">Pumpe</span>
-                <p class="water-value" id="auto-pump">–</p>
-              </div>
-            </div>
+        <section class="card ultrasonic-panel">
+          <p class="label">Ultraschall-Rohabstände</p>
+          <div class="ultrasonic-legend" aria-label="Messstellen">
+            <span style="color:#2563eb">Wasser</span><span style="color:#15803d">Moos 1</span>
+            <span style="color:#d97706">Moos 2</span><span style="color:#7c3aed">Moos 3</span>
+            <span style="color:#dc2626">Moos 4</span>
           </div>
-          <div id="pump-release" hidden>
-            <label class="pump-release-label">
-              <span class="mode-switch">
-                <input type="checkbox" id="pump-enable" role="switch" aria-label="Automatische Pumpe freigeben" disabled>
-                <span class="mode-slider"></span>
-              </span>
-              Automatische Pumpe freigeben
-            </label>
-            <p class="status" id="pump-release-error" role="alert"></p>
-          </div>
-          <p class="status" id="water-source"></p>
           <div class="chart-container">
-            <svg class="chart" id="water-chart" viewBox="0 0 800 230" role="img"
-              aria-label="Wasserstand und aktueller Zielwasserstand"></svg>
+            <svg class="chart" id="ultrasonic-chart" viewBox="0 0 800 230"
+              role="img" aria-label="Verlauf der Ultraschall-Rohabstände"></svg>
           </div>
           <p class="status chart-status"
-            id="water-chart-status">Lade Verlauf …</p>
+            id="ultrasonic-status">Lade Verlauf …</p>
         </section>
         <section class="card">
           <div class="temperature-head">
@@ -338,16 +296,6 @@
         </section>
       </div>
     </main>
-    <dialog id="pump-confirm" aria-labelledby="pump-confirm-title">
-      <form method="dialog">
-        <h2 id="pump-confirm-title">Automatische Pumpe freigeben?</h2>
-        <p>Die Pumpe füllt selbstständig bis zum Zielwasserstand nach. Tank und Schläuche prüfen.</p>
-        <div class="dialog-actions">
-          <button value="cancel" autofocus>Abbrechen</button>
-          <button value="confirm">Pumpe freigeben</button>
-        </div>
-      </form>
-    </dialog>
     <script src="/static/app.js" defer></script>
   </body>
 </html>

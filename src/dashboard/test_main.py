@@ -98,7 +98,7 @@ class DashboardTests(unittest.TestCase):
         self.assertAlmostEqual(state['target_cm'], 5.0)
         self.assertTrue(state['water_ready'])
         self.assertTrue(state['pump_allowed'])
-        self.assertEqual(state['moss_distances_cm']['moss1'], 5.44)
+        self.assertEqual(state['moss_distances_cm']['moss1'], 5.6)
 
     def test_water_api_only_reads_controller_snapshot(self):
         control = MagicMock()
@@ -131,7 +131,6 @@ class DashboardTests(unittest.TestCase):
 
     def test_ultrasonic_debug_uses_fresh_filtered_readings_and_mounting_heights(self):
         config = main.load()
-        config['moos_3']['montagehoehe_cm'] = None
         now = 100
         def reading(side, field, value, sampled=now):
             return dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=sampled)
@@ -156,10 +155,21 @@ class DashboardTests(unittest.TestCase):
                 patch.object(main.time, 'time', return_value=now):
             result = main.debug_sensors()['ultrasonic']
         self.assertEqual(result['tank'], dict(raw_cm=4, filtered_cm=4.1, calculated_cm=4.165))
-        self.assertAlmostEqual(result['moss1']['calculated_cm'], config['moos_1']['montagehoehe_cm'] - 5.2)
+        self.assertAlmostEqual(result['moss1']['calculated_cm'], config['moos']['montagehoehe_cm'] - 5.2)
         self.assertEqual(result['moss2'], dict(raw_cm=None, filtered_cm=None, calculated_cm=None))
-        self.assertEqual(result['moss3'], dict(raw_cm=5, filtered_cm=5, calculated_cm=None))
+        self.assertAlmostEqual(result['moss3']['calculated_cm'], config['moos']['montagehoehe_cm'] - 5)
         self.assertEqual(result['moss4'], dict(raw_cm=5, filtered_cm=None, calculated_cm=None))
+
+    def test_ultrasonic_debug_uses_one_shared_mounting_height(self):
+        config = main.load()
+        config['moos']['montagehoehe_cm'] = None
+        data = [dict(side='moss1', sensor='ultrasonic', field=field, value=value, sampled=100)
+                for field, value in [('distance_cm', 5), ('distance_filtered_cm', 5), ('measurement_stable', 1)]]
+        with patch.object(main, 'live_readings', return_value=data), \
+                patch.object(main, 'load', return_value=config), patch.object(main.time, 'time', return_value=100):
+            result = main.debug_sensors()
+        self.assertIsNone(result['moss_mounting_height_cm'])
+        self.assertIsNone(result['ultrasonic']['moss1']['calculated_cm'])
 
     def test_ultrasonic_debug_does_not_mix_old_water_or_inconsistent_samples(self):
         now = 100
@@ -173,6 +183,32 @@ class DashboardTests(unittest.TestCase):
             result = main.debug_sensors()['ultrasonic']
         self.assertEqual(result['tank'], dict(raw_cm=None, filtered_cm=None, calculated_cm=None))
         self.assertEqual(result['moss1'], dict(raw_cm=5, filtered_cm=None, calculated_cm=None))
+
+    def test_ultrasonic_debug_distinguishes_missing_echo_from_no_recent_sample(self):
+        now = 100
+        data = [dict(side='left', sensor='sht45', field='temperature_c', value=22, sampled=now),
+                dict(side='tank', sensor='ultrasonic', field='echo_received', value=0, sampled=now),
+                dict(side='moss1', sensor='ultrasonic', field='echo_received', value=0, sampled=now),
+                dict(side='moss2', sensor='ultrasonic', field='echo_received', value=0, sampled=80),
+                dict(side='moss3', sensor='ultrasonic', field='distance_cm', value=5.3, sampled=now),
+                dict(side='moss3', sensor='ultrasonic', field='echo_received', value=1, sampled=now)]
+        with patch.object(main, 'live_readings', return_value=data), patch.object(main.time, 'time', return_value=now):
+            result = main.debug_sensors()
+        self.assertEqual(result['ultrasonic_status']['tank'], 'invalid')
+        self.assertEqual(result['ultrasonic_status']['moss1'], 'invalid')
+        self.assertEqual(result['ultrasonic_status']['moss2'], 'unavailable')
+        self.assertEqual(result['ultrasonic_status']['moss3'], 'ok')
+        self.assertEqual(result['ultrasonic']['moss3']['raw_cm'], 5.3)
+        self.assertIsNone(result['ultrasonic']['moss3']['filtered_cm'])
+
+    def test_ultrasonic_debug_reports_configured_filter(self):
+        config = main.load()
+        config['ultraschall_glaettung'].update(messungen=7, mindestanteil_prozent=70,
+                                                wasser_streuung_cm=.4, moos_streuung_cm=.6, max_messpause_s=8)
+        with patch.object(main, 'live_readings', return_value=[]), patch.object(main, 'load', return_value=config):
+            info = main.debug_sensors()['filter']
+        self.assertEqual(info, {'samples': 7, 'fraction': .7, 'minimum_samples': 5, 'max_gap_seconds': 8,
+                                'water_spread_cm': .4, 'moss_spread_cm': .6})
 
     def test_manual_shows_live_values_and_history(self):
         readings = [dict(side='left', sensor='sht45', field='temperature_c', value=21)]
@@ -212,6 +248,29 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(result['window_seconds'], 60)
         calls = client.query_api.return_value.query.call_args_list
         self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[0].args[0])
+
+    def test_ultrasonic_history_returns_five_separate_raw_series(self):
+        def record(side, value, hour):
+            return SimpleNamespace(values={'side': side}, get_value=lambda: value,
+                                   get_time=lambda: datetime(2026, 1, 1, hour, tzinfo=timezone.utc))
+        table = SimpleNamespace(records=[record('moss1', 5.6, 2), record('tank', 4.2, 0),
+                                         record('moss1', 5.5, 1), record('moss2', 5.7, 0),
+                                         record('moss3', 5.8, 0), record('moss4', 5.9, 0),
+                                         record('other', 7, 0), record('tank', float('nan'), 1)])
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.query_api.return_value.query.return_value = [table]
+        with patch.object(main, 'InfluxDBClient', return_value=client):
+            result = main.ultrasonic_history('1h')
+        self.assertEqual(list(result['series']), ['tank', 'moss1', 'moss2', 'moss3', 'moss4'])
+        self.assertEqual([point['value'] for point in result['series']['moss1']], [5.5, 5.6])
+        self.assertEqual([point['value'] for point in result['series']['tank']], [4.2])
+        self.assertEqual(result['window_seconds'], 10)
+        query = client.query_api.return_value.query.call_args.args[0]
+        self.assertIn('r._field == "distance_cm"', query)
+        self.assertIn('fn: last', query)
+        self.assertNotIn('distance_filtered_cm', query)
+        self.assertEqual(main.ultrasonic_history('invalid').status_code, 400)
 
 
 if __name__ == '__main__':

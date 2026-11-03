@@ -4,8 +4,7 @@ from pump_control import PumpRegulator, water_overview, pump_ready
 
 OPTIONS = {'wasser_unter_moosspitzen_cm': 2.5, 'pumpe_hysterese_cm': .2, 'pumpe_leistung_prozent': 25}
 CONFIG = {'wasserstand': {'max_fuellhoehe_cm': 7}, 'automatik': OPTIONS,
-          **{f'moos_{i}': {'montagehoehe_cm': mount}
-             for i, mount in enumerate([12.94, 12.059, None, None], 1)}}
+          'moos': {'montagehoehe_cm': 13.1, 'sensoren': {f'moos_{i}': {} for i in range(1, 5)}}}
 
 
 def state(level=3, target=5):
@@ -14,7 +13,7 @@ def state(level=3, target=5):
 
 def readings(now=10):
     return [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
-            for side, distance in [('moss1', 5.44), ('moss2', 4.559)]
+            for side, distance in [('moss1', 5.6), ('moss2', 5.6), ('moss3', 5.6), ('moss4', 5.6)]
             for field, value in [('distance_filtered_cm', distance), ('measurement_stable', 1)]]
 
 
@@ -22,14 +21,21 @@ class TargetTests(unittest.TestCase):
     def test_target_uses_mount_minus_distance_without_platform_offset(self):
         result = water_overview(readings(), CONFIG, 11)
         self.assertAlmostEqual(result['target_cm'], 5)
-        self.assertEqual(result['moss_distances_cm']['moss1'], 5.44)
-        self.assertIsNone(result['moss_distances_cm']['moss3'])
+        self.assertEqual(result['moss_distances_cm']['moss1'], 5.6)
+        self.assertEqual(result['moss_distances_cm']['moss3'], 5.6)
 
     def test_missing_stale_unstable_or_impossible_moss_blocks_target(self):
         for data in [[], readings()[:2], readings(now=-10),
                      [dict(r, value=0) if r['field'] == 'measurement_stable' else r for r in readings()],
                      [dict(r, value=20) if r['field'] == 'distance_filtered_cm' else r for r in readings()]]:
             self.assertIsNone(water_overview(data, CONFIG, 11)['target_cm'])
+
+    def test_shared_mounting_height_and_missing_mount(self):
+        config = copy.deepcopy(CONFIG)
+        config['moos']['montagehoehe_cm'] = 13.2
+        self.assertAlmostEqual(water_overview(readings(), config, 11)['target_cm'], 5.1)
+        config['moos']['montagehoehe_cm'] = None
+        self.assertIsNone(water_overview(readings(), config, 11)['target_cm'])
 
     def test_target_capped_below_hard_limit_and_at_zero(self):
         config = copy.deepcopy(CONFIG)

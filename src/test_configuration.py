@@ -1,6 +1,6 @@
 import copy
 import unittest
-from configuration import load, validate
+from configuration import load, validate, setting
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -20,11 +20,44 @@ class ConfigurationTests(unittest.TestCase):
         data['messintervalle']['schnelle_sensoren_s'] = 0
         with self.assertRaises(ValueError): validate(data)
 
+    def test_ultrasonic_filter_requires_safe_valid_parameters(self):
+        for key, value in [('messungen', 2), ('messungen', 4), ('messungen', 102),
+                           ('messungen', 15.0), ('mindestanteil_prozent', 50),
+                           ('mindestanteil_prozent', 101), ('mindestanteil_prozent', 80.5),
+                           ('wasser_streuung_cm', 0), ('moos_streuung_cm', 5.1),
+                           ('wasser_streuung_cm', True), ('max_messpause_s', 0),
+                           ('max_messpause_s', 13), ('max_messpause_s', True)]:
+            data = copy.deepcopy(load())
+            data['ultraschall_glaettung'][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                validate(data)
+        data = copy.deepcopy(load())
+        data['ultraschall_glaettung'].update(messungen=3, mindestanteil_prozent=51,
+                                             wasser_streuung_cm=.01, moos_streuung_cm=5)
+        validate(data)
+
+    def test_nested_moss_pins_are_checked_and_accessible(self):
+        data = copy.deepcopy(load())
+        self.assertEqual(setting('MOSS_1_TRIGGER_GPIO'), str(data['moos']['sensoren']['moos_1']['trigger_gpio']))
+        data['moos']['sensoren']['moos_4']['trigger_gpio'] = data['wasserstand']['echo_gpio']
+        with self.assertRaises(ValueError):
+            validate(data)
+        data = copy.deepcopy(load())
+        data['moos']['sensoren']['moos_1']['extra'] = 1
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_filter_gap_must_exceed_both_sample_intervals(self):
+        data = copy.deepcopy(load())
+        data['ultraschall_glaettung']['max_messpause_s'] = data['messintervalle']['moos_s']
+        with self.assertRaises(ValueError):
+            validate(data)
+
     def test_mounting_height_may_be_unset_but_must_be_positive(self):
         data = copy.deepcopy(load())
-        data['moos_1']['montagehoehe_cm'] = None
+        data['moos']['montagehoehe_cm'] = None
         validate(data)
-        data['moos_1']['montagehoehe_cm'] = -1
+        data['moos']['montagehoehe_cm'] = -1
         with self.assertRaises(ValueError):
             validate(data)
 

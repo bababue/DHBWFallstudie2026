@@ -69,8 +69,8 @@ class Actuators:
         with self.lock:
             if self.closed:
                 raise RuntimeError("GPIO controller is closed")
-            if device == 'pump' and value > 0 and not self.pump_allowed():
-                raise PumpLocked('Pumpe gesperrt: Wasserstand zu hoch oder Messung nicht verfügbar')
+            if device == 'pump' and value > 0:
+                raise PumpLocked('Pumpe ist deaktiviert')
             pin, hz = self.pins[device], self.frequencies[device]
             old = self.values[device]
             if device in self.BOOSTS:

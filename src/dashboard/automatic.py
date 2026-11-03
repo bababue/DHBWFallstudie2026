@@ -7,7 +7,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from configuration import load
-from pump_control import PumpRegulator, pump_ready
+from pump_control import PumpRegulator
+from actuators import PumpLocked
 from measurements import CONTROL_INTERVAL_SECONDS
 from thermal_control import ThermalRegulator
 from threading import Event, RLock, Thread
@@ -70,17 +71,7 @@ class AutomaticControl:
             if not enabled:
                 self.disable_pump()
                 return self.status()
-            # Recheck mode, process session and configuration after the dialog closes.
-            self.apply()
-            if self.mode != 'AUTO':
-                raise PermissionError('Freigabe nur im AUTO-Modus möglich')
-            if confirmation != self.confirmation:
-                raise ValueError('Modus oder Konfiguration geändert; bitte erneut bestätigen')
-            if not pump_ready(self.water_state):
-                raise ValueError('Freigabe erst mit sicheren Wasser- und Moosmessungen möglich')
-            self.enabled = True
-            self.apply()
-            return self.status()
+            raise PermissionError('Pumpe ist deaktiviert')
 
     def apply(self):
         with self.lock:
@@ -121,9 +112,8 @@ class AutomaticControl:
             thermal = self.thermal.update(self.get_readings(), options, schedule, time.time())
             values.update(fan=thermal['fan'], led=thermal['led'])
         if self.enabled:
-            values['pump'] = self.pump.value(self.water_state, options, time.monotonic())
-        else:
-            self.pump.reset()
+            self.disable_pump()
+        self.pump.reset()
         for device, value in values.items():
             latest = self.get_mode()
             if (latest.get('mode'), latest.get('session')) != (state.get('mode'), state.get('session')):
@@ -146,6 +136,8 @@ class AutomaticControl:
         with self.lock:
             if self.get_mode().get('mode') != 'MANUAL':
                 raise PermissionError('Nur im Manual-Modus verfügbar')
+            if device == 'pump' and isinstance(value, (int, float)) and value > 0:
+                raise PumpLocked('Pumpe ist deaktiviert')
             self.initialize_manual()
             return self.actuators.set(device, value)
 

@@ -44,18 +44,26 @@
     "sensor_boden_abstand_cm"
   ],
   "MOSS_1_TRIGGER_GPIO": [
+    "moos",
+    "sensoren",
     "moos_1",
     "trigger_gpio"
   ],
   "MOSS_1_ECHO_GPIO": [
+    "moos",
+    "sensoren",
     "moos_1",
     "echo_gpio"
   ],
   "MOSS_2_TRIGGER_GPIO": [
+    "moos",
+    "sensoren",
     "moos_2",
     "trigger_gpio"
   ],
   "MOSS_2_ECHO_GPIO": [
+    "moos",
+    "sensoren",
     "moos_2",
     "echo_gpio"
   ],
@@ -80,18 +88,26 @@
     "max_fuellhoehe_cm"
   ],
   "MOSS_3_TRIGGER_GPIO": [
+    "moos",
+    "sensoren",
     "moos_3",
     "trigger_gpio"
   ],
   "MOSS_3_ECHO_GPIO": [
+    "moos",
+    "sensoren",
     "moos_3",
     "echo_gpio"
   ],
   "MOSS_4_TRIGGER_GPIO": [
+    "moos",
+    "sensoren",
     "moos_4",
     "trigger_gpio"
   ],
   "MOSS_4_ECHO_GPIO": [
+    "moos",
+    "sensoren",
     "moos_4",
     "echo_gpio"
   ],
@@ -151,20 +167,28 @@
     "automatik",
     "wasser_unter_moosspitzen_cm"
   ],
-  "MOSS_1_MOUNT_HEIGHT_CM": [
-    "moos_1",
-    "montagehoehe_cm"
+  "ULTRASONIC_FILTER_SAMPLES": [
+    "ultraschall_glaettung",
+    "messungen"
   ],
-  "MOSS_2_MOUNT_HEIGHT_CM": [
-    "moos_2",
-    "montagehoehe_cm"
+  "ULTRASONIC_MIN_PERCENT": [
+    "ultraschall_glaettung",
+    "mindestanteil_prozent"
   ],
-  "MOSS_3_MOUNT_HEIGHT_CM": [
-    "moos_3",
-    "montagehoehe_cm"
+  "ULTRASONIC_WATER_SPREAD_CM": [
+    "ultraschall_glaettung",
+    "wasser_streuung_cm"
   ],
-  "MOSS_4_MOUNT_HEIGHT_CM": [
-    "moos_4",
+  "ULTRASONIC_MOSS_SPREAD_CM": [
+    "ultraschall_glaettung",
+    "moos_streuung_cm"
+  ],
+  "ULTRASONIC_MAX_GAP_SECONDS": [
+    "ultraschall_glaettung",
+    "max_messpause_s"
+  ],
+  "MOSS_MOUNT_HEIGHT_CM": [
+    "moos",
     "montagehoehe_cm"
   ]
 }

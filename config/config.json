@@ -15,25 +15,26 @@
     "sensor_boden_abstand_cm": 8.6,
     "max_fuellhoehe_cm": 7.0
   },
-  "moos_1": {
-    "trigger_gpio": 9,
-    "echo_gpio": 11,
-    "montagehoehe_cm": 13.1
-  },
-  "moos_2": {
-    "trigger_gpio": 0,
-    "echo_gpio": 5,
-    "montagehoehe_cm": 13.1
-  },
-  "moos_3": {
-    "trigger_gpio": 22,
-    "echo_gpio": 10,
-    "montagehoehe_cm": 13.1
-  },
-  "moos_4": {
-    "trigger_gpio": 17,
-    "echo_gpio": 27,
-    "montagehoehe_cm": 13.1
+  "moos": {
+    "montagehoehe_cm": 13.1,
+    "sensoren": {
+      "moos_1": {
+        "trigger_gpio": 9,
+        "echo_gpio": 11
+      },
+      "moos_2": {
+        "trigger_gpio": 0,
+        "echo_gpio": 5
+      },
+      "moos_3": {
+        "trigger_gpio": 22,
+        "echo_gpio": 10
+      },
+      "moos_4": {
+        "trigger_gpio": 17,
+        "echo_gpio": 27
+      }
+    }
   },
   "taster": {
     "gpio": 26
@@ -60,5 +61,12 @@
     "temperatur_ziel_c": 22,
     "temperatur_max_c": 25,
     "wasser_unter_moosspitzen_cm": 2.5
+  },
+  "ultraschall_glaettung": {
+    "messungen": 15,
+    "mindestanteil_prozent": 80,
+    "wasser_streuung_cm": 0.2,
+    "moos_streuung_cm": 0.3,
+    "max_messpause_s": 12
   }
 }

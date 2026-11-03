@@ -4,52 +4,23 @@
 
 Alle Ultraschallsensoren liefern `distance_cm` direkt ab ihrer Sensorfläche.
 Bei den Moossensoren ist das der Abstand ab Decke zur Moosoberfläche.
-Der gemeinsame Filter in `src/measurements.py` verwendet 15 Messungen:
-Mindestens 80 % müssen innerhalb von ±0,2 cm (Wasser) bzw. ±0,3 cm (Moos)
+Der gemeinsame Filter verwendet die Werte unter `ultraschall_glaettung` in
+`config/config.json`: standardmäßig 15 Messungen, davon müssen mindestens 80 %
+innerhalb von ±0,2 cm (Wasser) bzw. ±0,3 cm (Moos)
 um den Median liegen. Aus diesen Werten wird der Median gebildet.
-Bei fehlenden Echos oder einer Messpause über 12 Sekunden beginnt der Filter neu.
+Bei fehlenden Echos oder einer Messpause über `max_messpause_s` beginnt der Filter neu.
+Die Pause ist höchstens 12 Sekunden einstellbar.
 Rohwert, gefilterter Wert und Gültigkeit werden von Anzeige, Datenbank und
 Regelung gemeinsam verwendet. Fehlgeschlagene Messungen ersetzen alte Werte.
 
-Die Montagehöhe ist der Abstand Sensorfläche–Tankboden. Für Sensor 1 und 2
-wurden 12,94 cm und 12,059 cm aus den bisherigen Kalibrierungen übernommen.
-Sensoren 3 und 4 messen ebenfalls Abstände, werden aber erst mit eingetragener
-`montagehoehe_cm` zur Bewässerung herangezogen.
+Die gemeinsame Montagehöhe ist der Abstand Sensorfläche–Tankboden und steht
+unter `moos.montagehoehe_cm` in `config/config.json`. Die Pins der vier
+Sensoren stehen unter `moos.sensoren`.
 
-## Ziel und Pumpenfreigabe
+## Pumpe
 
-```text
-Ziel = Mittelwert(Montagehöhe − gefilterter Moosabstand) − 2,5 cm
-```
-
-Alle zur Regelung eingetragenen Moossensoren müssen stabile, höchstens
-12 Sekunden alte Messungen liefern. Zielwerte werden auf 0 bis
-`max_fuellhoehe_cm − pumpe_hysterese_cm` begrenzt, aktuell 0 bis 6,8 cm.
-Ein fester Zielwert und eine zusätzliche Mooshöhen-Aggregation entfallen.
-
-Nach jedem Eintritt in AUTO muss „Automatische Pumpe freigeben“ im Dashboard
-angeschaltet und im Dialog bestätigt werden. Die Freigabe wird nicht gespeichert.
-Neue Modussitzung, Sensor-/Dashboard-/Pi-Neustart, abgelaufener Modus-Snapshot
-oder Konfigurationsänderung entziehen sie. Eine Bestätigung aus einem zuvor
-geöffneten Dialog wird dann abgewiesen. Ausschalten ist ohne Dialog möglich.
-Ein kurzzeitig ungültiger Abstand sperrt das Nachfüllen innerhalb der Sitzung;
-nach der Erholung muss die Einschaltbedingung erneut 30 Sekunden bestehen.
-
-Die Regelung kennt drei Zustände:
-
-- **Gesperrt:** keine Freigabe, ungültige Messwerte oder Sicherheitsgrenze erreicht.
-- **Warten:** Wasser im Zielbereich oder niedriger Stand noch nicht bestätigt.
-- **Nachfüllen:** gefilterter Wasserstand seit 30 Sekunden unter Ziel minus 0,2 cm.
-  Die Pumpe läuft mit 25 % bis zum gefilterten Zielwasserstand.
-
-Eine einzelne Welle am normalen Zielwert beendet das Nachfüllen nicht.
-Der rohe Wasserstand ab **7,0 cm** schaltet die Pumpe dagegen sofort ab,
-auch in MANUAL. Die Grenze ist jetzt direkt `wasserstand.max_fuellhoehe_cm`;
-der bisherige Sicherheitsabstand wurde bereits eingerechnet.
-Fehlende Wasser-Echos oder Wasserwerte älter als 3 Sekunden sperren ebenfalls.
-Der gemeinsame Sensor-Snapshot und der Modus dürfen höchstens 5 Sekunden alt sein.
-Die Pumpensteuerung besitzt den Zustand; HTTP-Abfragen lesen nur seinen Snapshot.
-Alle Filter-, Alters- und Zeitgrenzen stehen zentral in `src/measurements.py`.
+Die Pumpe ist derzeit vollständig deaktiviert. Der Pumpenausgang wird beim Start
+auf 0 gesetzt und jeder Einschaltbefehl wird in AUTO und MANUAL zurückgewiesen.
 
 ## Speicherung und Anzeige
 
@@ -61,6 +32,7 @@ Die bisherigen Papier-Bezugsabstände und Mooshöhenfelder werden nicht mehr erz
 Historische Daten bleiben erhalten. `moos_sensor_health.healthy` dokumentiert
 Sensorantworten; die Verwendbarkeit gefilterter Abstände bestimmt `measurement_stable`.
 
-Das Dashboard zeigt Deckenabstände je Moossensor, Wasserstand, Ziel und Pumpenzustand.
-Der Wassergraph enthält Messhistorie und eine Linie für das aktuelle Ziel.
-OLED und Debug-Tabelle verwenden dieselben gefilterten Abstände.
+Das Dashboard zeigt fünf Linien für die Rohabstände: Wasser und Moos 1 bis 4.
+Für längere Zeiträume wird pro Zeitfenster der letzte Rohwert verwendet;
+fehlende Messungen werden nicht als Werte erfunden. Die Debug-Tabelle zeigt
+zusätzlich geglättete Abstände und daraus berechnete Höhen.

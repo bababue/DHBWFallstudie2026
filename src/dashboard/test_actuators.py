@@ -64,18 +64,17 @@ class ActuatorTests(unittest.TestCase):
         self.assertEqual(self.control.status()["fan"], 0)
         self.assertEqual(self.gpio.calls[-1], ("write", 21, 0))
 
-    def test_pump_runs_at_exact_duty_without_startup_boost(self):
-        with patch('actuators.threading.Timer') as timer:
-            self.control.set('pump', 25)
-        timer.assert_not_called()
-        self.assertIn(('pwm', 16, 5, 25), self.gpio.calls)
+    def test_pump_is_disabled_even_if_the_water_interlock_allows_it(self):
+        for value in (5, 25, 100):
+            with self.assertRaisesRegex(PumpLocked, 'deaktiviert'):
+                self.control.set('pump', value)
+        self.assertFalse(any(call[0] == 'pwm' and call[1] == 16 and call[2] for call in self.gpio.calls))
+        self.assertEqual(self.control.status()['pump'], 0)
         self.control.set('pump', 0)
-        self.assertEqual(self.gpio.calls[-1], ('write', 16, 0))
 
     def test_stop_during_boost_keeps_both_motors_off(self):
         with patch("actuators.threading.Timer"):
             self.control.set("fan", 50)
-            self.control.set("pump", 30)
         generations = dict(self.control.generations)
         self.control.set("fan", 0)
         self.control.set("pump", 0)
@@ -86,7 +85,6 @@ class ActuatorTests(unittest.TestCase):
     def test_scale_is_linear_and_boost_only_applies_in_start_range(self):
         with patch("actuators.threading.Timer") as timer:
             self.control.set("fan", 55)
-            self.control.set("pump", 35)
         timer.assert_not_called()
         self.assertAlmostEqual(self.control.duty("fan", 55), 25 + 50 * 75 / 95)
         self.assertAlmostEqual(self.control.duty("pump", 35), 35)
@@ -94,8 +92,6 @@ class ActuatorTests(unittest.TestCase):
         self.assertIn(("write", 20, 1), self.gpio.calls)
         self.control.set("fan", 100)
         self.assertIn(("write", 21, 1), self.gpio.calls)
-        self.control.set("pump", 100)
-        self.assertIn(("write", 16, 1), self.gpio.calls)
 
     def test_pump_cannot_start_when_interlock_is_closed(self):
         self.control.pump_allowed = lambda: False

@@ -56,7 +56,7 @@ class Config:
     def from_config(cls):
         data = load()
         water = data["wasserstand"]
-        moss = tuple(data[f"moos_{index}"] for index in range(1, 5))
+        moss = tuple(data['moos']['sensoren'][f'moos_{index}'] for index in range(1, 5))
         chip = os.getenv("GPIOCHIP_DEVICE", "/dev/gpiochip0")
         token = os.getenv("INFLUXDB_TOKEN", "")
         if not re.fullmatch(r"/dev/gpiochip\d+", chip):
@@ -152,11 +152,14 @@ def run():
             for side, bus, scd in zip(("left", "right"), buses, scd_sensors)
             for sensor in (SHT45(bus, config.sht45_address), BH1750(bus, config.bh1750_address), scd)
         ]
+        settings = load()
+        filter_settings = settings['ultraschall_glaettung']
         water_sensor = WaterLevel(lgpio, handle, config.water_trigger, config.water_echo,
-                                  config.water_floor_distance_cm, max_level=load()["wasserstand"]["max_fuellhoehe_cm"])
+                                  config.water_floor_distance_cm, max_level=settings['wasserstand']['max_fuellhoehe_cm'],
+                                  filter_settings=filter_settings)
         sensors.append(("tank", water_sensor))
         for index, (trigger, echo) in enumerate(config.moss_pins, start=1):
-            sensor = MossDistance(lgpio, handle, trigger, echo)
+            sensor = MossDistance(lgpio, handle, trigger, echo, filter_settings=filter_settings)
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
@@ -179,6 +182,7 @@ def run():
         next_display = start_time
         displayed_version = None
         last_command_id = None
+        missing_echoes = set()
 
         def refresh_display():
             nonlocal next_display, displayed_version
@@ -269,7 +273,16 @@ def run():
                         # The SCD40 has no new value between its 5 s conversions.
                         # Do not publish a false unhealthy or repeat a stale sample.
                         if not is_co2 or fields is not None or error:
-                            update_display_values(display_values, side, sensor.name, fields, finished)
+                            display_fields = fields
+                            if sensor.name == 'ultrasonic':
+                                if fields is None and side not in missing_echoes:
+                                    LOG.warning('%s/ultrasonic: kein gültiger Messwert oder kein Echo', side)
+                                    missing_echoes.add(side)
+                                elif fields is not None and side in missing_echoes:
+                                    LOG.info('%s/ultrasonic: Messwerte wieder verfügbar', side)
+                                    missing_echoes.remove(side)
+                                display_fields = {**(fields or {}), 'echo_received': int(fields is not None)}
+                            update_display_values(display_values, side, sensor.name, display_fields, finished)
                             timestamp = datetime.now(timezone.utc)
                             points.extend(sample_points(side, sensor.name, fields, timestamp))
                         refresh_display()

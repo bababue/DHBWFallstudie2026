@@ -16,7 +16,7 @@ def water_overview(readings, config, now):
         valid = (valid_number(value) and 0 < value <= MAX_DISTANCE_CM and stable.get('value') == 1
                  and distance.get('sampled') == stable.get('sampled'))
         distances[side] = value if valid else None
-        mount = config[f'moos_{index}']['montagehoehe_cm']
+        mount = config['moos']['montagehoehe_cm']
         if mount is not None:
             expected += 1
             if valid and value <= mount:

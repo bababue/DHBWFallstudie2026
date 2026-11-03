@@ -43,11 +43,10 @@ Der Taster an GPIO 26 wechselt mit kurzem Druck zwischen `AUTO` und `MANUAL`.
 Gedrückthalten zeigt die Sensorübersicht. Nach einem Neustart startet das System
 in `AUTO`. Der Modus lässt sich auch im Dashboard umschalten.
 
-- **AUTO:** Licht und Temperatur werden automatisch geregelt. Die Pumpe bleibt
-  zunächst gesperrt. „Automatische Pumpe freigeben“ einschalten und den Dialog
-  bestätigen. Nach jedem Moduswechsel in AUTO oder Neustart erneut freigeben.
-- **MANUAL:** Lüfter, Pumpe und Licht lassen sich im Dashboard einstellen.
-  Die Wasserstands-Sperre für die Pumpe gilt in beiden Modi.
+- **AUTO:** Licht und Temperatur werden automatisch geregelt.
+- **MANUAL:** Lüfter und Licht lassen sich im Dashboard einstellen.
+
+Die Pumpe ist derzeit in beiden Modi vollständig deaktiviert.
 
 Die Sensorwerte werden auch in MANUAL aufgezeichnet. Messwerte, die nicht neu
 eintreffen, werden nicht als aktuell weiterverwendet.
@@ -59,13 +58,18 @@ Hardware und Sollwerte stehen in `config/config.json`; Zugangsdaten stehen in
 Die Sensoren liefern ausschließlich echte Messungen. Details zum Aufbau stehen
 in [HARDWARE.md](HARDWARE.md).
 
-Die Moossensoren messen direkt den Abstand ab Decke. Pro Sensor steht unter
-`montagehoehe_cm` der Abstand seiner Sensorfläche zum Tankboden; übernommen
-wurden 12,94 cm und 12,059 cm. `null` bedeutet: noch nicht für Bewässerung eingerichtet.
-Das Ziel liegt 2,5 cm unter der aus diesen Abständen berechneten Moosoberfläche.
-Die Pumpe startet nach 30 Sekunden bestätigt niedrigem Wasserstand und stoppt
-am gefilterten Ziel. Ein Rohwasserstand ab 7 cm sperrt sie sofort.
-Filter- und Zeitgrenzen stehen gesammelt in `src/measurements.py`.
+Die Moossensoren messen direkt den Abstand ab Decke. Unter `moos` stehen eine
+gemeinsame `montagehoehe_cm` (Abstand Sensorfläche–Tankboden) und die Pins der
+vier Sensoren unter `sensoren`.
+Das Dashboard zeigt den Verlauf der Rohabstände von Wasser und Moos 1 bis 4.
+Für längere Zeiträume wird pro Zeitfenster jeweils der letzte Rohwert dargestellt.
+Die Ultraschallglättung steht in `config/config.json` unter `ultraschall_glaettung`:
+`messungen` (15), `mindestanteil_prozent` (80), `wasser_streuung_cm` (0,2),
+`moos_streuung_cm` (0,3) und `max_messpause_s` (12). Nach einer Änderung startet der Sensorprozess neu.
+Mehr Messungen verlängern die Zeit, bis ein geglätteter Wert verfügbar ist.
+Die maximale Messpause muss größer als die Messintervalle für Wasser und Moos
+und darf höchstens 12 Sekunden sein.
+Weitere Zeitgrenzen stehen in `src/measurements.py`.
 
 Änderungen an Sensorpins oder Intervallen starten `sensors`
 automatisch neu. Einstellungen in `automatik` werden live gelesen. Nach einer
@@ -78,11 +82,6 @@ docker compose restart sensors dashboard
 
 Die Software validiert Konfigurationsstruktur, Wertebereiche und doppelte
 GPIO-Belegungen.
-
-Die Wasserstands-Pumpensperre benötigt eine konfigurierte maximale Füllhöhe und
-einen höchstens drei Sekunden alten Messwert. Fehlende oder ungültige Werte
-sperren die Pumpe. Die maximale Füllhöhe gilt auch in MANUAL.
-Diese Software-Sperre ersetzt keinen unabhängigen Schwimmerschalter.
 
 ## Kalibrierung
 

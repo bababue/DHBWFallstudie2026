@@ -35,122 +35,44 @@ class AutomaticControlTests(unittest.TestCase):
     def make_control(self):
         return AutomaticControl(self.actuator, lambda: dict(self.mode), lambda config: dict(self.data))
 
-    def arm(self):
+    def test_auto_pump_cannot_be_enabled_even_with_valid_measurements(self):
         self.control.apply()
         token = self.control.status()['confirmation']
-        self.control.set_pump_enabled(True, token)
-        return token
-
-    def test_auto_starts_blocked_and_needs_explicit_current_confirmation(self):
-        self.control.apply()
+        with self.assertRaisesRegex(PermissionError, 'deaktiviert'):
+            self.control.set_pump_enabled(True, token)
         self.now = 100
         self.control.apply()
+        self.assertFalse(self.control.enabled)
         self.assertEqual(self.actuator.values['pump'], 0)
-        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, 'old-token')
-        self.arm()
-        self.now += 30
-        self.control.apply()
-        self.assertEqual(self.actuator.values['pump'], 25)
-        self.control.set_pump_enabled(False, None)
-        self.assertEqual(self.actuator.values['pump'], 0)
-        self.assertFalse(self.control.enabled)
 
-    def test_mode_switch_and_quick_return_need_new_confirmation(self):
-        old = self.arm()
-        self.mode = {'mode': 'MANUAL', 'session': 'manual'}
+    def test_legacy_enabled_state_is_revoked(self):
         self.control.apply()
-        self.assertFalse(self.control.enabled)
-        self.mode = {'mode': 'AUTO', 'session': 'again'}
-        self.control.apply()
-        self.assertFalse(self.control.enabled)
-        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, old)
-        self.arm()
-        # Intermediate MANUAL need not have been observed by the dashboard loop.
-        self.mode['session'] = 'quick-manual-auto'
-        self.control.apply()
-        self.assertFalse(self.control.enabled)
-
-    def test_sensor_restart_dashboard_restart_and_connection_loss_revoke_release(self):
-        self.arm()
-        self.mode['session'] = 'restarted-sensor'
-        self.control.apply()
-        self.assertFalse(self.control.enabled)
-        old = self.arm()
-        replacement = self.make_control()
-        replacement.apply()
-        with self.assertRaises(ValueError): replacement.set_pump_enabled(True, old)
-        self.mode = {}
+        self.control.enabled = True
+        self.actuator.values['pump'] = 25
         self.control.apply()
         self.assertFalse(self.control.enabled)
         self.assertEqual(self.actuator.values['pump'], 0)
 
-    def test_config_change_rejects_dialog_opened_before_change(self):
-        self.control.apply()
-        token = self.control.status()['confirmation']
-        self.config['automatik']['wasser_unter_moosspitzen_cm'] = 3
-        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, token)
-        self.assertFalse(self.control.enabled)
-
-    def test_switch_off_stops_running_pump_and_invalidates_old_confirmation(self):
-        old = self.arm()
-        self.now = 30
-        self.control.apply()
-        self.assertEqual(self.actuator.values['pump'], 25)
-        self.control.set_pump_enabled(False, None)
-        self.assertEqual(self.actuator.values['pump'], 0)
-        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, old)
-
-    def test_new_mode_session_stops_a_running_pump_immediately(self):
-        self.arm()
-        self.now = 30
-        self.control.apply()
-        self.assertEqual(self.actuator.values['pump'], 25)
-        self.mode['session'] = 'new-auto'
-        self.control.apply()
-        self.assertEqual(self.actuator.values['pump'], 0)
-        self.assertFalse(self.control.enabled)
-
-    def test_heartbeat_refresh_does_not_revoke_current_session(self):
-        self.mode['updated'] = 0
-        self.arm()
-        self.mode['updated'] = 1
-        self.now = 30
-        self.control.apply()
-        self.assertTrue(self.control.enabled)
-        self.assertEqual(self.actuator.values['pump'], 25)
-
-    def test_control_error_and_shutdown_revoke_release_and_stop_outputs(self):
-        self.arm()
-        self.now = 30
-        self.control.apply()
-        with patch.object(self.control, 'get_water_state', side_effect=OSError('snapshot unavailable')):
-            with self.assertRaises(OSError): self.control.apply()
-        self.assertFalse(self.control.enabled)
-        self.assertEqual(self.actuator.values['pump'], 0)
-        self.arm()
-        self.control.close()
-        self.assertFalse(self.control.enabled)
-        self.assertEqual(self.actuator.values['pump'], 0)
-
-    def test_status_is_read_only_and_unsafe_readings_cannot_be_armed(self):
-        self.control.apply()
-        token = self.control.status()['confirmation']
-        self.data['water_ready'] = False
-        with self.assertRaises(ValueError): self.control.set_pump_enabled(True, token)
-        self.assertFalse(self.control.enabled)
-        context = self.control.context
-        self.control.status(); self.control.status()
-        self.assertEqual(self.control.context, context)
-
-    def test_manual_remains_manual_and_water_lock_still_stops_it(self):
+    def test_manual_pump_cannot_be_enabled_and_other_controls_work(self):
+        from actuators import PumpLocked
         self.mode = {'mode': 'MANUAL', 'session': 'manual'}
         self.control.apply()
         self.control.set_manual('led', 35)
         self.control.apply()
         self.assertEqual(self.actuator.values['led'], 35)
-        self.control.set_manual('pump', 25)
-        self.actuator.allowed = False
+        with self.assertRaisesRegex(PumpLocked, 'deaktiviert'):
+            self.control.set_manual('pump', 25)
+        self.assertEqual(self.actuator.values['pump'], 0)
+
+    def test_switch_off_and_failure_always_stop_pump(self):
         self.control.apply()
+        self.actuator.values['pump'] = 25
+        self.control.set_pump_enabled(False, None)
+        self.assertEqual(self.actuator.values['pump'], 0)
+        self.actuator.values['pump'] = 25
+        with patch.object(self.control, 'get_water_state', side_effect=OSError('snapshot unavailable')):
+            with self.assertRaises(OSError): self.control.apply()
+        self.assertFalse(self.control.enabled)
         self.assertEqual(self.actuator.values['pump'], 0)
 
     def test_light_schedule_boundaries_and_midnight(self):

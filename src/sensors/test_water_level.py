@@ -1,10 +1,57 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from water_level import WaterLevel
+from moss_distance import MossDistance
 from measurements import DistanceFilter, WATER_SPREAD_CM, FILTER_SAMPLES
 
 
 class WaterLevelTests(unittest.TestCase):
+    def test_configured_filter_applies_separate_spreads_to_both_sensor_types(self):
+        settings = dict(messungen=5, mindestanteil_prozent=60,
+                        wasser_streuung_cm=.06, moos_streuung_cm=.25, max_messpause_s=12)
+        water = WaterLevel(MagicMock(), 1, 6, 13, 8.3, 7, filter_settings=settings)
+        moss = MossDistance(MagicMock(), 1, 9, 11, filter_settings=settings)
+        samples = [5, 5.05, 5.1, 5.25, 5.3]
+        with patch.object(water, '_distance_cm', side_effect=samples), \
+                patch.object(moss, '_distance_cm', side_effect=samples):
+            for _ in samples:
+                water_result = water.read()
+                moss_result = moss.read()
+        self.assertEqual(water_result['measurement_stable'], 0)
+        self.assertEqual(water_result['distance_cm'], 5.3)
+        self.assertEqual(moss_result['measurement_stable'], 1)
+        self.assertEqual(moss_result['distance_filtered_cm'], 5.1)
+
+    def test_configured_minimum_fraction_controls_stability(self):
+        settings = dict(messungen=5, mindestanteil_prozent=60,
+                        wasser_streuung_cm=.2, moos_streuung_cm=.3, max_messpause_s=12)
+        samples = [5, 5, 5, 6, 6]
+        for percent, expected in [(60, 1), (80, 0)]:
+            settings['mindestanteil_prozent'] = percent
+            sensor = WaterLevel(MagicMock(), 1, 6, 13, 8.3, 7, filter_settings=settings)
+            with patch.object(sensor, '_distance_cm', side_effect=samples):
+                for _ in samples:
+                    result = sensor.read()
+            self.assertEqual(result['measurement_stable'], expected)
+
+    def test_percentage_boundary_is_exact(self):
+        settings = dict(messungen=25, mindestanteil_prozent=56,
+                        wasser_streuung_cm=.2, moos_streuung_cm=.3, max_messpause_s=12)
+        sensor = WaterLevel(MagicMock(), 1, 6, 13, 8.3, 7, filter_settings=settings)
+        with patch.object(sensor, '_distance_cm', side_effect=[5] * 14 + [6] * 11):
+            for _ in range(25):
+                result = sensor.read()
+        self.assertEqual(result['measurement_stable'], 1)
+
+    def test_configured_gap_resets_filter(self):
+        settings = dict(messungen=3, mindestanteil_prozent=67,
+                        wasser_streuung_cm=.2, moos_streuung_cm=.3, max_messpause_s=2)
+        filtered = DistanceFilter.from_settings(settings, 'wasser')
+        filtered.update(5, 0)
+        filtered.update(5, 1)
+        self.assertEqual(filtered.update(5, 3)['measurement_stable'], 1)
+        self.assertEqual(filtered.update(5, 6)['measurement_stable'], 0)
+
     def sensor(self):
         return WaterLevel(MagicMock(), 1, 6, 13, 8.3, 7)
 

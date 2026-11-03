@@ -4,6 +4,7 @@ import json
 import math
 import os
 from pathlib import Path
+from measurements import MAX_SAMPLE_AGE_SECONDS
 
 PATH = Path('/config/config.json') if Path('/config').exists() else Path(__file__).resolve().parents[1] / 'config/config.json'
 KEYS = json.loads(Path(__file__).with_name('config_keys.json').read_text())
@@ -11,19 +12,31 @@ KEYS = json.loads(Path(__file__).with_name('config_keys.json').read_text())
 
 def validate(data):
     expected = {}
-    for group, key in KEYS.values():
-        expected.setdefault(group, set()).add(key)
-    if not isinstance(data, dict) or set(data) != set(expected):
-        raise ValueError('Die Konfigurationsbereiche müssen vollständig erhalten bleiben.')
+    for path in KEYS.values():
+        node = expected
+        for key in path[:-1]:
+            node = node.setdefault(key, {})
+        node[path[-1]] = None
+
+    def check_structure(value, schema, path='Konfiguration'):
+        if not isinstance(value, dict) or set(value) != set(schema):
+            raise ValueError(f'{path}: unbekannte oder fehlende Einstellungen')
+        for key, children in schema.items():
+            if children is not None:
+                check_structure(value[key], children, f'{path}.{key}')
+
+    check_structure(data, expected)
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
               'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000),
-              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
-    for group, keys in expected.items():
-        if not isinstance(data[group], dict) or set(data[group]) != keys:
-            raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
-    for name, (group, key) in KEYS.items():
-        value = data[group][key]
+              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2),
+              'ULTRASONIC_WATER_SPREAD_CM': (.01, 5), 'ULTRASONIC_MOSS_SPREAD_CM': (.01, 5),
+              'ULTRASONIC_MAX_GAP_SECONDS': (1, MAX_SAMPLE_AGE_SECONDS)}
+    for name, path in KEYS.items():
+        value = data
+        for key in path:
+            value = value[key]
+        group, key = '.'.join(path[:-1]), path[-1]
         if value is None and name.endswith('MOUNT_HEIGHT_CM'):
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -37,6 +50,12 @@ def validate(data):
                          'AUTO_LIGHT_LEVEL_PERCENT': (0, 100)}[name]
             if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
                 raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
+        elif name == 'ULTRASONIC_FILTER_SAMPLES':
+            if type(value) is not int or not 3 <= value <= 101 or value % 2 == 0:
+                raise ValueError('ultraschall_glaettung.messungen: ungerade ganze Zahl von 3 bis 101 erforderlich')
+        elif name == 'ULTRASONIC_MIN_PERCENT':
+            if type(value) is not int or not 51 <= value <= 100:
+                raise ValueError('ultraschall_glaettung.mindestanteil_prozent: ganze Zahl von 51 bis 100 erforderlich')
         elif name == 'PUMP_LEVEL_PERCENT':
             if type(value) is not int or not 5 <= value <= 100:
                 raise ValueError('automatik.pumpe_leistung_prozent: ganze Zahl 5 bis 100 erforderlich')
@@ -54,6 +73,9 @@ def validate(data):
                 raise ValueError('i2c.taktpause_us: ganze Zahl erforderlich')
     if data['automatik']['temperatur_max_c'] - data['automatik']['temperatur_ziel_c'] < 2:
         raise ValueError('Temperaturmaximum muss mindestens 2 °C über dem Ziel liegen')
+    intervals = data['messintervalle']
+    if data['ultraschall_glaettung']['max_messpause_s'] <= max(intervals['schnelle_sensoren_s'], intervals['moos_s']):
+        raise ValueError('Die maximale Ultraschall-Messpause muss größer als beide Messintervalle sein')
     maximum = data['wasserstand']['max_fuellhoehe_cm']
     if maximum is not None and maximum >= data['wasserstand']['sensor_boden_abstand_cm']:
         raise ValueError('Maximale Füllhöhe muss kleiner als der Sensor-Boden-Abstand sein')
@@ -69,8 +91,9 @@ def load():
 def setting(name, default=None):
     if name not in KEYS:
         return os.getenv(name, default)
-    group, key = KEYS[name]
-    value = load()[group][key]
+    value = load()
+    for key in KEYS[name]:
+        value = value[key]
     return '' if value is None else str(value)
 
 

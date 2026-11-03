@@ -257,32 +257,23 @@ h1 {
   font-size: .8rem;
 }
 
-.water-panel {
-  grid-column: 1/-1;
+.ultrasonic-panel {
+  grid-column: 1 / -1;
 }
-
-.water-metrics {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 24px;
-  margin: 24px 0;
-}
-
-.water-metric-label {
+.ultrasonic-legend {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 12px 0;
+  font-size: .9rem;
 }
-
-.water-metric-label i {
+.ultrasonic-legend span::before {
+  content: "";
   display: inline-block;
-  width: 20px;
+  width: 18px;
   border-top: 2px solid;
-}
-
-.legend-target {
-  color: #2563eb;
-  border-top-style: dashed!important;
+  vertical-align: middle;
+  margin-right: 6px;
 }
 
 .overview-row {
@@ -347,12 +338,10 @@ h1 {
 .humidity-head,
 .co2-head,
 .light-head,
-.water-head,
 .temperature-value,
 .humidity-value,
 .co2-value,
 .light-value,
-.water-value,
 .moss-value {
   font-size: clamp(2rem,3.5vw,2.8rem);
   font-weight: 700;
@@ -380,14 +369,6 @@ select {
   display: flex;
   gap: 20px;
   font-size: .8rem;
-}
-
-.legend-water {
-  color: #2563eb;
-}
-
-.legend-moss {
-  color: #16a34a;
 }
 
 .chart-container {
@@ -494,16 +475,6 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .water-metrics {
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 20px 12px;
-  }
-
-  .water-metric-label {
-    font-size: .75rem;
-    align-items: start;
-  }
-
   .mode {
     min-height: 220px;
   }
@@ -532,11 +503,6 @@ th {
   border-left: 2px dashed #000;
 }
 
-#water-pump[hidden],
-#auto-pump-panel[hidden] {
-  display: none;
-}
-
 .averaged::before {
   content: "Ø";
   font-size: .55em;
@@ -546,39 +512,6 @@ th {
 
 #light-hours {
   font-weight: 700;
-}
-
-#pump-release[hidden] {
-  display: none;
-}
-.pump-release-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-}
-#pump-confirm {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-  max-width: min(440px, 90vw);
-}
-#pump-confirm::backdrop {
-  background: #0007;
-}
-#pump-confirm h2 {
-  margin-top: 0;
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-.dialog-actions button {
-  font: inherit;
-  padding: 10px 16px;
-  cursor: pointer;
 }
 
 .ultrasonic-title {

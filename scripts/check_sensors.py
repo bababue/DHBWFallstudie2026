@@ -134,7 +134,7 @@ def run_diagnostic(config, gpio, drivers, chip, emit=print, sleep=time.sleep,
         failed |= check_distance(gpio, handle, 'Wasser', water['trigger_gpio'], water['echo_gpio'],
                                  False, drivers['TimestampUltrasonic'], emit, sleep)
         for index in range(1, 5):
-            moss = config[f'moos_{index}']
+            moss = config['moos']['sensoren'][f'moos_{index}']
             failed |= check_distance(gpio, handle, f'Moos {index}', moss['trigger_gpio'], moss['echo_gpio'],
                                      True, drivers['TimestampUltrasonic'], emit, sleep)
     finally:

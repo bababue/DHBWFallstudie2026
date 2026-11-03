@@ -2,7 +2,7 @@
 
 import time
 from threading import Event, Lock
-from measurements import (DistanceFilter, WATER_SPREAD_CM, MAX_DISTANCE_CM,
+from measurements import (DistanceFilter, MAX_DISTANCE_CM,
                           SOUND_CM_PER_SECOND, ECHO_TIMEOUT_SECONDS, TRIGGER_SECONDS)
 
 
@@ -71,11 +71,11 @@ class TimestampUltrasonic:
 class WaterLevel(TimestampUltrasonic):
     name = "ultrasonic"
 
-    def __init__(self, gpio, handle, trigger_pin, echo_pin, floor_distance_cm, max_level):
+    def __init__(self, gpio, handle, trigger_pin, echo_pin, floor_distance_cm, max_level, filter_settings=None):
         super().__init__(gpio, handle, trigger_pin, echo_pin)
         self.floor_distance_cm = floor_distance_cm
         self.max_level = max_level
-        self.filter = DistanceFilter(WATER_SPREAD_CM)
+        self.filter = DistanceFilter.from_settings(filter_settings, 'wasser')
 
     def read(self):
         result = self.filter.update(self._distance_cm(), time.monotonic())
