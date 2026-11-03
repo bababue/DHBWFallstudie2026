@@ -191,10 +191,6 @@
     "automatik",
     "lichtstaerke_prozent"
   ],
-  "WATER_BELOW_MOSS_CM": [
-    "automatik",
-    "wasser_unter_moosspitzen_cm"
-  ],
   "PUMP_HYSTERESIS_CM": [
     "automatik",
     "pumpe_hysterese_cm"
@@ -203,16 +199,8 @@
     "automatik",
     "pumpe_leistung_prozent"
   ],
-  "PUMP_PULSE_SECONDS": [
+  "WATER_TARGET_CM": [
     "automatik",
-    "pumpe_impuls_s"
-  ],
-  "PUMP_PAUSE_SECONDS": [
-    "automatik",
-    "pumpe_pause_s"
-  ],
-  "PUMP_MAX_RUNTIME_SECONDS": [
-    "automatik",
-    "pumpe_max_laufzeit_s"
+    "wasser_ziel_cm"
   ]
 }

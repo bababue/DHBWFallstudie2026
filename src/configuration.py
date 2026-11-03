@@ -19,10 +19,15 @@ def upgrade(data):
                                       "lichtstaerke_prozent": 100})
         if isinstance(data.get("automatik"), dict):
             options = dict(data["automatik"])
-            for key, value in {"wasser_unter_moosspitzen_cm": 2.0, "pumpe_hysterese_cm": 0.2,
-                               "pumpe_leistung_prozent": 30, "pumpe_impuls_s": 1.0,
-                               "pumpe_pause_s": 5.0, "pumpe_max_laufzeit_s": 30.0}.items():
-                options.setdefault(key, value)
+            legacy_pulse = 'pumpe_impuls_s' in options
+            for key in ('wasser_unter_moosspitzen_cm', 'pumpe_impuls_s', 'pumpe_pause_s', 'pumpe_max_laufzeit_s'):
+                options.pop(key, None)
+            options.setdefault('wasser_ziel_cm', 1.3)
+            options.setdefault('pumpe_hysterese_cm', 0.2)
+            # Replace the previous pulse default when upgrading to continuous operation.
+            if legacy_pulse and options.get('pumpe_leistung_prozent') == 30:
+                options['pumpe_leistung_prozent'] = 25
+            options.setdefault('pumpe_leistung_prozent', 25)
             data["automatik"] = options
         data.setdefault("aktoren", {"licht_gpio": 20, "luefter_gpio": 21, "pumpe_gpio": 16,
                                     "licht_pwm_hz": 2000, "luefter_pwm_hz": 5, "pumpe_pwm_hz": 5})
@@ -55,9 +60,7 @@ def validate(data):
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
               'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000), 'WATER_FILTER_SAMPLES': (3, 31), 'WATER_MAX_SPREAD_CM': (.01, 5),
-              'WATER_BELOW_MOSS_CM': (.1, 20), 'PUMP_HYSTERESIS_CM': (.05, 2),
-              'PUMP_PULSE_SECONDS': (.2, 2), 'PUMP_PAUSE_SECONDS': (3, 60),
-              'PUMP_MAX_RUNTIME_SECONDS': (1, 120)}
+              'WATER_TARGET_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
     for group, keys in expected.items():
         if not isinstance(data[group], dict) or set(data[group]) != keys:
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
@@ -95,8 +98,6 @@ def validate(data):
                 raise ValueError(f'{group}.{key}: erlaubter Bereich {low} bis {high}')
             if name == 'I2C_DELAY_US' and type(value) is not int:
                 raise ValueError('i2c.taktpause_us: ganze Zahl erforderlich')
-    if data['automatik']['pumpe_max_laufzeit_s'] < data['automatik']['pumpe_impuls_s']:
-        raise ValueError('Maximale Pumpenlaufzeit muss mindestens der Impulsdauer entsprechen')
     count = data['wasserstand']['filter_messungen']
     if type(count) is not int or count % 2 == 0:
         raise ValueError('wasserstand.filter_messungen: ungerade ganze Zahl erforderlich')

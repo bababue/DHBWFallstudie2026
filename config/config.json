@@ -66,11 +66,8 @@
     "licht_start_stunde": 6,
     "lichtdauer_stunden": 16,
     "lichtstaerke_prozent": 100,
-    "wasser_unter_moosspitzen_cm": 2.0,
     "pumpe_hysterese_cm": 0.2,
-    "pumpe_leistung_prozent": 30,
-    "pumpe_impuls_s": 1.0,
-    "pumpe_pause_s": 5.0,
-    "pumpe_max_laufzeit_s": 30.0
+    "pumpe_leistung_prozent": 25,
+    "wasser_ziel_cm": 1.3
   }
 }

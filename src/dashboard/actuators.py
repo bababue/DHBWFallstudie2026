@@ -14,8 +14,8 @@ class PumpLocked(Exception):
 
 class Actuators:
     BOOST_SECONDS = 0.5
-    BOOSTS = {"fan": (50, 100), "pump": (30, 75)}
-    MIN_DUTY = {"fan": 25, "pump": 15}
+    BOOSTS = {"fan": (50, 100)}
+    MIN_DUTY = {"fan": 25}
 
     def __init__(self, gpio, chip: str, led_pin: int, fan_pin: int, pump_pin: int,
                  led_hz: int, fan_hz: int, pump_hz: int, pump_allowed=None):
@@ -50,7 +50,7 @@ class Actuators:
     def duty(device: str, value: int) -> float:
         if value == 0:
             return 0
-        if device == "led":
+        if device in ("led", "pump"):
             return value
         minimum = Actuators.MIN_DUTY[device]
         return minimum + (value - 5) * (100 - minimum) / 95

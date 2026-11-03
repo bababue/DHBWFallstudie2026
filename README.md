@@ -146,8 +146,8 @@ Sensorübersicht. Beim Loslassen erscheint wieder der Modus, ohne weiterzuschalt
 Der Taster wird mit Pull-up gelesen und ist beim Drücken aktiv-low. Nach jedem
 Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
 Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
-Im AUTO-Modus ist der Lüfter derzeit auf 0 % gesetzt. Die Pumpe hält den Wasserstand
-2 cm unter der geglätteten Moosspitzenhöhe. Das Licht folgt
+Im AUTO-Modus ist der Lüfter derzeit auf 0 % gesetzt. Die Pumpe hält einen festen Wasserstand
+von 1,3 cm und läuft dafür durchgehend mit 25 %, bis dieser erreicht ist. Das Licht folgt
 `automatik` in der Konfiguration: standardmäßig 06:00 bis 22:00 Uhr mit 100 %,
 die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin). Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
 Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
@@ -257,15 +257,10 @@ Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/
 
 Die Moosspitzenhöhe wird ab dem Boden berechnet: `max(0; 6 cm + Bezugsabstand − Rohabstand)`. Die 6 cm entsprechen der Gitterhöhe; der Bezugsabstand stammt aus der Papierkalibrierung auf dem Gitter.
 
-Die Pumpenregelung verwendet mindestens zwei aktuelle und stabile Moossensoren
-(einschließlich Demo-Sensoren). Der Zielwasserstand ist die mittlere Moosspitzenhöhe
-minus `automatik.wasser_unter_moosspitzen_cm` (Standard 2 cm), begrenzt auf den
-sicheren Bereich unterhalb der Pumpensperre. Die echte Wasserstandsmessung muss
-stabil und höchstens drei Sekunden alt sein. Nachgefüllt wird ab 0,2 cm unter
-Soll in Impulsen von einer Sekunde bei 30 %, mit fünf Sekunden Pause. Nach insgesamt
-30 Sekunden Pumpenlaufzeit ohne Erreichen des Ziels sperrt die Regelung weiteres
-Nachfüllen bis zum Wechsel MANUAL → AUTO. Diese Werte stehen unter `automatik`.
-Im Graphen wird der Zielverlauf aus der Moosspitzenhöhe und den aktuellen
-Regelparametern berechnet; Änderungen der Parameter gelten auch für die dargestellte
-Zielkurve vergangener Zeiträume. Bestehende historische Mooswerte vor der Umstellung
-auf Höhen über dem Boden bleiben unverändert und sind dafür nicht vergleichbar.
+Die Pumpenregelung verwendet `automatik.wasser_ziel_cm` (1,3 cm) und
+`pumpe_leistung_prozent` (25 %), ohne Startboost oder Pumpenpausen. Sie läuft
+bis zum Ziel und startet nach Erreichen erst wieder bei einem Absinken um
+`pumpe_hysterese_cm` (0,2 cm). Die echte Wasserstandsmessung muss stabil und
+höchstens drei Sekunden alt sein. Die Wasserstandssperre ist immer vorrangig.
+Die Moosspitzenhöhe dient derzeit nur zur Anzeige. Im Graphen zeigt die
+horizontale Ziellinie den aktuell eingestellten Sollwert über den gewählten Zeitraum.

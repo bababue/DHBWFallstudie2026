@@ -100,8 +100,7 @@ class DashboardTests(unittest.TestCase):
                     patch.object(main, 'load', return_value=config), \
                     patch.object(main, 'live_readings', return_value=readings):
                 state, _ = main.pump_state()
-        self.assertEqual(state['target_cm'], 5.5)
-        self.assertTrue(state['moss_ready'])
+        self.assertEqual(state['target_cm'], 1.3)
         self.assertTrue(state['water_ready'])
         self.assertTrue(state['pump_allowed'])
         self.assertEqual(state['moss_height_cm'], 7.5)

@@ -55,12 +55,12 @@ class AutomaticControlTests(unittest.TestCase):
         self.mode = 'AUTO'
         self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
         self.automatic.apply()
-        self.controller.set.assert_called_once_with('pump', 30)
+        self.controller.set.assert_called_once_with('pump', 25)
         self.controller.set.reset_mock()
         self.mode = 'MANUAL'
         self.automatic.apply()
         self.controller.set.assert_not_called()
-        self.assertIsNone(self.automatic.pump.pulse_started)
+        self.assertFalse(self.automatic.pump.reached)
 
     def test_manual_values_are_only_set_in_manual(self):
         self.automatic.set_manual('fan', 30)
