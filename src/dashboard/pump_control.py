@@ -1,4 +1,4 @@
-"""Fixed water target and continuous pump control."""
+"""Moss-relative water target and continuous pump control."""
 import math
 
 
@@ -6,17 +6,17 @@ def valid_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def target_level(config):
+def target_level(config, moss_height):
     maximum = config['wasserstand']['max_fuellhoehe_cm']
-    if maximum is None:
+    if maximum is None or not valid_number(moss_height):
         return None
     options = config['automatik']
     ceiling = maximum - config['wasserstand']['sicherheitsabstand_cm'] - options['pumpe_hysterese_cm']
-    return max(0.0, min(options['wasser_ziel_cm'], ceiling))
+    return max(0.0, min(moss_height - options['wasser_unter_moosspitzen_cm'], ceiling))
 
 
 def water_overview(readings, config, now):
-    """The moss height remains a display value; the water target is fixed."""
+    """Derive the target from the mean of fresh, smoothed moss tip heights."""
     heights = []
     for reading in readings:
         if (reading.get('side') in ('moss1', 'moss2', 'moss3', 'moss4')
@@ -24,8 +24,8 @@ def water_overview(readings, config, now):
                 and valid_number(reading.get('sampled')) and 0 <= now - reading['sampled'] <= 12
                 and valid_number(reading.get('value')) and reading['value'] >= 0):
             heights.append(reading['value'])
-    return {'moss_height_cm': sum(heights) / len(heights) if heights else None,
-            'target_cm': target_level(config)}
+    height = sum(heights) / len(heights) if heights else None
+    return {'moss_height_cm': height, 'target_cm': target_level(config, height)}
 
 
 class PumpRegulator:

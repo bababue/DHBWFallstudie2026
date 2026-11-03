@@ -83,7 +83,7 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaises(ValueError): validate(data)
 
     def test_pump_settings_reject_invalid_target_and_duty(self):
-        for key, value in [('wasser_ziel_cm', -1), ('pumpe_hysterese_cm', 0),
+        for key, value in [('wasser_unter_moosspitzen_cm', -1), ('pumpe_hysterese_cm', 0),
                            ('pumpe_leistung_prozent', 1)]:
             data = copy.deepcopy(load())
             data['automatik'][key] = value

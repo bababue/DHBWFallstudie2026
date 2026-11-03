@@ -15,16 +15,16 @@ def upgrade(data):
         data.setdefault("moos_3", {"trigger_gpio": 22, "echo_gpio": 10, "bezugsabstand_cm": None})
         data.setdefault("moos_4", {"trigger_gpio": 17, "echo_gpio": 27, "bezugsabstand_cm": None})
         data.pop("deckel", None)
-        data.setdefault("automatik", {"licht_start_stunde": 4, "lichtdauer_stunden": 16,
+        data.setdefault("automatik", {"licht_start_stunde": 6, "lichtdauer_stunden": 16,
                                       "lichtstaerke_prozent": 100})
         if isinstance(data.get("automatik"), dict):
             options = dict(data["automatik"])
             legacy_pulse = 'pumpe_impuls_s' in options
-            for key in ('wasser_unter_moosspitzen_cm', 'pumpe_impuls_s', 'pumpe_pause_s', 'pumpe_max_laufzeit_s'):
+            for key in ('wasser_ziel_cm', 'pumpe_impuls_s', 'pumpe_pause_s', 'pumpe_max_laufzeit_s'):
                 options.pop(key, None)
             options.setdefault('temperatur_ziel_c', 22)
             options.setdefault('temperatur_max_c', 25)
-            options.setdefault('wasser_ziel_cm', 1.3)
+            options.setdefault('wasser_unter_moosspitzen_cm', 2)
             options.setdefault('pumpe_hysterese_cm', 0.2)
             # Replace the previous pulse default when upgrading to continuous operation.
             if legacy_pulse and options.get('pumpe_leistung_prozent') == 30:
@@ -62,7 +62,7 @@ def validate(data):
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
               'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000), 'WATER_FILTER_SAMPLES': (3, 31), 'WATER_MAX_SPREAD_CM': (.01, 5),
-              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_TARGET_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
+              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
     for group, keys in expected.items():
         if not isinstance(data[group], dict) or set(data[group]) != keys:
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')

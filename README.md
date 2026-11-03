@@ -148,7 +148,7 @@ Neustart beginnt die Anzeige in `AUTO`. Auch im Modus `MANUAL` werden die
 Sensordaten in InfluxDB gespeichert und die Graphen angezeigt.
 Im AUTO-Modus ist der Lüfter derzeit auf 0 % gesetzt. Die Pumpe hält einen festen Wasserstand
 von 1,3 cm und läuft dafür durchgehend mit 25 %, bis dieser erreicht ist. Das Licht folgt
-`automatik` in der Konfiguration: standardmäßig 04:00 bis 20:00 Uhr mit 100 %,
+`automatik` in der Konfiguration: standardmäßig 06:00 bis 22:00 Uhr mit 100 %,
 die übrigen acht Stunden ausgeschaltet (Zeitzone Europe/Berlin). Beim Verlassen von MANUAL werden diese Sollwerte wieder übernommen.
 Im Manual-Modus lassen sich Lüfter, Pumpe und Licht im Dashboard einstellen.
 Die Regler zeigen den zuletzt gesetzten Stellwert; beim Start der Dashboard-Steuerung
@@ -257,12 +257,13 @@ Technische Grundlagen: [SHT4x-Datenblatt](https://sensirion.com/media/documents/
 
 Die Moosspitzenhöhe wird ab dem Boden berechnet: `max(0; 6 cm + Bezugsabstand − Rohabstand)`. Die 6 cm entsprechen der Gitterhöhe; der Bezugsabstand stammt aus der Papierkalibrierung auf dem Gitter.
 
-Die Pumpenregelung verwendet `automatik.wasser_ziel_cm` (1,3 cm) und
+Die Pumpenregelung verwendet die mittlere geglättete Moosspitzenhöhe minus
+`automatik.wasser_unter_moosspitzen_cm` (2 cm), mindestens 0 cm, und
 `pumpe_leistung_prozent` (25 %), ohne Startboost oder Pumpenpausen. Sie läuft
 bis zum Ziel und startet nach Erreichen erst wieder bei einem Absinken um
 `pumpe_hysterese_cm` (0,2 cm). Die echte Wasserstandsmessung muss stabil und
 höchstens drei Sekunden alt sein. Die Wasserstandssperre ist immer vorrangig.
-Die Moosspitzenhöhe dient derzeit nur zur Anzeige. Im Graphen zeigt die
+Ohne aktuelle Mooshöhe bleibt die Pumpe aus. Die Sicherheitsgrenze begrenzt auch den Zielwert. Im Graphen zeigt die
 horizontale Ziellinie den aktuell eingestellten Sollwert über den gewählten Zeitraum.
 
 ### Temperaturregelung in AUTO

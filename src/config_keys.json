@@ -199,10 +199,6 @@
     "automatik",
     "pumpe_leistung_prozent"
   ],
-  "WATER_TARGET_CM": [
-    "automatik",
-    "wasser_ziel_cm"
-  ],
   "AUTO_TEMPERATURE_TARGET_C": [
     "automatik",
     "temperatur_ziel_c"
@@ -210,5 +206,9 @@
   "AUTO_TEMPERATURE_MAX_C": [
     "automatik",
     "temperatur_max_c"
+  ],
+  "WATER_BELOW_MOSS_CM": [
+    "automatik",
+    "wasser_unter_moosspitzen_cm"
   ]
 }
