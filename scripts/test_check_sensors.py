@@ -13,7 +13,7 @@ def config():
                 'sht45_adresse': 68, 'bh1750_adresse': 35, 'scd40_adresse': 98},
         'wasserstand': {'trigger_gpio': 5, 'echo_gpio': 6},
         **{f'moos_{index}': {'trigger_gpio': 2 * index + 5,
-                             'echo_gpio': 2 * index + 6, 'demo': True}
+                             'echo_gpio': 2 * index + 6}
            for index in range(1, 5)},
     }
 

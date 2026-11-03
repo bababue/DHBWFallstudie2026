@@ -48,12 +48,9 @@ Die beiden I²C-Busse verwenden GPIO-Paare, die keine Hardware-I²C-Paare des Pi
 
 ## Konfigurations- und Kalibrierstatus
 
-Die Software kennt vier Moos-Sensoren. Aktuell sind `moos_1.demo` und
-`moos_2.demo` in `config/config.json` auf `true` gesetzt; diese beiden erzeugen
-synthetische Messwerte. Die Sensoren 3 und 4 stehen auf `demo: false`, haben
-keinen Kalibrierwert und liefern damit im derzeitigen Aufbau keine Höhenwerte.
-Die Konfiguration ist die maßgebliche Quelle, falls sich Demo-Modus oder
-Kalibrierwerte ändern.
+Die Software kennt vier Moos-Sensoren und misst ausschließlich echte Echos.
+Sensoren 1 und 2 haben Bezugsabstände in `config/config.json`. Sensoren 3 und 4
+haben noch keinen Kalibrierwert und liefern deshalb nur Rohabstände.
 
 Die Wasserstand-Konfiguration enthält einen Sensor-Boden-Abstand von 8,265 cm;
 die Hardware-Übergabe nennt 8,62 cm (86,2 mm). Das sind unterschiedliche Werte.
@@ -74,4 +71,4 @@ Der dokumentierte 5-Hz-Betrieb führt bei kleinen Stellwerten zu einzelnen Impul
 - **SCD40:** Beide Sensoren wurden laut Übergabe per Forced Recalibration auf 430 ppm eingestellt, unter der Annahme frischer Luft am offenen Fenster. Dabei waren teils ungewöhnlich große Korrekturen nötig. Die CO₂-Werte und mögliche Drift sollten weiter beobachtet werden; die automatische Selbstkalibrierung war zum Übergabezeitpunkt aktiv.
 - **Lastverhalten:** Wasserfluss und Lüfterlauf bei niedrigen Stellwerten sind offen.
 - **Wasserstand-Ultraschallsensor:** Die aktuelle Pinangabe ist Trigger GPIO 6 und Echo GPIO 13. Der Abstand vom Sensor zum Boden muss am echten Einbau kalibriert werden: Die Übergabe nennt 86,2 mm, während `config/config.json` derzeit 8,265 cm enthält. Modell, Versorgung und Pegel der Echo-Leitung sind nicht dokumentiert; vor dem Anschluss sicherstellen, dass am Pi-Eingang höchstens 3,3 V anliegen.
-- **Mooshöhen-Ultraschallsensoren:** Für Sensoren 1 und 2 sind Bezugsabstände in `config/config.json` eingetragen, aber beide stehen auf Demo-Modus und liefern daher synthetische Werte. Vor Verwendung echter Sensoren Demo-Modus ausschalten und die Montageabstände prüfen. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.
+- **Mooshöhen-Ultraschallsensoren:** Für Sensoren 1 und 2 sind Bezugsabstände in `config/config.json` eingetragen; Montageabstände am realen Aufbau prüfen. Sensoren 3 und 4 sind softwareseitig vorgesehen, ihr physischer Einbau ist nicht dokumentiert. Echo-Pegel und Pinverfügbarkeit (insbesondere GPIO 0 sowie GPIO 9–11) am echten Pi prüfen.

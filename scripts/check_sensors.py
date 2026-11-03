@@ -135,7 +135,6 @@ def run_diagnostic(config, gpio, drivers, chip, emit=print, sleep=time.sleep,
                                  False, drivers['TimestampUltrasonic'], emit, sleep)
         for index in range(1, 5):
             moss = config[f'moos_{index}']
-            emit(f'Moos {index}: Demo-Modus wird ignoriert; Hardwareecho wird gemessen')
             failed |= check_distance(gpio, handle, f'Moos {index}', moss['trigger_gpio'], moss['echo_gpio'],
                                      True, drivers['TimestampUltrasonic'], emit, sleep)
     finally:

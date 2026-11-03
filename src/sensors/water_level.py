@@ -1,6 +1,7 @@
 """Ultrasonic distance measurement and water depth in the tank."""
 
 import statistics
+import math
 import time
 from collections import deque
 from threading import Event, Lock
@@ -76,7 +77,7 @@ class WaterLevel(TimestampUltrasonic):
         super().__init__(gpio, handle, trigger_pin, echo_pin)
         options = options or {}
         self.floor_distance_cm = floor_distance_cm
-        self.count = options.get('filter_messungen', 5)
+        self.count = options.get('filter_messungen', 15)
         self.max_spread = options.get('max_streuung_cm', .2)
         self.max_level = options.get('max_fuellhoehe_cm')
         self.recent = deque(maxlen=self.count)
@@ -101,7 +102,7 @@ class WaterLevel(TimestampUltrasonic):
             return result
         median = statistics.median(self.recent)
         inliers = [v for v in self.recent if abs(v - median) <= self.max_spread]
-        if len(inliers) < self.count // 2 + 1:
+        if len(inliers) < math.ceil(self.count * 0.8):
             return result
         stable = statistics.median(inliers)
         result.update({'measurement_stable': 1, 'distance_filtered_cm': stable,

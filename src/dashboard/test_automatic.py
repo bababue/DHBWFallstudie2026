@@ -68,7 +68,11 @@ class AutomaticControlTests(unittest.TestCase):
         self.automatic.get_water_state = lambda: (state(), OPTIONS)
         self.mode = 'AUTO'
         self.controller.status.return_value = {'fan': 0, 'pump': 0, 'led': 0}
-        self.automatic.apply()
+        with patch('pump_control.time.monotonic', return_value=0):
+            self.automatic.apply()
+        self.controller.set.assert_not_called()
+        with patch('pump_control.time.monotonic', return_value=30):
+            self.automatic.apply()
         self.controller.set.assert_called_once_with('pump', 25)
         self.controller.set.reset_mock()
         self.mode = 'MANUAL'

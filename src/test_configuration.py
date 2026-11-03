@@ -20,34 +20,20 @@ class ConfigurationTests(unittest.TestCase):
         data['messintervalle']['schnelle_sensoren_s'] = 0
         with self.assertRaises(ValueError): validate(data)
 
-    def test_demo_flags_must_be_boolean_and_allow_missing_reference(self):
+    def test_fixed_target_requires_boolean_flag_and_valid_height(self):
+        for value in ('true', 1, None):
+            data = copy.deepcopy(load())
+            data['automatik']['zielwasserstand_fest'] = value
+            with self.assertRaises(ValueError):
+                validate(data)
+        for value in (-1, float('nan'), float('inf'), True, None):
+            data = copy.deepcopy(load())
+            data['automatik']['zielwasserstand_cm'] = value
+            with self.assertRaises(ValueError):
+                validate(data)
         data = copy.deepcopy(load())
-        for i in range(1, 5):
-            data[f'moos_{i}']['demo'] = True
-            data[f'moos_{i}']['bezugsabstand_cm'] = None
+        data['automatik'].update(zielwasserstand_fest=True, zielwasserstand_cm=0)
         validate(data)
-        data['moos_2']['demo'] = 'true'
-        with self.assertRaises(ValueError): validate(data)
-
-    def test_legacy_config_fields_are_rejected(self):
-        data = copy.deepcopy(load())
-        data['moos_demo'] = {'demo_data': True}
-        with self.assertRaises(ValueError): validate(data)
-        data = copy.deepcopy(load())
-        data['deckel'] = {'offen_abstand_cm': 12.0}
-        with self.assertRaises(ValueError): validate(data)
-
-    def test_demo_distance_is_validated_without_defaults(self):
-        data = copy.deepcopy(load())
-        data['moos_1']['bezugsabstand_cm'] = 6.94
-        data['moos_1']['demo_abstand_cm'] = 7.94
-        data['moos_2']['bezugsabstand_cm'] = None
-        data['moos_2']['demo_abstand_cm'] = None
-        result = validate(data)
-        self.assertEqual(result['moos_1']['demo_abstand_cm'], 7.94)
-        self.assertIsNone(result['moos_2']['demo_abstand_cm'])
-        result['moos_1']['demo_abstand_cm'] = -1
-        with self.assertRaises(ValueError): validate(result)
 
     def test_actuator_gpio_collisions_and_invalid_frequency_are_rejected(self):
         data = copy.deepcopy(load())

@@ -1,31 +1,10 @@
 """Calibrated moss height from staggered ultrasonic sensors."""
 
 import statistics
-import random
 import time
 from collections import deque
 
 from water_level import TimestampUltrasonic
-
-
-class WaterNoise:
-    """Estimate water distance dispersion from the last minute of raw echoes."""
-
-    WINDOW_S = 60
-    MIN_SAMPLES = 5
-
-    def __init__(self):
-        self.samples = deque()
-
-    def add(self, now, value):
-        self.samples.append((now, value))
-
-    def sigma(self, now):
-        while self.samples and self.samples[0][0] < now - self.WINDOW_S:
-            self.samples.popleft()
-        if len(self.samples) < self.MIN_SAMPLES:
-            return None
-        return statistics.stdev(value for _, value in self.samples)
 
 
 class MossHeight(TimestampUltrasonic):
@@ -33,35 +12,20 @@ class MossHeight(TimestampUltrasonic):
     WINDOW_S = 60
     PLATFORM_HEIGHT_CM = 6.0
 
-    def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None,
-                 demo_distance_cm=None, demo_sigma_cm=None, demo_enabled=None):
-        self.demo_enabled = demo_distance_cm is not None if demo_enabled is None else demo_enabled
-        self.demo_distance_cm = demo_distance_cm
-        self.demo_sigma_cm = demo_sigma_cm
-        if not self.demo_enabled:
-            super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
+    def __init__(self, gpio, handle, trigger_pin, echo_pin, empty_distance_cm=None):
+        super().__init__(gpio, handle, trigger_pin, echo_pin, pull_down=True)
         self.empty_distance_cm = empty_distance_cm
         self.recent_distances = deque()
 
-    def close(self):
-        if not self.demo_enabled:
-            super().close()
-
     def read(self):
-        if self.demo_enabled:
-            if self.demo_distance_cm is None or self.demo_sigma_cm is None:
-                return None
-            distance = max(0.001, min(self.MAX_DISTANCE_CM,
-                                      random.gauss(self.demo_distance_cm, self.demo_sigma_cm)))
-        else:
-            distance = super()._distance_cm()
+        distance = super()._distance_cm()
         if distance is None or not 0 < distance <= self.MAX_DISTANCE_CM:
             return None
         now = time.monotonic()
         self.recent_distances.append((now, distance))
         while self.recent_distances and self.recent_distances[0][0] < now - self.WINDOW_S:
             self.recent_distances.popleft()
-        result = {"distance_cm": distance, "demo_data": self.demo_enabled}
+        result = {"distance_cm": distance}
         if self.empty_distance_cm is not None:
             result["height_cm"] = max(0.0, self.PLATFORM_HEIGHT_CM + self.empty_distance_cm - result["distance_cm"])
             minute_distance = statistics.median(value for _, value in self.recent_distances)

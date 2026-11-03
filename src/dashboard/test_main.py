@@ -88,14 +88,14 @@ class DashboardTests(unittest.TestCase):
                 water['max_fuellhoehe_cm'] = None
                 self.assertFalse(main.water_pump_allowed())
 
-    def test_automatic_water_combines_demo_moss_with_real_water(self):
+    def test_automatic_water_waits_for_stable_real_moss(self):
         from test_pump_control import CONFIG
         config = dict(CONFIG, wasserstand=dict(CONFIG['wasserstand'], sensor_boden_abstand_cm=8.265),
                       moos_1={'bezugsabstand_cm': 6.94}, moos_2={'bezugsabstand_cm': 6.059})
         now = time.time()
         readings = [dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=now)
                     for side in ('moss1', 'moss2')
-                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1), ('demo_data', True)]]
+                    for field, value in [('height_median_1m_cm', 7.5), ('measurement_stable', 1)]]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'water.json'
             path.write_text(json.dumps({'sampled': now, 'distance_cm': 4.0,

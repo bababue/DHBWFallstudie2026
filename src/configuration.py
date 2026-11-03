@@ -18,15 +18,16 @@ def validate(data):
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
               'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000), 'WATER_FILTER_SAMPLES': (3, 31), 'WATER_MAX_SPREAD_CM': (.01, 5),
-              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2)}
+              'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2),
+              'FIXED_WATER_TARGET_CM': (0, 400)}
     for group, keys in expected.items():
         if not isinstance(data[group], dict) or set(data[group]) != keys:
             raise ValueError(f'{group}: unbekannte oder fehlende Einstellungen')
     for name, (group, key) in KEYS.items():
         value = data[group][key]
-        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name.endswith('DEMO_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
+        if value is None and (name.endswith('EMPTY_DISTANCE_CM') or name == 'WATER_MAX_LEVEL_CM'):
             continue
-        if name.startswith('MOSS_') and name.endswith('_DEMO'):
+        if name == 'FIXED_WATER_TARGET_ENABLED':
             if type(value) is not bool:
                 raise ValueError(f'{group}.{key}: true oder false erforderlich')
             continue

@@ -55,11 +55,22 @@ eintreffen, werden nicht als aktuell weiterverwendet.
 
 Hardware und Sollwerte stehen in `config/config.json`; Zugangsdaten stehen in
 `.env`. Die Konfigurationsdatei wird in die Container nur lesbar eingebunden.
-`moos_1.demo` und `moos_2.demo` sind derzeit `true` und erzeugen synthetische
-Messwerte. Für echte Sensoren auf `false` setzen. Details zum Aufbau stehen in
-[HARDWARE.md](HARDWARE.md).
+Die Sensoren liefern ausschließlich echte Messungen. Details zum Aufbau stehen
+in [HARDWARE.md](HARDWARE.md).
 
-Änderungen an Sensorpins, Intervallen oder Demo-Modus starten `sensors`
+Ein fester Zielwasserstand lässt sich unter `automatik` vorgeben:
+
+```json
+"zielwasserstand_fest": true,
+"zielwasserstand_cm": 5.0
+```
+
+Die Höhe wird in cm ab Tankboden angegeben. Standardmäßig ist die Flag `false`;
+dann folgt das Ziel den stabilen Moosmessungen mit 2,5 cm Abstand.
+Das Dashboard zeigt „Fest eingestellt“ an, wenn die Vorgabe aktiv ist.
+Wasserstandssperre, Glättung und Sicherheitsgrenze gelten weiterhin.
+
+Änderungen an Sensorpins oder Intervallen starten `sensors`
 automatisch neu. Einstellungen in `automatik` werden live gelesen. Nach einer
 Änderung an Aktor-GPIOs oder PWM-Frequenzen Dashboard und Sensorprozess neu
 starten:

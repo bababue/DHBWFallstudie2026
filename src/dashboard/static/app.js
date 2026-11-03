@@ -521,16 +521,21 @@ function initMetric(metric, unit) {
         document.getElementById("water-target").textContent = fmt(
           state.target_cm,
         );
+        document.getElementById("water-target-source").textContent =
+          state.target_source === "fixed"
+            ? (state.target_limited ? "Fest eingestellt · sicherheitsbegrenzt" : "Fest eingestellt")
+            : "Aus Moosmessungen";
         setReading(
           "water-moss",
           fmt(state.moss_height_cm),
           state.moss_averaged === true,
         );
         document.getElementById("water-source").textContent =
-          state.reason && (!state.water_ready || !state.pump_allowed || state.target_cm === null)
+          state.reason && (!state.water_ready || !state.pump_allowed || state.target_cm === null || state.reason.startsWith("Warte"))
             ? state.reason
             : "";
       } catch (e) {
+        document.getElementById("water-target-source").textContent = "";
         for (const id of ["water", "water-target", "water-moss"]) {
           setReading(id, "–");
         }

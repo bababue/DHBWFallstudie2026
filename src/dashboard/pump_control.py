@@ -2,6 +2,7 @@
 import math
 import json
 import statistics
+import time
 from threading import Lock
 
 
@@ -11,11 +12,17 @@ def valid_number(value):
 
 def target_level(config, moss_height):
     maximum = config['wasserstand']['max_fuellhoehe_cm']
-    if maximum is None or not valid_number(moss_height):
+    if maximum is None:
         return None
     options = config['automatik']
+    if options.get('zielwasserstand_fest', False):
+        desired = options['zielwasserstand_cm']
+    elif valid_number(moss_height):
+        desired = moss_height - options['wasser_unter_moosspitzen_cm']
+    else:
+        return None
     ceiling = maximum - config['wasserstand']['sicherheitsabstand_cm'] - options['pumpe_hysterese_cm']
-    return max(0.0, min(moss_height - options['wasser_unter_moosspitzen_cm'], ceiling))
+    return max(0.0, min(desired, ceiling))
 
 
 def pump_ready(data):
@@ -34,7 +41,11 @@ def water_overview(readings, config, now):
                 and valid_number(reading.get('value')) and reading['value'] >= 0):
             heights.append(reading['value'])
     height = sum(heights) / len(heights) if heights else None
-    return {'moss_height_cm': height, 'moss_averaged': len(heights) > 1, 'target_cm': target_level(config, height)}
+    target = target_level(config, height)
+    fixed = config['automatik'].get('zielwasserstand_fest', False)
+    return {'moss_height_cm': height, 'moss_averaged': len(heights) > 1, 'target_cm': target,
+            'target_source': 'fixed' if fixed else 'moss',
+            'target_limited': bool(fixed and target is not None and target < config['automatik']['zielwasserstand_cm'])}
 
 
 class StableWaterTarget:
@@ -61,6 +72,8 @@ class StableWaterTarget:
                 self.reset()
                 self.signature = signature
             result = water_overview(readings, config, now)
+            if config['automatik'].get('zielwasserstand_fest', False):
+                return result
             expected = {f'moss{i}' for i in range(1, 5)
                         if config.get(f'moos_{i}', {}).get('bezugsabstand_cm') is not None}
             fresh = {(r['side'], r['field']): r for r in readings
@@ -104,7 +117,9 @@ class StableWaterTarget:
 
 
 class PumpRegulator:
-    """Run continuously up to the target; hysteresis prevents chatter afterward."""
+    """Confirm low water before filling; stop immediately on high or unsafe readings."""
+
+    LOW_WATER_CONFIRM_SECONDS = 30
 
     def __init__(self):
         self.reset()
@@ -112,19 +127,35 @@ class PumpRegulator:
     def reset(self):
         self.reached = False
         self.reason = ''
+        self.running = False
+        self.below_since = None
 
-    def value(self, data, options):
+    def value(self, data, options, now=None):
+        now = time.monotonic() if now is None else now
         if not pump_ready(data):
+            self.running = False
+            self.below_since = None
             self.reason = 'Warte auf sichere Messwerte'
             return 0
         target, level = data['target_cm'], data['water_level_cm']
         if target <= 0 or max(level, data['raw_level_cm']) >= target:
             self.reached = True
+            self.running = False
+            self.below_since = None
             self.reason = 'Zielwasserstand erreicht'
             return 0
-        if self.reached and level >= target - options['pumpe_hysterese_cm']:
+        if self.reached and max(level, data['raw_level_cm']) >= target - options['pumpe_hysterese_cm']:
+            self.running = False
+            self.below_since = None
             self.reason = 'Zielwasserstand erreicht'
             return 0
+        if not self.running:
+            if self.below_since is None:
+                self.below_since = now
+            if now - self.below_since < self.LOW_WATER_CONFIRM_SECONDS:
+                self.reason = 'Warte auf bestätigten niedrigen Wasserstand'
+                return 0
+            self.running = True
         self.reached = False
         self.reason = 'Wasser wird nachgefüllt'
         return options['pumpe_leistung_prozent']

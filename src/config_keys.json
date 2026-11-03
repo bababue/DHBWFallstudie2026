@@ -119,38 +119,6 @@
     "moos_4",
     "bezugsabstand_cm"
   ],
-  "MOSS_1_DEMO": [
-    "moos_1",
-    "demo"
-  ],
-  "MOSS_2_DEMO": [
-    "moos_2",
-    "demo"
-  ],
-  "MOSS_3_DEMO": [
-    "moos_3",
-    "demo"
-  ],
-  "MOSS_4_DEMO": [
-    "moos_4",
-    "demo"
-  ],
-  "MOSS_1_DEMO_DISTANCE_CM": [
-    "moos_1",
-    "demo_abstand_cm"
-  ],
-  "MOSS_2_DEMO_DISTANCE_CM": [
-    "moos_2",
-    "demo_abstand_cm"
-  ],
-  "MOSS_3_DEMO_DISTANCE_CM": [
-    "moos_3",
-    "demo_abstand_cm"
-  ],
-  "MOSS_4_DEMO_DISTANCE_CM": [
-    "moos_4",
-    "demo_abstand_cm"
-  ],
   "LED_GPIO": [
     "aktoren",
     "licht_gpio"
@@ -210,5 +178,13 @@
   "WATER_BELOW_MOSS_CM": [
     "automatik",
     "wasser_unter_moosspitzen_cm"
+  ],
+  "FIXED_WATER_TARGET_ENABLED": [
+    "automatik",
+    "zielwasserstand_fest"
+  ],
+  "FIXED_WATER_TARGET_CM": [
+    "automatik",
+    "zielwasserstand_cm"
   ]
 }
