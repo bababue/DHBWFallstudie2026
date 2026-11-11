@@ -138,6 +138,11 @@
                   <td id="ultrasonic-moss4-inliers">–</td>
                   <td id="ultrasonic-moss4-calculated">–</td>
                 </tr>
+                <tr>
+                  <th scope="row">Median Mooshöhe</th>
+                  <td colspan="3"></td>
+                  <td id="ultrasonic-moss-median">–</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -219,15 +224,10 @@
           </section>
         </div>
         <section class="card ultrasonic-panel">
-          <p class="label">Berechnete Höhen</p>
-          <div class="ultrasonic-legend" aria-label="Messstellen">
-            <span style="color:#2563eb">Wasser</span><span style="color:#15803d">Moos 1</span>
-            <span style="color:#d97706">Moos 2</span><span style="color:#7c3aed">Moos 3</span>
-            <span style="color:#dc2626">Moos 4</span>
-          </div>
+          <p class="label">Median der Mooshöhe</p>
           <div class="chart-container">
             <svg class="chart" id="ultrasonic-chart" viewBox="0 0 800 230"
-              role="img" aria-label="Verlauf der berechneten Wasser- und Mooshöhen"></svg>
+              role="img" aria-label="Verlauf der medianen Mooshöhe"></svg>
           </div>
           <p class="status chart-status"
             id="ultrasonic-status">Lade Verlauf …</p>

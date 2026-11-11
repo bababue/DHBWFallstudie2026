@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import statistics
 import tempfile
 import time
 import uuid
@@ -226,8 +227,12 @@ def debug_sensors():
                     calculated = mount - value
         ultrasonic[side] = {'raw_cm': raw_value, 'filtered_cm': value,
                             'inlier_percent': inlier_percent, 'calculated_cm': calculated}
+    moss_heights = [ultrasonic[side]['calculated_cm']
+                    for side in ('moss1', 'moss2', 'moss3', 'moss4')
+                    if valid_number(ultrasonic[side]['calculated_cm'])]
     settings = config['ultraschall_glaettung']
     return {'readings': readings, 'ultrasonic': ultrasonic, 'ultrasonic_status': ultrasonic_status,
+            'moss_median_cm': statistics.median(moss_heights) if moss_heights else None,
             'filter': {'samples': settings['messungen'], 'max_gap_seconds': settings['max_messpause_s'],
                        'water_spread_cm': settings['wasser_streuung_cm'], 'moss_spread_cm': settings['moos_streuung_cm']},
             'moss_mounting_height_cm': config['moos']['montagehoehe_cm'],
@@ -307,35 +312,34 @@ def ultrasonic_history(period: str = '1h'):
         return Response('Ungültiger Zeitraum', status_code=400)
     duration, window, _ = PERIODS[period]
     if period == '10m':
-        window = '1s'
+        window = '4s'
     org = setting('INFLUXDB_ORG', 'moos')
     bucket = setting('INFLUXDB_BUCKET', 'moos_sensors')
-    sides = ('tank', 'moss1', 'moss2', 'moss3', 'moss4')
-    moss_filter = ' or '.join(f'r.side == {json.dumps(side)}' for side in sides[1:])
+    sides = ('moss1', 'moss2', 'moss3', 'moss4')
+    moss_filter = ' or '.join(f'r.side == {json.dumps(side)}' for side in sides)
     query = (f'from(bucket: {json.dumps(bucket)})\n'
              f'  |> range(start: -{duration})\n'
              '  |> filter(fn: (r) => r._measurement == "moos_sensor" '
-             'and r.sensor == "ultrasonic" '
-             'and ((r.side == "tank" and r._field == "water_level_cm") '
-             f'or (({moss_filter}) and r._field == "distance_filtered_cm")))\n'
+             'and r.sensor == "ultrasonic" and r._field == "distance_filtered_cm" '
+             f'and ({moss_filter}))\n'
              f'  |> aggregateWindow(every: {window}, fn: last, createEmpty: false, timeSrc: "_start")')
-    series = {side: [] for side in sides}
+    series = {'moss_median': []}
     try:
         moss_mount = load()['moos']['montagehoehe_cm']
+        windows = {}
         with InfluxDBClient(url=setting('INFLUXDB_URL', 'http://influxdb:8086'),
                             token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
             for table in client.query_api().query(query, org=org):
                 for record in table.records:
                     side, value = record.values.get('side'), record.get_value()
-                    if side not in series or not valid_number(value):
+                    if side not in sides or not valid_number(value) or moss_mount is None:
                         continue
-                    if side != 'tank':
-                        if moss_mount is None:
-                            continue
-                        value = moss_mount - value
-                    series[side].append({'time': int(record.get_time().timestamp()), 'value': value})
-        for points in series.values():
-            points.sort(key=lambda point: point['time'])
+                    timestamp = int(record.get_time().timestamp())
+                    windows.setdefault(timestamp, {})[side] = moss_mount - value
+        series['moss_median'] = [
+            {'time': timestamp, 'value': statistics.median(heights.values())}
+            for timestamp, heights in sorted(windows.items())
+        ]
         return {'series': series, 'window_seconds': int(window[:-1]) * (60 if window.endswith('m') else 1)}
     except Exception:
         LOG.exception('Ultraschallverlauf nicht verfügbar')

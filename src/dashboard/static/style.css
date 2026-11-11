@@ -260,22 +260,6 @@ h1 {
 .ultrasonic-panel {
   grid-column: 1 / -1;
 }
-.ultrasonic-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  margin: 12px 0;
-  font-size: .9rem;
-}
-.ultrasonic-legend span::before {
-  content: "";
-  display: inline-block;
-  width: 18px;
-  border-top: 2px solid;
-  vertical-align: middle;
-  margin-right: 6px;
-}
-
 .overview-row {
   grid-column: 1/-1;
   display: grid;

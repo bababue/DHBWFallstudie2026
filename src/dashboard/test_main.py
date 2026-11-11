@@ -156,7 +156,8 @@ class DashboardTests(unittest.TestCase):
         with patch.object(main, 'live_readings', return_value=data), \
                 patch.object(main, 'load', return_value=config), \
                 patch.object(main.time, 'time', return_value=now):
-            result = main.debug_sensors()['ultrasonic']
+            debug = main.debug_sensors()
+            result = debug['ultrasonic']
         self.assertEqual(result['tank'], dict(raw_cm=4, filtered_cm=4.1,
                                               inlier_percent=75, calculated_cm=4.165))
         self.assertAlmostEqual(result['moss1']['calculated_cm'], config['moos']['montagehoehe_cm'] - 5.2)
@@ -166,6 +167,7 @@ class DashboardTests(unittest.TestCase):
         self.assertAlmostEqual(result['moss3']['calculated_cm'], config['moos']['montagehoehe_cm'] - 5)
         self.assertEqual(result['moss4'], dict(raw_cm=5, filtered_cm=None,
                                                inlier_percent=0, calculated_cm=None))
+        self.assertAlmostEqual(debug['moss_median_cm'], config['moos']['montagehoehe_cm'] - 5.1)
 
     def test_ultrasonic_debug_uses_one_shared_mounting_height(self):
         config = main.load()
@@ -177,6 +179,7 @@ class DashboardTests(unittest.TestCase):
             result = main.debug_sensors()
         self.assertIsNone(result['moss_mounting_height_cm'])
         self.assertIsNone(result['ultrasonic']['moss1']['calculated_cm'])
+        self.assertIsNone(result['moss_median_cm'])
 
     def test_ultrasonic_debug_does_not_mix_old_water_or_inconsistent_samples(self):
         now = 100
@@ -258,12 +261,13 @@ class DashboardTests(unittest.TestCase):
         calls = client.query_api.return_value.query.call_args_list
         self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[0].args[0])
 
-    def test_ultrasonic_history_returns_five_calculated_height_series(self):
+    def test_ultrasonic_history_returns_one_median_height_series(self):
         def record(side, value, hour):
             return SimpleNamespace(values={'side': side}, get_value=lambda: value,
                                    get_time=lambda: datetime(2026, 1, 1, hour, tzinfo=timezone.utc))
         table = SimpleNamespace(records=[record('moss1', 5.6, 2), record('tank', 4.2, 0),
-                                         record('moss1', 5.5, 1), record('moss2', 5.7, 0),
+                                         record('moss1', 5.5, 1), record('moss1', 5, 0),
+                                         record('moss2', 5.7, 0),
                                          record('moss3', 5.8, 0), record('moss4', 5.9, 0),
                                          record('other', 7, 0), record('tank', float('nan'), 1)])
         client = MagicMock()
@@ -274,15 +278,19 @@ class DashboardTests(unittest.TestCase):
         with patch.object(main, 'InfluxDBClient', return_value=client), \
                 patch.object(main, 'load', return_value=config):
             result = main.ultrasonic_history('1h')
-        self.assertEqual(list(result['series']), ['tank', 'moss1', 'moss2', 'moss3', 'moss4'])
-        self.assertEqual([point['value'] for point in result['series']['moss1']], [4.5, 4.4])
-        self.assertEqual([point['value'] for point in result['series']['tank']], [4.2])
+            short = main.ultrasonic_history('10m')
+            config['moos']['montagehoehe_cm'] = None
+            without_mount = main.ultrasonic_history('1h')
+        self.assertEqual(list(result['series']), ['moss_median'])
+        self.assertEqual([point['value'] for point in result['series']['moss_median']], [4.25, 4.5, 4.4])
         self.assertEqual(result['window_seconds'], 10)
         query = client.query_api.return_value.query.call_args.args[0]
-        self.assertIn('r._field == "water_level_cm"', query)
         self.assertIn('r._field == "distance_filtered_cm"', query)
         self.assertIn('fn: last', query)
+        self.assertNotIn('water_level_cm', query)
         self.assertNotIn('r._field == "distance_cm"', query)
+        self.assertEqual(short['window_seconds'], 4)
+        self.assertEqual(without_mount['series']['moss_median'], [])
         self.assertEqual(main.ultrasonic_history('invalid').status_code, 400)
 
 
