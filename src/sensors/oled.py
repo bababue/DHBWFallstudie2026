@@ -147,11 +147,11 @@ def overview_values(readings):
     }
 
 
-def render(readings):
+def render(readings, mode='AUTO'):
     """Draw the current dashboard values on the sensor overview."""
     values = overview_values(readings)
     image = Bild()
-    image.text(0, 0, "Sensoren")
+    image.text(0, 0, f"Sensoren {mode}")
     image.rechteck(0, 9, BREITE, 1)
     rows = (("Abstand", "moos", "cm"), ("Temp", "temperatur", "°C"),
             ("Luft", "luftfeuchtigkeit", "%"), ("CO2", "co2", "ppm"),
@@ -162,17 +162,5 @@ def render(readings):
         value = values[key]
         text = "--" if value is None else f"{value:.1f}".replace(".", ",") + " " + unit
         image.text_rechts(127, y, text)
-    return image.daten
-
-
-def render_mode(mode):
-    """Draw the selected mode without activating any control behavior."""
-    image = Bild()
-    image.text(0, 0, "Modus")
-    image.rechteck(0, 9, BREITE, 1)
-    scale = 1 if mode == "MANUAL" else 2
-    width = (len(mode) * 6 - 1) * scale
-    image.text((BREITE - width) // 2, 26 if scale == 2 else 32, mode, scale)
-    image.text(0, 56, "Klick: weiter")
     return image.daten
 

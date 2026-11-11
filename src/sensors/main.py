@@ -18,7 +18,7 @@ from configuration import load
 from sensors import BH1750, SCD40, SHT45, SoftwareI2C
 from button import ButtonModes, apply_mode_command, start_button_reader
 from moss_distance import MossDistance
-from oled import Oled, render, render_mode
+from oled import Oled, render
 from schedule import ScheduledRead
 from storage import BufferedWriter
 from water_level import WaterLevel
@@ -163,7 +163,7 @@ def run():
             moss_sensors.append(sensor)
             sensors.append((f"moss{index}", sensor))
         oled = Oled(buses[0])
-        modes = ButtonModes()
+        modes = ButtonModes(settings['modus']['manuell_dauer_stunden'] * 3600)
         button_thread = start_button_reader(lgpio, handle, config.button_pin, STOP, modes)
         button_claimed = True
         start_time = time.monotonic()
@@ -186,7 +186,7 @@ def run():
 
         def refresh_display():
             nonlocal next_display, displayed_version
-            mode, show_info, version = modes.snapshot()
+            mode, version = modes.snapshot()
             now = time.monotonic()
             if version == displayed_version and now < next_display:
                 return
@@ -206,8 +206,7 @@ def run():
             except OSError as exc:
                 LOG.warning("Mode publication failed: %s", exc)
             try:
-                frame = (render(display_readings(display_values, now))
-                         if show_info else render_mode(mode))
+                frame = render(display_readings(display_values, now), mode)
                 oled.zeigen(frame)
                 displayed_version = version
             except Exception as exc:
@@ -226,7 +225,8 @@ def run():
                     now = time.monotonic()
                     last_command_id = apply_mode_command(modes, '/run/moos/mode-command.json',
                                                          last_command_id, time.time())
-                    mode, show_info, version = modes.snapshot()
+                    modes.expire(now)
+                    mode, version = modes.snapshot()
                     due = [task for task in tasks if task.ready(now)]
                     if not due and now < next_display and version == displayed_version:
                         STOP.wait(max(0, min(0.05, next_display - now,

@@ -2,7 +2,7 @@
 
 import unittest
 
-from oled import BREITE, HOEHE, Oled, overview_values, render, render_mode
+from oled import BREITE, HOEHE, Oled, overview_values, render
 from main import display_readings, update_display_values
 
 
@@ -50,10 +50,12 @@ class OledTests(unittest.TestCase):
         self.assertEqual(display_readings(values, 11), {})
         self.assertEqual(display_readings(values, 23), {})
 
-    def test_each_mode_has_its_own_screen(self):
-        frames = [render_mode(mode) for mode in ("AUTO", "MANUAL", "MEASURING")]
-        self.assertEqual(len(set(map(bytes, frames))), 3)
-        self.assertTrue(all(len(frame) == BREITE * HOEHE // 8 for frame in frames))
+    def test_mode_is_in_heading_while_sensor_values_stay_visible(self):
+        readings = {("left", "sht45", "temperature_c"): 21.5}
+        auto = render(readings, 'AUTO')
+        manual = render(readings, 'MANUAL')
+        self.assertNotEqual(auto[:BREITE * 2], manual[:BREITE * 2])
+        self.assertEqual(auto[BREITE * 2:], manual[BREITE * 2:])
 
     def test_oled_writes_the_overview_to_i2c(self):
         class Bus:

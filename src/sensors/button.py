@@ -1,4 +1,4 @@
-"""Debounced GPIO button state for the OLED's display modes."""
+"""Debounced GPIO button and timed operating mode."""
 
 import json
 import logging
@@ -13,18 +13,24 @@ MODES = ("AUTO", "MANUAL")
 
 class ButtonModes:
     DEBOUNCE_SECONDS = 0.04
-    HOLD_SECONDS = 0.6
 
-    def __init__(self):
+    def __init__(self, manual_timeout_seconds=3600):
         self._lock = Lock()
         self._raw = False
         self._raw_since = 0.0
         self._pressed = False
-        self._pressed_since = None
-        self._show_info = False
+        self._manual_since = None
+        self._manual_timeout_seconds = manual_timeout_seconds
         self._session = uuid.uuid4().hex
         self._mode = 0
         self._version = 0
+
+    def _set_mode(self, index, now):
+        if self._mode != index:
+            self._mode = index
+            self._manual_since = now if MODES[index] == 'MANUAL' else None
+            self._session = uuid.uuid4().hex
+            self._version += 1
 
     def feed(self, pressed, now):
         with self._lock:
@@ -34,28 +40,19 @@ class ButtonModes:
             if self._pressed != self._raw and now - self._raw_since >= self.DEBOUNCE_SECONDS:
                 self._pressed = self._raw
                 if self._pressed:
-                    self._pressed_since = now
-                else:
-                    if self._pressed_since is not None and now - self._pressed_since < self.HOLD_SECONDS:
-                        self._mode = (self._mode + 1) % len(MODES)
-                        self._session = uuid.uuid4().hex
-                    self._show_info = False
-                    self._pressed_since = None
-                self._version += 1
-            if (self._pressed and not self._show_info and self._pressed_since is not None
-                    and now - self._pressed_since >= self.HOLD_SECONDS):
-                self._show_info = True
-                self._version += 1
+                    self._set_mode((self._mode + 1) % len(MODES), now)
 
-    def set_mode(self, mode):
+    def set_mode(self, mode, now=None):
         if mode not in MODES:
             raise ValueError('Unbekannter Modus')
         with self._lock:
-            index = MODES.index(mode)
-            if self._mode != index:
-                self._mode = index
-                self._session = uuid.uuid4().hex
-                self._version += 1
+            self._set_mode(MODES.index(mode), time.monotonic() if now is None else now)
+
+    def expire(self, now):
+        with self._lock:
+            if (self._manual_since is not None
+                    and now - self._manual_since >= self._manual_timeout_seconds):
+                self._set_mode(MODES.index('AUTO'), now)
 
     def control_state(self):
         with self._lock:
@@ -63,7 +60,7 @@ class ButtonModes:
 
     def snapshot(self):
         with self._lock:
-            return MODES[self._mode], self._show_info, self._version
+            return MODES[self._mode], self._version
 
 
 def apply_mode_command(modes, path, previous_id, now):

@@ -20,6 +20,16 @@ class ConfigurationTests(unittest.TestCase):
         data['messintervalle']['schnelle_sensoren_s'] = 0
         with self.assertRaises(ValueError): validate(data)
 
+    def test_manual_timeout_is_configured_in_hours(self):
+        for value in (0, 169, True, '1'):
+            data = copy.deepcopy(load())
+            data['modus']['manuell_dauer_stunden'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate(data)
+        data = copy.deepcopy(load())
+        data['modus']['manuell_dauer_stunden'] = 1.5
+        validate(data)
+
     def test_ultrasonic_filter_requires_safe_valid_parameters(self):
         for key, value in [('messungen', 2), ('messungen', 102),
                            ('messungen', 15.0),

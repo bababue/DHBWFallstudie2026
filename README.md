@@ -39,9 +39,11 @@ Checkout ohne lokale Änderungen.
 
 ## Bedienung
 
-Der Taster an GPIO 26 wechselt mit kurzem Druck zwischen `AUTO` und `MANUAL`.
-Gedrückthalten zeigt die Sensorübersicht. Nach einem Neustart startet das System
-in `AUTO`. Der Modus lässt sich auch im Dashboard umschalten.
+Der Taster an GPIO 26 wechselt bei jedem Druck zwischen `AUTO` und `MANUAL`.
+Das OLED zeigt dauerhaft die Messwerte und den aktuellen Modus in der Überschrift.
+Nach einem Neustart startet das System in `AUTO`. Der Modus ist auch im Dashboard
+sichtbar und lässt sich dort umschalten. `MANUAL` endet nach der unter
+`modus.manuell_dauer_stunden` eingestellten Zeit (Vorgabe: 1 Stunde) automatisch.
 
 - **AUTO:** Licht und Temperatur werden automatisch geregelt.
 - **MANUAL:** Lüfter und Licht lassen sich im Dashboard einstellen.

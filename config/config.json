@@ -39,6 +39,9 @@
   "taster": {
     "gpio": 26
   },
+  "modus": {
+    "manuell_dauer_stunden": 1
+  },
   "messintervalle": {
     "schnelle_sensoren_s": 1,
     "moos_s": 4,

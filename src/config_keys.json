@@ -71,6 +71,10 @@
     "taster",
     "gpio"
   ],
+  "MANUAL_TIMEOUT_HOURS": [
+    "modus",
+    "manuell_dauer_stunden"
+  ],
   "FAST_SAMPLE_INTERVAL_SECONDS": [
     "messintervalle",
     "schnelle_sensoren_s"
