@@ -262,11 +262,14 @@ h1 {
 }
 .height-readouts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  grid-template-columns: max-content max-content;
+  justify-content: start;
+  gap: clamp(32px, 5vw, 80px);
 }
 @media (max-width: 700px) {
-  .height-readouts { grid-template-columns: 1fr; gap: 16px; }
+  .height-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .height-readouts .metric-readout { flex-wrap: wrap; }
+  .height-readouts .moss-value { font-size: clamp(1.3rem, 5vw, 2rem); }
 }
 
 .ultrasonic-legend {

@@ -1,5 +1,6 @@
 """Dashboard for the current operating mode and camera."""
 import json
+import hashlib
 import logging
 import os
 import statistics
@@ -389,7 +390,11 @@ def request_mode(body: dict):
 
 @app.get('/', response_class=HTMLResponse)
 def index():
-    page = (Path(__file__).parent / 'static' / 'index.html').read_text()
+    static = Path(__file__).parent / 'static'
+    page = (static / 'index.html').read_text()
+    for asset in ('style.css', 'app.js'):
+        version = hashlib.sha256((static / asset).read_bytes()).hexdigest()[:12]
+        page = page.replace(f'/static/{asset}', f'/static/{asset}?v={version}')
     return HTMLResponse(headers={'Cache-Control': 'no-store'}, content=page)
 
 

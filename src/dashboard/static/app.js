@@ -507,9 +507,11 @@ function initUltrasonicChart() {
       const padding = Math.max((high - low) * .1, .5);
       low -= padding;
       high += padding;
+      const width = Math.max(320, chart.clientWidth);
+      chart.setAttribute("viewBox", `0 0 ${width} 230`);
       const ns = "http://www.w3.org/2000/svg",
         left = 55,
-        right = 780,
+        right = width - 20,
         top = 15,
         bottom = 195;
       const x = (time) => left + (time - start) / span * (right - left);
@@ -568,7 +570,7 @@ function initUltrasonicChart() {
     }
   }
   period.addEventListener("change", update);
-  update();
+  new ResizeObserver(update).observe(chart);
   setInterval(update, 30000);
 }
 initUltrasonicChart();
