@@ -46,6 +46,10 @@ class BufferedWriter:
             try:
                 self.write(batch)
             except Exception as error:
+                if getattr(error, 'status', None) in (400, 422):
+                    LOG.error("InfluxDB rejected batch of %d points permanently; "
+                              "not retrying partial writes: %s", len(batch), error)
+                    continue
                 with self.condition:
                     self.pending.extendleft(reversed(batch))
                     self._trim()

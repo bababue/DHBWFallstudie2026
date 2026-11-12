@@ -21,6 +21,26 @@ class ScheduleTests(unittest.TestCase):
 
 
 class StorageTests(unittest.TestCase):
+    def test_permanent_rejection_does_not_block_following_samples(self):
+        stop, rejected, written = Event(), Event(), Event()
+        calls = []
+        def write(points):
+            calls.append(points)
+            if points == [1]:
+                rejected.set()
+                error = RuntimeError('field type conflict')
+                error.status = 422
+                raise error
+            written.set()
+        buffer = BufferedWriter(write, stop)
+        buffer.submit([1])
+        self.assertTrue(rejected.wait(1))
+        buffer.submit([2])
+        self.assertTrue(written.wait(1))
+        stop.set()
+        buffer.close()
+        self.assertEqual(calls, [[1], [2]])
+
     def test_write_happens_in_background(self):
         stop = Event()
         written = Event()

@@ -260,6 +260,14 @@ h1 {
 .ultrasonic-panel {
   grid-column: 1 / -1;
 }
+.height-readouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+@media (max-width: 700px) {
+  .height-readouts { grid-template-columns: 1fr; gap: 16px; }
+}
 
 .ultrasonic-legend {
   display: flex;

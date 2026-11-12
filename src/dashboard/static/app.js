@@ -578,11 +578,17 @@ const debugToggle = document.getElementById("debug-toggle"),
   debugStatus = document.getElementById("debug-status");
 
 async function updateDebug() {
-  if (!debugToggle.checked) return;
   try {
     const response = await fetch("/api/debug/sensors", { cache: "no-store" });
     if (!response.ok) throw Error();
     const data = await response.json();
+    const height = (value) => Number.isFinite(value)
+      ? value.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " cm"
+      : "–";
+    document.getElementById("moss-height").textContent = height(data.moss_median_cm);
+    document.getElementById("water-height").textContent = height(data.ultrasonic.tank.calculated_cm);
+    document.getElementById("moss-height-source").textContent = [1, 2, 3, 4]
+      .map((index) => `${index}: ${height(data.ultrasonic[`moss${index}`].calculated_cm)}`).join("\n");
     if (!debugToggle.checked) return;
     debugPanel.querySelectorAll("tbody [id]").forEach((cell) =>
       cell.textContent = "–"
@@ -641,6 +647,9 @@ async function updateDebug() {
       ? ""
       : "Keine aktuellen Messwerte";
   } catch (e) {
+    document.getElementById("moss-height").textContent = "–";
+    document.getElementById("water-height").textContent = "–";
+    document.getElementById("moss-height-source").textContent = "Messwerte nicht erreichbar";
     if (debugToggle.checked) {
       debugPanel.querySelectorAll("tbody [id]").forEach((cell) =>
         cell.textContent = "–"
@@ -654,6 +663,7 @@ debugToggle.addEventListener("change", () => {
   if (debugToggle.checked) updateDebug();
 });
 setInterval(updateDebug, 1000);
+updateDebug();
 
 const camera = document.getElementById("camera");
 function connectCamera() {

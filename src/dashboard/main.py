@@ -276,11 +276,17 @@ def metric_data(field, unit, period, current_only):
     if field == 'water_level_cm':
         sensor_filter = 'r.sensor == "ultrasonic"'
     side_filter = 'r.side == "tank"' if field == 'water_level_cm' else 'r.side == "left" or r.side == "right"'
+    field_filter = ( '(r._field == "humidity_pct" or r._field == "humidity_pct_float")'
+                    if field == 'humidity_pct' else f'r._field == {json.dumps(field)}')
     base = (f'from(bucket: {json.dumps(bucket)})\n'
             '  |> range(start: -DURATION)\n'
             '  |> filter(fn: (r) => r._measurement == "moos_sensor" and '
-            f'r._field == {json.dumps(field)} and ({sensor_filter}) '
+            f'{field_filter} and ({sensor_filter}) '
             f'and ({side_filter}))\n')
+    if field == 'humidity_pct':
+        base += ('  |> map(fn: (r) => ({r with _value: float(v: r._value), _field: "humidity_pct"}))\n'
+                 '  |> group(columns: ["_measurement", "sensor", "side", "_field"])\n'
+                 '  |> sort(columns: ["_time"])\n')
     history_query = (base.replace('DURATION', duration) +
                      f'  |> aggregateWindow(every: {window}, fn: {function}, createEmpty: false, timeSrc: "_start")')
     selected_sensors = ({'illuminance_lux': {'bh1750'}, 'water_level_cm': {'ultrasonic'},

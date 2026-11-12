@@ -95,7 +95,11 @@ def sample_points(side: str, sensor_name: str, fields: dict[str, float] | None, 
     if fields:
         measurement = Point("moos_sensor").tag("side", side).tag("sensor", sensor_name).time(timestamp, WritePrecision.NS)
         for name, value in fields.items():
-            measurement.field(name, value)
+            # Avoid the legacy integer humidity field without deleting old data.
+            if name == 'humidity_pct':
+                measurement.field('humidity_pct_float', float(value))
+            else:
+                measurement.field(name, value)
         points.append(measurement)
     return points
 

@@ -151,7 +151,7 @@ class SHT45:
         data = self.bus.read(self.address, 6)
         temperature = -45 + 175 * checked_word(data[:3]) / 65535
         humidity = -6 + 125 * checked_word(data[3:]) / 65535
-        return {"temperature_c": temperature, "humidity_pct": min(100, max(0, humidity))}
+        return {"temperature_c": temperature, "humidity_pct": min(100.0, max(0.0, humidity))}
 
 
 class BH1750:
