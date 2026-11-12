@@ -14,24 +14,28 @@ class ThermalTests(unittest.TestCase):
     def value(self, temp, active=True, now=100):
         return self.reg.update(readings(temp), OPTIONS, dict(active=active, level=50), now)
 
-    def test_daytime_cooling_and_dimming(self):
-        self.assertEqual((self.value(21)['fan'], self.value(21)['led']), (0, 50))
-        self.assertEqual((self.value(22)['fan'], self.value(22)['led']), (0, 50))
-        self.assertEqual((self.value(23)['fan'], self.value(23)['led']), (0, 35))
-        self.assertEqual((self.value(24)['fan'], self.value(24)['led']), (5, 15))
-        self.assertEqual(self.value(24.5)['fan'], 50)
+    def test_continuous_outputs_slew_and_immediate_cutoff(self):
+        options = dict(OPTIONS, temperatur_glaettung_s=0, stellwert_aenderung_prozent_pro_s=2)
+        def update(temp, now, active=True):
+            data = [dict(r, sampled=now) for r in readings(temp)]
+            return self.reg.update(data, options, dict(active=active, level=100), now)
+        self.assertEqual(update(20.5, 100)['led'], 0)
+        self.assertEqual(update(20.5, 110)['led'], 20)
+        self.assertEqual(update(20.5, 150)['led'], 100)
+        result = update(23, 170)
+        self.assertEqual(result['fan'], 33)
+        self.assertEqual(result['led'], 67)
+        result = update(25, 170.1)
+        self.assertEqual((result['fan'], result['led']), (100, 0))
+        self.assertEqual(update(24, 180)['led'], 0)
+        self.assertGreater(update(23.9, 190)['led'], 0)
+        self.assertEqual(update(23, 250, False)['fan'], 0)
 
-    def test_cutoff_and_recovery_hysteresis(self):
-        self.assertEqual(self.value(25)['led'], 0)
-        self.assertEqual(self.value(24.5)['fan'], 100)
-        self.assertEqual(self.value(24)['led'], 0)
-        self.assertGreater(self.value(23.9)['led'], 0)
-
-    def test_night_stays_dark_but_overheat_protected(self):
-        self.assertEqual(self.value(23, False)['fan'], 0)
-        self.assertEqual(self.value(23, False)['led'], 0)
-        self.assertEqual(self.value(25, False)['fan'], 100)
-        self.assertEqual(self.value(23, False)['fan'], 0)
+    def test_smoothing_cannot_delay_raw_overheat(self):
+        self.value(20)
+        data = [dict(r, sampled=101) for r in readings(25)]
+        result = self.reg.update(data, OPTIONS, dict(active=True, level=100), 101)
+        self.assertEqual((result['fan'], result['led']), (100, 0))
 
     def test_stale_or_missing_sides_fail_safe(self):
         self.assertEqual(self.value(22, now=113)['led'], 0)
@@ -44,12 +48,6 @@ class ThermalTests(unittest.TestCase):
         self.assertEqual(temperatures(data, 100), [21, 25])
         self.assertEqual(temperatures(data[1:], 100), [30, 25])
         self.assertEqual(self.reg.update(data, OPTIONS, dict(active=True, level=100), 100)['led'], 0)
-
-    def test_fan_deadband(self):
-        self.assertEqual(self.value(23.9)['fan'], 0)
-        self.assertGreater(self.value(24)['fan'], 0)
-        self.assertGreater(self.value(23.5)['fan'], 0)
-        self.assertEqual(self.value(23.4)['fan'], 0)
 
 class IntegrationTests(unittest.TestCase):
     def test_auto_controls_actual_outputs_and_manual_is_untouched(self):

@@ -28,6 +28,9 @@ def validate(data):
     check_structure(data, expected)
     pins = []
     limits = {'FAST_SAMPLE_INTERVAL_SECONDS': (.5, 60), 'MOSS_SAMPLE_INTERVAL_SECONDS': (4, 60),
+              'AUTO_LIGHT_TRANSITION_MINUTES': (0, 120),
+              'AUTO_SLEW_PERCENT_PER_SECOND': (.1, 100),
+              'AUTO_TEMPERATURE_SMOOTHING_SECONDS': (0, 120),
               'CO2_READY_POLL_SECONDS': (.2, 5), 'I2C_DELAY_US': (5, 1000),
               'MANUAL_TIMEOUT_HOURS': (.1, 168),
               'AUTO_TEMPERATURE_TARGET_C': (5, 30), 'AUTO_TEMPERATURE_MAX_C': (7, 35), 'WATER_BELOW_MOSS_CM': (0, 400), 'PUMP_HYSTERESIS_CM': (.05, 2),
@@ -38,6 +41,10 @@ def validate(data):
         for key in path:
             value = value[key]
         group, key = '.'.join(path[:-1]), path[-1]
+        if name == 'DEMO_ENABLED':
+            if type(value) is not bool:
+                raise ValueError('demo.aktiv: true oder false erforderlich')
+            continue
         if value is None and name.endswith('MOUNT_HEIGHT_CM'):
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -49,7 +56,7 @@ def validate(data):
         elif name in ('AUTO_LIGHT_START_HOUR', 'AUTO_LIGHT_DURATION_HOURS', 'AUTO_LIGHT_LEVEL_PERCENT'):
             low, high = {'AUTO_LIGHT_START_HOUR': (0, 23), 'AUTO_LIGHT_DURATION_HOURS': (1, 23),
                          'AUTO_LIGHT_LEVEL_PERCENT': (0, 100)}[name]
-            if type(value) is not int or not low <= value <= high or (name == 'AUTO_LIGHT_LEVEL_PERCENT' and 0 < value < 5):
+            if type(value) is not int or not low <= value <= high:
                 raise ValueError(f'{group}.{key}: erlaubte ganze Zahl {low} bis {high}')
         elif name == 'ULTRASONIC_FILTER_SAMPLES':
             if type(value) is not int or not 3 <= value <= 101:

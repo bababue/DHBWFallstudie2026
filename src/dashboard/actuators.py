@@ -64,8 +64,9 @@ class Actuators:
             self.gpio.tx_pwm(self.handle, pin, hz, duty)
 
     def set(self, device: str, value: int) -> dict[str, int]:
-        if device not in self.values or type(value) is not int or not (value == 0 or 5 <= value <= 100):
-            raise ValueError("Device must be led, fan or pump and value 0 or an integer 5..100")
+        minimum = 1 if device == 'led' else 5
+        if device not in self.values or type(value) is not int or not (value == 0 or minimum <= value <= 100):
+            raise ValueError("Device must be led, fan or pump; LED accepts 0..100, motors 0 or 5..100 integers")
         with self.lock:
             if self.closed:
                 raise RuntimeError("GPIO controller is closed")
@@ -74,6 +75,10 @@ class Actuators:
             pin, hz = self.pins[device], self.frequencies[device]
             old = self.values[device]
             if device in self.BOOSTS:
+                if value > 0 and self.timers[device] is not None:
+                    # Keep the original start deadline; apply the newest target afterward.
+                    self.values[device] = value
+                    return dict(self.values)
                 self.generations[device] += 1
                 if self.timers[device] is not None:
                     self.timers[device].cancel()

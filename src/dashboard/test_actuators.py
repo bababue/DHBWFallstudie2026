@@ -72,6 +72,39 @@ class ActuatorTests(unittest.TestCase):
         self.assertEqual(self.control.status()['pump'], 0)
         self.control.set('pump', 0)
 
+    def test_updates_during_boost_keep_original_timer_and_use_latest_target(self):
+        with patch('actuators.threading.Timer') as timer:
+            self.control.set('fan', 5)
+            generation = self.control.generations['fan']
+            calls = list(self.gpio.calls)
+            for target in (6, 12, 65):
+                self.control.set('fan', target)
+            timer.assert_called_once()
+            timer.return_value.cancel.assert_not_called()
+            self.assertEqual(self.gpio.calls, calls)
+            self.assertEqual(self.control.generations['fan'], generation)
+            self.assertEqual(self.control.status()['fan'], 65)
+            self.control._finish_boost('fan', generation)
+            self.assertEqual(self.gpio.calls[-1], ('pwm', 21, 5, self.control.duty('fan', 65)))
+
+    def test_old_boost_callback_cannot_finish_new_start(self):
+        with patch('actuators.threading.Timer'):
+            self.control.set('fan', 5)
+            old_generation = self.control.generations['fan']
+            self.control.set('fan', 0)
+            self.assertEqual(self.gpio.calls[-1], ('write', 21, 0))
+            self.control.set('fan', 10)
+            calls = list(self.gpio.calls)
+            self.control._finish_boost('fan', old_generation)
+            self.assertEqual(self.gpio.calls, calls)
+            self.control._finish_boost('fan', self.control.generations['fan'])
+            self.assertEqual(self.gpio.calls[-1], ('pwm', 21, 5, self.control.duty('fan', 10)))
+
+    def test_led_supports_one_percent_ramp_resolution(self):
+        for value in (1, 2, 3, 4):
+            self.control.set('led', value)
+            self.assertEqual(self.gpio.calls[-1], ('pwm', 20, 200, value))
+
     def test_stop_during_boost_keeps_both_motors_off(self):
         with patch("actuators.threading.Timer"):
             self.control.set("fan", 50)

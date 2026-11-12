@@ -1,4 +1,9 @@
 {
+  "AUTO_LIGHT_TRANSITION_MINUTES": ["automatik", "licht_uebergang_minuten"],
+  "AUTO_SLEW_PERCENT_PER_SECOND": ["automatik", "stellwert_aenderung_prozent_pro_s"],
+  "AUTO_TEMPERATURE_SMOOTHING_SECONDS": ["automatik", "temperatur_glaettung_s"],
+  "DEMO_ENABLED": ["demo", "aktiv"],
+  "DEMO_MOSS_OFFSET_CM": ["demo", "moos_ueber_wasser_cm"],
   "LEFT_I2C_SDA_GPIO": [
     "i2c",
     "links_sda_gpio"

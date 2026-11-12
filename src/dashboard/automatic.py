@@ -23,14 +23,18 @@ def light_schedule(config=None, now=None):
     minute = now.hour * 60 + now.minute
     start = config['licht_start_stunde'] * 60
     duration = config['lichtdauer_stunden'] * 60
+    elapsed = (minute + now.second / 60 - start) % 1440
+    transition = min(config.get('licht_uebergang_minuten', 20), duration / 2)
+    factor = min(1, elapsed / transition, (duration-elapsed) / transition) if transition else 1
+    level = config['lichtstaerke_prozent'] * max(0, factor) if elapsed < duration else 0
     return {'start': start, 'duration': duration, 'current': minute,
             'active': (minute - start) % 1440 < duration,
-            'level': config['lichtstaerke_prozent']}
+            'level': level}
 
 
 def auto_setpoints(schedule):
     """Set the LED by the local daily schedule; other outputs are currently off."""
-    return {'fan': 0, 'pump': 0, 'led': schedule['level'] if schedule['active'] else 0}
+    return {'fan': 0, 'pump': 0, 'led': round(schedule['level']) if schedule['active'] else 0}
 
 
 class AutomaticControl:
@@ -89,6 +93,8 @@ class AutomaticControl:
         if context != self.context:
             self.disable_pump()
             self.context = context
+            self.thermal = ThermalRegulator()
+            self.thermal.outputs.update(self.actuators.status())
         if self.get_water_state is not None:
             self.water_state = self.get_water_state(config)
         current = self.actuators.status()

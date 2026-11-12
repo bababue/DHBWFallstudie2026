@@ -1,4 +1,8 @@
 {
+  "demo": {
+    "aktiv": true,
+    "moos_ueber_wasser_cm": 2
+  },
   "i2c": {
     "links_sda_gpio": 15,
     "links_scl_gpio": 14,
@@ -58,7 +62,10 @@
   "automatik": {
     "licht_start_stunde": 6,
     "lichtdauer_stunden": 16,
-    "lichtstaerke_prozent": 50,
+    "lichtstaerke_prozent": 100,
+    "licht_uebergang_minuten": 20,
+    "stellwert_aenderung_prozent_pro_s": 2,
+    "temperatur_glaettung_s": 10,
     "pumpe_hysterese_cm": 0.2,
     "pumpe_leistung_prozent": 25,
     "temperatur_ziel_c": 22,

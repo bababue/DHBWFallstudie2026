@@ -131,6 +131,7 @@ class DashboardTests(unittest.TestCase):
 
     def test_ultrasonic_debug_uses_fresh_filtered_readings_and_mounting_heights(self):
         config = main.load()
+        config['demo']['aktiv'] = False
         now = 100
         def reading(side, field, value, sampled=now):
             return dict(side=side, sensor='ultrasonic', field=field, value=value, sampled=sampled)
@@ -274,11 +275,15 @@ class DashboardTests(unittest.TestCase):
         client.__enter__.return_value = client
         client.query_api.return_value.query.return_value = [table]
         config = main.load()
+        config['demo']['aktiv'] = False
         config['moos']['montagehoehe_cm'] = 10
         with patch.object(main, 'InfluxDBClient', return_value=client), \
                 patch.object(main, 'load', return_value=config):
             result = main.ultrasonic_history('1h')
             short = main.ultrasonic_history('10m')
+            config['demo']['aktiv'] = True
+            demo = main.ultrasonic_history('1h')
+            config['demo']['aktiv'] = False
             config['moos']['montagehoehe_cm'] = None
             without_mount = main.ultrasonic_history('1h')
         self.assertEqual(list(result['series']), ['tank', 'moss_median'])
@@ -293,6 +298,9 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(short['window_seconds'], 4)
         self.assertEqual(without_mount['series']['moss_median'], [])
         self.assertEqual(without_mount['series']['tank'], result['series']['tank'])
+        self.assertEqual(demo['series']['moss_median'], [
+            {'time': point['time'], 'value': point['value'] + config['demo']['moos_ueber_wasser_cm']}
+            for point in result['series']['tank']])
         self.assertEqual(main.ultrasonic_history('invalid').status_code, 400)
 
 

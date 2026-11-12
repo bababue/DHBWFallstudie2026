@@ -588,9 +588,9 @@ async function updateDebug() {
       ? value.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " cm"
       : "–";
     document.getElementById("moss-height").textContent = height(data.moss_median_cm);
+    document.getElementById("moss-height-label").textContent = data.demo
+      ? "Mooshöhe · Demo" : "Mooshöhe · Median";
     document.getElementById("water-height").textContent = height(data.ultrasonic.tank.calculated_cm);
-    document.getElementById("moss-height-source").textContent = [1, 2, 3, 4]
-      .map((index) => `${index}: ${height(data.ultrasonic[`moss${index}`].calculated_cm)}`).join("\n");
     if (!debugToggle.checked) return;
     debugPanel.querySelectorAll("tbody [id]").forEach((cell) =>
       cell.textContent = "–"
@@ -634,6 +634,8 @@ async function updateDebug() {
       }
     }
     document.getElementById("ultrasonic-moss-median").textContent = fmt(data.moss_median_cm);
+    document.getElementById("ultrasonic-moss-label").textContent = data.demo
+      ? "Mooshöhe · Demo" : "Median Mooshöhe";
     const filter = data.filter;
     document.getElementById("ultrasonic-filter-note").textContent =
       `${filter.samples} Messungen; nur Werte innerhalb ±${
@@ -651,7 +653,6 @@ async function updateDebug() {
   } catch (e) {
     document.getElementById("moss-height").textContent = "–";
     document.getElementById("water-height").textContent = "–";
-    document.getElementById("moss-height-source").textContent = "Messwerte nicht erreichbar";
     if (debugToggle.checked) {
       debugPanel.querySelectorAll("tbody [id]").forEach((cell) =>
         cell.textContent = "–"

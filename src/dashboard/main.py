@@ -232,8 +232,12 @@ def debug_sensors():
                     for side in ('moss1', 'moss2', 'moss3', 'moss4')
                     if valid_number(ultrasonic[side]['calculated_cm'])]
     settings = config['ultraschall_glaettung']
+    moss_median = statistics.median(moss_heights) if moss_heights else None
+    if config['demo']['aktiv']:
+        water = ultrasonic['tank']['calculated_cm']
+        moss_median = water + config['demo']['moos_ueber_wasser_cm'] if valid_number(water) else None
     return {'readings': readings, 'ultrasonic': ultrasonic, 'ultrasonic_status': ultrasonic_status,
-            'moss_median_cm': statistics.median(moss_heights) if moss_heights else None,
+            'moss_median_cm': moss_median, 'demo': config['demo']['aktiv'],
             'filter': {'samples': settings['messungen'], 'max_gap_seconds': settings['max_messpause_s'],
                        'water_spread_cm': settings['wasser_streuung_cm'], 'moss_spread_cm': settings['moos_streuung_cm']},
             'moss_mounting_height_cm': config['moos']['montagehoehe_cm'],
@@ -333,7 +337,8 @@ def ultrasonic_history(period: str = '1h'):
              f'  |> aggregateWindow(every: {window}, fn: last, createEmpty: false, timeSrc: "_start")')
     series = {'tank': [], 'moss_median': []}
     try:
-        moss_mount = load()['moos']['montagehoehe_cm']
+        config = load()
+        moss_mount = config['moos']['montagehoehe_cm']
         windows = {}
         with InfluxDBClient(url=setting('INFLUXDB_URL', 'http://influxdb:8086'),
                             token=setting('INFLUXDB_TOKEN', ''), org=org, timeout=5000) as client:
@@ -352,6 +357,11 @@ def ultrasonic_history(period: str = '1h'):
             {'time': timestamp, 'value': statistics.median(heights.values())}
             for timestamp, heights in sorted(windows.items())
         ]
+        if config['demo']['aktiv']:
+            series['moss_median'] = [
+                {'time': point['time'], 'value': point['value'] + config['demo']['moos_ueber_wasser_cm']}
+                for point in series['tank']
+            ]
         return {'series': series, 'window_seconds': int(window[:-1]) * (60 if window.endswith('m') else 1)}
     except Exception:
         LOG.exception('Ultraschallverlauf nicht verfügbar')

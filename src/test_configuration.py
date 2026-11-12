@@ -89,7 +89,7 @@ class ConfigurationTests(unittest.TestCase):
         del data['automatik']
         with self.assertRaises(ValueError): validate(data)
         for key, value in [('licht_start_stunde', 24), ('lichtdauer_stunden', 0),
-                           ('lichtstaerke_prozent', 101), ('lichtstaerke_prozent', 1)]:
+                           ('lichtstaerke_prozent', 101), ('lichtstaerke_prozent', -1)]:
             data = copy.deepcopy(load())
             data['automatik'][key] = value
             with self.assertRaises(ValueError): validate(data)

@@ -80,6 +80,6 @@ class AutomaticControlTests(unittest.TestCase):
         def value(hour):
             now = datetime(2026, 5, 3, hour, tzinfo=ZoneInfo('Europe/Berlin'))
             return auto_setpoints(light_schedule(options, now))['led']
-        self.assertEqual([value(h) for h in (5, 6, 21, 22)], [0, 80, 80, 0])
+        self.assertEqual([value(h) for h in (5, 6, 21, 22)], [0, 0, 80, 0])
         options['licht_start_stunde'] = 18
-        self.assertEqual([value(h) for h in (17, 18, 9, 10)], [0, 80, 80, 0])
+        self.assertEqual([value(h) for h in (17, 18, 9, 10)], [0, 0, 80, 0])
