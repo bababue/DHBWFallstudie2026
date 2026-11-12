@@ -467,6 +467,7 @@ function initUltrasonicChart() {
   const chart = document.getElementById("ultrasonic-chart");
   const status = document.getElementById("ultrasonic-status");
   const period = document.getElementById("global-period");
+  const colors = { tank: "#2563eb", moss_median: "#15803d" };
   const spans = {
     "10m": 600,
     "1h": 3600,
@@ -489,12 +490,15 @@ function initUltrasonicChart() {
       const end = Date.now() / 1000,
         span = spans[period.value],
         start = end - span;
-      const points = (data.series.moss_median || []).filter((point) =>
-        Number.isFinite(point.time) && Number.isFinite(point.value) &&
-        point.time >= start && point.time <= end
+      const series = Object.fromEntries(
+        Object.keys(colors).map((key) => [key, (data.series[key] || []).filter((point) =>
+          Number.isFinite(point.time) && Number.isFinite(point.value) &&
+          point.time >= start && point.time <= end
+        )]),
       );
+      const points = Object.values(series).flat();
       if (!points.length) {
-        status.textContent = "Keine Mooshöhen im gewählten Zeitraum";
+        status.textContent = "Keine Höhen im gewählten Zeitraum";
         return;
       }
       status.textContent = "";
@@ -523,24 +527,26 @@ function initUltrasonicChart() {
         label.textContent =
           value.toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " cm";
       }
-      let path = "", previous = null;
-      for (const point of points) {
-        const gap = previous === null ||
-          point.time - previous > Math.max(12, data.window_seconds * 1.5);
-        path += (gap ? "M" : "L") + x(point.time) + " " + y(point.value) +
-          " ";
-        previous = point.time;
-      }
-      if (path) {
-        add("path", {
-          d: path,
-          fill: "none",
-          stroke: "#15803d",
-          "stroke-width": 2,
-          "stroke-linejoin": "round",
-          "stroke-linecap": "round",
-          "vector-effect": "non-scaling-stroke",
-        });
+      for (const [key, values] of Object.entries(series)) {
+        let path = "", previous = null;
+        for (const point of values) {
+          const gap = previous === null ||
+            point.time - previous > Math.max(12, data.window_seconds * 1.5);
+          path += (gap ? "M" : "L") + x(point.time) + " " + y(point.value) +
+            " ";
+          previous = point.time;
+        }
+        if (path) {
+          add("path", {
+            d: path,
+            fill: "none",
+            stroke: colors[key],
+            "stroke-width": 2,
+            "stroke-linejoin": "round",
+            "stroke-linecap": "round",
+            "vector-effect": "non-scaling-stroke",
+          });
+        }
       }
       for (const [time, anchor] of [[start, "start"], [end, "end"]]) {
         const label = add("text", {

@@ -34,7 +34,7 @@ Die bisherigen Papier-Bezugsabstände und Mooshöhenfelder werden nicht mehr erz
 Historische Daten bleiben erhalten. `moos_sensor_health.healthy` dokumentiert
 Sensorantworten; die Verwendbarkeit gefilterter Abstände bestimmt `measurement_stable`.
 
-Das Dashboard zeigt eine Linie: den Median der berechneten Mooshöhen. Pro
+Das Dashboard zeigt die berechnete Wasserhöhe und den Median der Mooshöhen. Pro
 Zeitfenster wird der letzte geglättete Abstand je verfügbarem Moossensor
 verwendet; fehlende Messungen werden nicht als Werte erfunden. Die Debug-Tabelle
 zeigt zusätzlich Rohabstände, geglättete Abstände, ihren Inlier-Anteil, die

@@ -224,10 +224,14 @@
           </section>
         </div>
         <section class="card ultrasonic-panel">
-          <p class="label">Median der Mooshöhe</p>
+          <p class="label">Wasserhöhe und Mooshöhe</p>
+          <div class="ultrasonic-legend" aria-label="Kurven">
+            <span style="color:#2563eb">Wasserhöhe</span>
+            <span style="color:#15803d">Median der Mooshöhe</span>
+          </div>
           <div class="chart-container">
             <svg class="chart" id="ultrasonic-chart" viewBox="0 0 800 230"
-              role="img" aria-label="Verlauf der medianen Mooshöhe"></svg>
+              role="img" aria-label="Verlauf der Wasserhöhe und der medianen Mooshöhe"></svg>
           </div>
           <p class="status chart-status"
             id="ultrasonic-status">Lade Verlauf …</p>

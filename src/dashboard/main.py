@@ -320,10 +320,11 @@ def ultrasonic_history(period: str = '1h'):
     query = (f'from(bucket: {json.dumps(bucket)})\n'
              f'  |> range(start: -{duration})\n'
              '  |> filter(fn: (r) => r._measurement == "moos_sensor" '
-             'and r.sensor == "ultrasonic" and r._field == "distance_filtered_cm" '
-             f'and ({moss_filter}))\n'
+             'and r.sensor == "ultrasonic" '
+             'and ((r.side == "tank" and r._field == "water_level_cm") '
+             f'or (({moss_filter}) and r._field == "distance_filtered_cm")))\n'
              f'  |> aggregateWindow(every: {window}, fn: last, createEmpty: false, timeSrc: "_start")')
-    series = {'moss_median': []}
+    series = {'tank': [], 'moss_median': []}
     try:
         moss_mount = load()['moos']['montagehoehe_cm']
         windows = {}
@@ -332,10 +333,14 @@ def ultrasonic_history(period: str = '1h'):
             for table in client.query_api().query(query, org=org):
                 for record in table.records:
                     side, value = record.values.get('side'), record.get_value()
-                    if side not in sides or not valid_number(value) or moss_mount is None:
+                    if not valid_number(value):
                         continue
                     timestamp = int(record.get_time().timestamp())
-                    windows.setdefault(timestamp, {})[side] = moss_mount - value
+                    if side == 'tank':
+                        series['tank'].append({'time': timestamp, 'value': value})
+                    elif side in sides and moss_mount is not None:
+                        windows.setdefault(timestamp, {})[side] = moss_mount - value
+        series['tank'].sort(key=lambda point: point['time'])
         series['moss_median'] = [
             {'time': timestamp, 'value': statistics.median(heights.values())}
             for timestamp, heights in sorted(windows.items())

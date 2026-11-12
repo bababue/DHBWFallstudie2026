@@ -261,7 +261,7 @@ class DashboardTests(unittest.TestCase):
         calls = client.query_api.return_value.query.call_args_list
         self.assertIn('aggregateWindow(every: 1m, fn: mean', calls[0].args[0])
 
-    def test_ultrasonic_history_returns_one_median_height_series(self):
+    def test_ultrasonic_history_returns_water_and_median_moss_heights(self):
         def record(side, value, hour):
             return SimpleNamespace(values={'side': side}, get_value=lambda: value,
                                    get_time=lambda: datetime(2026, 1, 1, hour, tzinfo=timezone.utc))
@@ -281,16 +281,18 @@ class DashboardTests(unittest.TestCase):
             short = main.ultrasonic_history('10m')
             config['moos']['montagehoehe_cm'] = None
             without_mount = main.ultrasonic_history('1h')
-        self.assertEqual(list(result['series']), ['moss_median'])
+        self.assertEqual(list(result['series']), ['tank', 'moss_median'])
+        self.assertEqual(result['series']['tank'], [{'time': int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp()), 'value': 4.2}])
         self.assertEqual([point['value'] for point in result['series']['moss_median']], [4.25, 4.5, 4.4])
         self.assertEqual(result['window_seconds'], 10)
         query = client.query_api.return_value.query.call_args.args[0]
         self.assertIn('r._field == "distance_filtered_cm"', query)
         self.assertIn('fn: last', query)
-        self.assertNotIn('water_level_cm', query)
+        self.assertIn('r.side == "tank" and r._field == "water_level_cm"', query)
         self.assertNotIn('r._field == "distance_cm"', query)
         self.assertEqual(short['window_seconds'], 4)
         self.assertEqual(without_mount['series']['moss_median'], [])
+        self.assertEqual(without_mount['series']['tank'], result['series']['tank'])
         self.assertEqual(main.ultrasonic_history('invalid').status_code, 400)
 
 

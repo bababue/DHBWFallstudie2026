@@ -64,7 +64,8 @@ Die Moossensoren messen direkt den Abstand ab Decke. Unter `moos` stehen eine
 gemeinsame `montagehoehe_cm` (Abstand Sensorfläche–Tankboden) und die Pins der
 vier Sensoren unter `sensoren`.
 Die Debug-Tabelle zeigt die berechnete Wassertiefe, die vier Mooshöhen und den
-Median der verfügbaren Mooshöhen. Der Höhenverlauf zeigt nur diesen Median.
+Median der verfügbaren Mooshöhen. Der Höhenverlauf zeigt diesen Median und die
+berechnete Wasserhöhe.
 Die Werte beruhen auf geglätteten Abständen; je Zeitfenster wird der letzte
 geglättete Abstand pro Moossensor verwendet.
 Die Ultraschallglättung steht in `config/config.json` unter `ultraschall_glaettung`:
